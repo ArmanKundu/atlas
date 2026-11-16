@@ -21,9 +21,23 @@ jobs:
       - run: npm ci
       - run: npm run check
 
+  draft:
+    name: Create the draft release
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      # One draft is created up front, so the Mac and Windows jobs both upload to the same
+      # release instead of racing to create their own.
+      - name: Create the draft with generated notes
+        run: gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1 || gh release create "$TAG" --repo "$REPO" --draft --title "Atlas ${TAG#v}" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+
   build:
     name: Build (${{ matrix.name }})
-    needs: check
+    needs: draft
     strategy:
       fail-fast: false
       matrix:
@@ -47,17 +61,3 @@ jobs:
         run: npx electron-builder ${{ matrix.args }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  notes:
-    name: Release notes
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Add generated notes to the draft release
-        run: |
-          BODY=$(gh api "repos/$REPO/releases/generate-notes" -f tag_name="$TAG" --jq .body || true)
-          if [ -n "$BODY" ]; then gh release edit "$TAG" --repo "$REPO" --notes "$BODY" || true; fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
-          REPO: ${{ github.repository }}
