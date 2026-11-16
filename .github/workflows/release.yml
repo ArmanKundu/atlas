@@ -42,21 +42,21 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run e2e
+      - run: npm run build
       - name: Build and upload installers
         run: npx electron-builder ${{ matrix.args }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Unsigned for now. See README "Code signing" for the secrets to add later.
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
   notes:
     name: Release notes
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Generate notes on the draft release
-        run: gh release edit "$TAG" --repo "$REPO" --draft --generate-notes || gh release create "$TAG" --repo "$REPO" --draft --generate-notes
+      - name: Add generated notes to the draft release
+        run: |
+          BODY=$(gh api "repos/$REPO/releases/generate-notes" -f tag_name="$TAG" --jq .body || true)
+          if [ -n "$BODY" ]; then gh release edit "$TAG" --repo "$REPO" --notes "$BODY" || true; fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}

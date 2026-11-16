@@ -17,6 +17,11 @@ asar: true
 
 mac:
   category: public.app-category.education
+  # Ad-hoc signature: no certificate needed, and Apple silicon requires at least this to run.
+  # Replace with a Developer ID (see README "Code signing") to remove the first-open warning.
+  identity: '-'
+  # The hardened runtime needs a real certificate; with an ad-hoc signature it can stop the app launching.
+  hardenedRuntime: false
   icon: build/icon.icns
   target:
     - target: dmg

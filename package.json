@@ -22,7 +22,8 @@
     "e2e": "electron-vite build && playwright test",
     "check": "npm run lint && npm run typecheck && npm run test",
     "dist:mac": "electron-vite build && electron-builder --mac --publish never",
-    "dist:win": "electron-vite build && electron-builder --win --publish never"
+    "dist:win": "electron-vite build && electron-builder --win --publish never",
+    "release": "npm run check && npm version patch -m \"Release v%s\" && git push --follow-tags"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
@@ -68,5 +69,11 @@
     "typescript-eslint": "^8.72.2",
     "vite": "^8.3.8",
     "vitest": "^5.1.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ArmanKundu/atlas.git"
+  },
+  "homepage": "https://github.com/ArmanKundu/atlas",
+  "author": "Atlas contributors"
 }
