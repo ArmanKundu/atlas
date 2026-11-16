@@ -1,0 +1,52 @@
+appId: app.atlas.study
+productName: Atlas
+copyright: Copyright © Atlas contributors. MIT licence.
+
+directories:
+  output: release
+  buildResources: build
+
+# Only the built app ships. Source, tests, docs and design references stay out of the installer.
+files:
+  - out/**
+  - package.json
+  - LICENSE
+  - '!**/*.map'
+
+asar: true
+
+mac:
+  category: public.app-category.education
+  icon: build/icon.icns
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+  darkModeSupport: true
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  # User data lives in userData, never in the install folder, so updates and reinstalls keep it.
+  deleteAppDataOnUninstall: false
+
+linux:
+  icon: build/icon.png
+  category: Education
+  target: [AppImage]
+
+# Releases are published to GitHub. The owner and repo are read from package.json "repository"
+# (or the git remote) once the public repository exists.
+publish:
+  provider: github
+  releaseType: draft

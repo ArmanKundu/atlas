@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest something Atlas should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The study task or annoyance behind the request.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+    validations:
+      required: true
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Fits the hard rules
+      options:
+        - label: It works without a server, an account or telemetry
+          required: true

@@ -1,0 +1,20 @@
+node_modules/
+dist/
+out/
+release/
+.DS_Store
+*.log
+.env*
+*.tsbuildinfo
+coverage/
+test-results/
+playwright-report/
+
+# Third-party reference media stays local (see DECISIONS.md D-010)
+random-inspo/**/*.mp4
+random-inspo/**/*.mov
+random-inspo/**/*.webm
+random-inspo/**/*.jpg
+random-inspo/**/*.jpeg
+random-inspo/**/*.png
+random-inspo/**/*.gif

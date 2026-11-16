@@ -1,0 +1,63 @@
+name: Release
+
+# Builds installers for every version tag and attaches them to a draft GitHub Release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    name: Lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64 + x64
+            os: macos-latest
+            args: --mac --arm64 --x64
+          - name: Windows x64
+            os: windows-latest
+            args: --win --x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run e2e
+      - name: Build and upload installers
+        run: npx electron-builder ${{ matrix.args }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Unsigned for now. See README "Code signing" for the secrets to add later.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+  notes:
+    name: Release notes
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate notes on the draft release
+        run: gh release edit "$TAG" --repo "$REPO" --draft --generate-notes || gh release create "$TAG" --repo "$REPO" --draft --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}

@@ -1,0 +1,11 @@
+node_modules
+out
+release
+dist
+coverage
+test-results
+playwright-report
+package-lock.json
+BUILD_PROMPT.md
+random-inspo
+build
