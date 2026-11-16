@@ -1,59 +1,62 @@
 /*
- * Atlas design tokens: clean neutral greys, ink as the accent, one blue for focus
- * (DECISIONS.md D-001, revised in D-017).
+ * Atlas design tokens: clean white, a light grey sidebar, black buttons, blue for selection
+ * (DECISIONS.md D-019; notes in random-inspo/NOTES.md).
  *
  * Every colour is declared once with light-dark(); the active side follows `color-scheme`.
  * The main process sets Electron's theme source from the saved preference, so
  * `color-scheme: light dark` already resolves to the user's choice before first paint.
- * `data-theme` only forces a side (used by Settings, and when the UI runs in a plain browser).
+ * `data-theme` only forces a side (used by Settings).
  */
 :root {
   color-scheme: light dark;
 
-  /* Surfaces */
-  --atlas-canvas: light-dark(#f5f5f7, #1c1c1e);
-  --atlas-surface: light-dark(#ffffff, #232325);
-  --atlas-sunken: light-dark(#f5f5f7, #2c2c2e);
-  --atlas-hover: light-dark(rgb(20 20 18 / 0.05), rgb(255 255 255 / 0.06));
-  --atlas-active: light-dark(rgb(20 20 18 / 0.09), rgb(255 255 255 / 0.11));
-  --atlas-scrim: light-dark(rgb(20 20 18 / 0.28), rgb(0 0 0 / 0.55));
+  /* Surfaces. `canvas` is the sidebar and window chrome; `surface` is where content sits. */
+  --atlas-canvas: light-dark(#f7f7f8, #171717);
+  --atlas-surface: light-dark(#ffffff, #212121);
+  --atlas-sunken: light-dark(#f4f4f5, #2a2a2a);
+  --atlas-hover: light-dark(rgb(24 24 27 / 0.045), rgb(255 255 255 / 0.06));
+  --atlas-active: light-dark(rgb(24 24 27 / 0.08), rgb(255 255 255 / 0.1));
+  --atlas-scrim: light-dark(rgb(24 24 27 / 0.3), rgb(0 0 0 / 0.6));
 
   /* Lines */
-  --atlas-line: light-dark(#e8e8ed, #343437);
-  --atlas-line-strong: light-dark(#d2d2d7, #48484a);
+  --atlas-line: light-dark(#e9e9ec, #303030);
+  --atlas-line-strong: light-dark(#d4d4d8, #454545);
 
   /* Text. ink-3 is the lightest text allowed; it keeps 4.5:1 on canvas and surface. */
-  --atlas-ink: light-dark(#1d1d1f, #f5f5f7);
-  --atlas-ink-2: light-dark(#515154, #b7b7bc);
-  --atlas-ink-3: light-dark(#6e6e73, #98989d);
+  --atlas-ink: light-dark(#18181b, #ececec);
+  --atlas-ink-2: light-dark(#52525b, #b4b4b4);
+  --atlas-ink-3: light-dark(#6b6b74, #949494);
 
-  /* The one accent: ink. It inverts in the dark theme. */
-  --atlas-accent: light-dark(#1d1d1f, #f5f5f7);
-  --atlas-accent-hover: light-dark(#3a3a3c, #ffffff);
-  --atlas-accent-fg: light-dark(#ffffff, #1c1c1e);
+  /* Primary buttons are solid ink. It inverts in the dark theme. */
+  --atlas-accent: light-dark(#18181b, #ececec);
+  --atlas-accent-hover: light-dark(#3f3f46, #ffffff);
+  --atlas-accent-fg: light-dark(#ffffff, #171717);
 
-  /* Focus ring: the only hue in the chrome. */
-  --atlas-focus: light-dark(#0071e3, #4da3ff);
+  /* Blue: selection, links, focus, the active tool, topic tags. */
+  --atlas-blue: light-dark(#1d6fe0, #78aefa);
+  --atlas-blue-soft: light-dark(#eaf2fd, #1d2e47);
+  --atlas-blue-line: light-dark(#a9cbf7, #35527e);
+  --atlas-focus: light-dark(#1d6fe0, #78aefa);
 
-  /* Status, used for text and thin marks only. */
-  --atlas-danger: light-dark(#b3372a, #f08377);
-  --atlas-danger-soft: light-dark(#fbeeec, #3a201d);
-  --atlas-success: light-dark(#2a7449, #6cc08b);
-  --atlas-success-soft: light-dark(#e9f4ed, #1b3125);
+  /* Status, used for text, dots and thin marks. */
+  --atlas-danger: light-dark(#c0362c, #f08377);
+  --atlas-danger-soft: light-dark(#fdf0ee, #3a201d);
+  --atlas-success: light-dark(#1f7a45, #6cc08b);
+  --atlas-success-soft: light-dark(#eaf6ee, #1b3125);
   --atlas-warn: light-dark(#8f5200, #e0a458);
-  --atlas-warn-soft: light-dark(#fbf1df, #36290f);
+  --atlas-warn-soft: light-dark(#fdf4e3, #36290f);
 
-  /* Editorial register: warm paper for onboarding, welcome states and the weekly review. */
-  --atlas-paper: light-dark(#f5f5f7, #232325);
-  --atlas-paper-ink: light-dark(#1d1d1f, #f5f5f7);
-  --atlas-paper-ink-2: light-dark(#515154, #b7b7bc);
-  --atlas-paper-rule: light-dark(#e0e0e5, #3a3a3c);
+  /* Quiet panels: onboarding, welcome and empty states. */
+  --atlas-paper: light-dark(#fafafa, #1b1b1b);
+  --atlas-paper-ink: light-dark(#18181b, #ececec);
+  --atlas-paper-ink-2: light-dark(#52525b, #b4b4b4);
+  --atlas-paper-rule: light-dark(#e9e9ec, #303030);
 
   /* Mascot: black on light grey like the icon; the negative in the dark theme. */
   --atlas-mascot-body: light-dark(#1c1c1c, #e9e9e6);
   --atlas-mascot-eye: light-dark(#ffffff, #1c1c1c);
   --atlas-mascot-pupil: light-dark(#1c1c1c, #e9e9e6);
-  --atlas-mascot-tile: light-dark(#e8e8ed, #3a3a3c);
+  --atlas-mascot-tile: light-dark(#ececef, #333333);
 
   /* Subject colours: dots and thin strips only. */
   --atlas-subject-red: light-dark(#d2584b, #e8796d);
@@ -65,21 +68,20 @@
   --atlas-subject-purple: light-dark(#8763cf, #a98ae6);
   --atlas-subject-pink: light-dark(#cf5d97, #e686b6);
 
-  /* Shadows: soft, and only on things that float. */
+  /* Shadows: only on things that float. */
   --atlas-shadow-pill:
-    0 0 0 1px light-dark(rgb(20 20 18 / 0.05), rgb(255 255 255 / 0.07)),
-    0 1px 2px light-dark(rgb(20 20 18 / 0.05), rgb(0 0 0 / 0.4)),
-    0 4px 14px light-dark(rgb(20 20 18 / 0.07), rgb(0 0 0 / 0.35));
+    0 0 0 1px light-dark(rgb(24 24 27 / 0.08), rgb(255 255 255 / 0.09)),
+    0 1px 2px light-dark(rgb(24 24 27 / 0.05), rgb(0 0 0 / 0.4));
   --atlas-shadow-pop:
-    0 0 0 1px light-dark(rgb(20 20 18 / 0.06), rgb(255 255 255 / 0.08)),
-    0 8px 28px light-dark(rgb(20 20 18 / 0.12), rgb(0 0 0 / 0.5));
+    0 0 0 1px light-dark(rgb(24 24 27 / 0.07), rgb(255 255 255 / 0.09)),
+    0 6px 20px light-dark(rgb(24 24 27 / 0.1), rgb(0 0 0 / 0.5));
   --atlas-shadow-dialog:
-    0 0 0 1px light-dark(rgb(20 20 18 / 0.06), rgb(255 255 255 / 0.08)),
-    0 24px 64px light-dark(rgb(20 20 18 / 0.2), rgb(0 0 0 / 0.6));
+    0 0 0 1px light-dark(rgb(24 24 27 / 0.07), rgb(255 255 255 / 0.09)),
+    0 20px 56px light-dark(rgb(24 24 27 / 0.18), rgb(0 0 0 / 0.6));
 
   /* Layout */
   --atlas-topbar-h: 48px;
-  --atlas-sidebar-w: 244px;
+  --atlas-sidebar-w: 248px;
   --atlas-sidebar-rail-w: 56px;
   --atlas-reading-w: 1100px;
 }

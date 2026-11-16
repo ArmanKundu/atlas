@@ -19,7 +19,7 @@ export const PillBar = forwardRef<
       aria-orientation={orientation}
       className={cn(
         'inline-flex items-center gap-0.5 bg-surface p-1 shadow-pill select-none',
-        orientation === 'horizontal' ? 'h-10 rounded-full' : 'w-10 flex-col rounded-lg',
+        orientation === 'horizontal' ? 'h-10 rounded-lg' : 'w-10 flex-col rounded-lg',
         className,
       )}
       {...rest}
@@ -64,11 +64,12 @@ export const PillButton = forwardRef<HTMLButtonElement, PillButtonProps>(functio
       aria-label={children ? undefined : label}
       aria-pressed={active}
       className={cn(
-        'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-full text-ui font-medium text-ink-2',
+        'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md text-ui font-medium text-ink-2',
         'transition-colors duration-150 ease-out hover:bg-hover hover:text-ink active:bg-active',
         'disabled:pointer-events-none disabled:opacity-45',
         children ? 'px-2.5' : 'w-8',
-        active && 'bg-active text-ink',
+        active &&
+          'bg-blue-soft text-blue ring-1 ring-blue-line ring-inset hover:bg-blue-soft hover:text-blue',
         className,
       )}
       {...rest}

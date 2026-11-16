@@ -10,17 +10,17 @@
   --color-white: #ffffff;
   --color-black: #000000;
 
-  /* Radius scale from the brief: 10 / 14 / 20, plus a small one for inner controls. */
+  /* Radius scale: 8 px controls, 12 px cards, 16 px dialogs, 6 px for inner parts. */
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 
-  /* UI type is small and calm; 13 px is the base size. */
-  --text-2xs: 0.6875rem;
+  /* 14 px is the base size; 12 px for secondary detail. */
+  --text-2xs: 0.75rem;
   --text-2xs--line-height: 1rem;
-  --text-ui: 0.8125rem;
-  --text-ui--line-height: 1.25rem;
+  --text-ui: 0.875rem;
+  --text-ui--line-height: 1.3125rem;
 
   --ease-quiet: cubic-bezier(0.2, 0.8, 0.2, 1);
 
@@ -81,6 +81,9 @@
   --color-accent-hover: var(--atlas-accent-hover);
   --color-accent-fg: var(--atlas-accent-fg);
   --color-focus: var(--atlas-focus);
+  --color-blue: var(--atlas-blue);
+  --color-blue-soft: var(--atlas-blue-soft);
+  --color-blue-line: var(--atlas-blue-line);
   --color-danger: var(--atlas-danger);
   --color-danger-soft: var(--atlas-danger-soft);
   --color-success: var(--atlas-success);
@@ -167,12 +170,11 @@
 }
 
 /* Editorial register helpers. */
+/* A small label above a heading. */
 @utility eyebrow {
-  font-family: var(--font-mono);
   font-size: var(--text-2xs);
+  font-weight: 500;
   line-height: 1rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -95,3 +95,13 @@ At the owner's request the look moved away from the warm editorial paper: cool n
 - **Helpers:** 26 assistants grouped by purpose, with subject-specific ones (English, Maths, Science, Accounting, Languages) shown first inside a matching subject.
 - **School calendar:** read-only sync from an iCal subscription link (Compass and other portals), hourly, with events matched to subjects by name or code. The link is kept in the keychain. Times with a named time zone are read as this computer's local time.
 - **Exam layout:** practice papers follow the layout of a current written examination, measured from a 2025 paper the owner supplied: the cover (label box, grouped student-number boxes, a colour band in the subject's colour, contents lines), a running header with page numbers, left-aligned section headings with instructions and a rule, parts with marks in a right-hand column, 8.5 mm answer lines, and a "Do not write in this area" strip that swaps sides on left and right pages (drawn with CSS page-margin boxes). Only the layout is copied: no examining body's name, logo or official wording appears, and the cover says it is an AI-written practice paper. Maths subjects get blank working space instead of lines; essay subjects get more lines.
+
+### D-019 Redesign: white, grey sidebar, black buttons, blue for selection
+
+The owner asked for a look closer to their earlier app (the Operon screenshot kept locally as `random-inspo/references/06-operon-exam-viewer.webp`) and to Apple, ChatGPT, Codex and Claude. This replaces the warm editorial register and the all-pill controls (D-001, D-017):
+
+- **Colour:** white content, a `#f7f7f8` sidebar with a hairline edge, zinc greys, solid black primary buttons, and one blue for selection, links, focus, the active tool and tags.
+- **Type and shape:** system font at 14 px, semibold headings; 8 px controls, 12 px cards, 16 px dialogs. The brief's 10/14/20 radii and pill buttons are retired; pills remain only for count badges.
+- **Shell:** the sidebar has the app and study system at the top, search, the main places, subjects, a quieter group of study tools, and the study buddy with the next-exam countdown at the bottom. The top bar shows the page name, AI status with a dot, search, the timer, an Ask button and the profile.
+- **Today:** opens with an ask box and one-tap helpers (ChatGPT-style), then today's progress, the next exam and shortcuts.
+- A reply in progress now keeps its text in the main process, so a chat opened from another screen mid-reply shows what has streamed so far.

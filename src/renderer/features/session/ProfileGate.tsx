@@ -38,7 +38,7 @@ export function ProfileGate() {
           label="The Atlas mascot"
         />
         <p className="eyebrow mt-6 text-paper-ink-2">Atlas</p>
-        <h1 className="mt-2 font-serif text-[2rem] leading-[1.12] font-medium tracking-[-0.01em] text-balance">
+        <h1 className="mt-2 text-[1.75rem] leading-9 font-semibold tracking-[-0.025em] text-balance">
           {creating
             ? profiles.length === 0
               ? APP_TAGLINE

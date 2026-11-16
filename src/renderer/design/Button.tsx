@@ -6,7 +6,7 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 type Size = 'sm' | 'md'
 
 const base =
-  'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full font-medium whitespace-nowrap ' +
+  'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md font-medium whitespace-nowrap ' +
   'transition-colors duration-150 ease-out select-none ' +
   'disabled:pointer-events-none disabled:opacity-45'
 
@@ -19,8 +19,8 @@ const variants: Record<Variant, string> = {
 }
 
 const sizes: Record<Size, string> = {
-  sm: 'h-7 px-3 text-ui',
-  md: 'h-8 px-3.5 text-ui',
+  sm: 'h-7 px-2.5 text-2xs',
+  md: 'h-8 px-3 text-ui',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -32,7 +32,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   trailingIcon?: ReactNode
 }
 
-/** A pill button. `primary` is the dark ink pill; use one per cluster. */
+/** A button. `primary` is solid ink; use one per cluster. */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { variant = 'secondary', size = 'md', icon, trailingIcon, className, children, type, ...rest },
   ref,

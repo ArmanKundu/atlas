@@ -4,7 +4,7 @@ import { cn } from '@/lib/cn'
 import { Button } from './Button'
 
 /**
- * Designed empty state in the editorial register: mono eyebrow, serif heading, one clear action.
+ * Designed empty state: a quiet panel with a small label, a heading and one clear action.
  * `art` is usually the mascot.
  */
 export function EmptyState({
@@ -25,19 +25,17 @@ export function EmptyState({
   return (
     <section
       className={cn(
-        'flex flex-col items-center rounded-xl bg-paper px-8 py-14 text-center text-paper-ink',
+        'flex flex-col items-center rounded-lg border border-line bg-paper px-8 py-12 text-center text-paper-ink',
         className,
       )}
     >
       {art ? <div className="mb-6">{art}</div> : null}
       {eyebrow ? <p className="eyebrow mb-3 text-paper-ink-2">{eyebrow}</p> : null}
-      <h2 className="max-w-[22ch] font-serif text-[1.75rem] leading-[1.15] font-medium tracking-[-0.01em] text-balance">
+      <h2 className="max-w-[26ch] text-[1.25rem] leading-7 font-semibold tracking-[-0.015em] text-balance">
         {title}
       </h2>
       {children ? (
-        <p className="mt-3 max-w-[46ch] text-[0.9375rem] leading-6 text-pretty text-paper-ink-2">
-          {children}
-        </p>
+        <p className="mt-2 max-w-[52ch] text-pretty text-paper-ink-2">{children}</p>
       ) : null}
       {action ? <div className="mt-6">{action}</div> : null}
     </section>

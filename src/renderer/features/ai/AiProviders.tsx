@@ -75,7 +75,7 @@ function ProviderCard({
     <div
       className={cn(
         'rounded-lg bg-surface p-4 ring-1 ring-inset',
-        isDefault ? 'ring-2 ring-accent' : 'ring-line',
+        isDefault ? 'ring-2 ring-blue' : 'ring-line',
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -93,7 +93,7 @@ function ProviderCard({
                     : 'Not installed'}
               </Badge>
             )}
-            {isDefault ? <Badge tone="neutral">In use</Badge> : null}
+            {isDefault ? <Badge tone="blue">In use</Badge> : null}
           </div>
           <p className="mt-0.5 text-ink-2">{status.description}.</p>
           <p className="mt-1 text-ink-3">{status.detail}.</p>

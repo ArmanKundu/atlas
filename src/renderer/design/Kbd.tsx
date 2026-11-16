@@ -14,7 +14,9 @@ export function Kbd({
     <kbd
       className={cn(
         'inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-sm px-1 font-sans text-2xs font-medium',
-        tone === 'default' ? 'bg-hover text-ink-3' : 'bg-white/15 text-accent-fg',
+        tone === 'default'
+          ? 'bg-surface text-ink-3 ring-1 ring-line ring-inset'
+          : 'bg-white/15 text-accent-fg',
         className,
       )}
     >

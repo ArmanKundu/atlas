@@ -31,14 +31,14 @@ export function Segmented<T extends string>({
         // Radix sends '' when the active item is pressed again; a choice is always required here.
         if (next) onChange(next as T)
       }}
-      className={cn('inline-flex h-8 items-center gap-0.5 rounded-full bg-hover p-0.5', className)}
+      className={cn('inline-flex h-8 items-center gap-0.5 rounded-md bg-active p-0.5', className)}
     >
       {options.map((option) => (
         <ToggleGroup.Item
           key={option.value}
           value={option.value}
           className={cn(
-            'inline-flex h-7 items-center gap-1.5 rounded-full px-3 font-medium text-ink-2 select-none',
+            'inline-flex h-7 items-center gap-1.5 rounded-[6px] px-2.5 font-medium text-ink-2 select-none',
             'transition-colors duration-150 ease-out hover:text-ink',
             'data-[state=on]:bg-surface data-[state=on]:text-ink data-[state=on]:shadow-pill',
           )}

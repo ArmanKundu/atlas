@@ -112,7 +112,7 @@ export function AppShell() {
           onToggleSidebar={toggleSidebar}
           onOpenPalette={openPalette}
         />
-        <main className="min-h-0 flex-1 overflow-hidden rounded-tl-xl border-t border-l border-line bg-surface">
+        <main className="min-h-0 flex-1 overflow-hidden bg-surface">
           <RouteBoundary key={location.pathname} name={location.pathname}>
             <Outlet />
           </RouteBoundary>

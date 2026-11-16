@@ -99,6 +99,8 @@ export interface AiServiceDeps {
  */
 export class AiService {
   private readonly running = new Map<string, AbortController>()
+  /** Text streamed so far for each reply in progress, by message id. */
+  private readonly partial = new Map<string, string>()
 
   constructor(private readonly deps: AiServiceDeps) {}
 
@@ -254,7 +256,14 @@ export class AiService {
   /* ---------- Chat ---------- */
 
   messages(chatId: string): ChatMessage[] {
-    return this.db().list('chat_messages', { chatId }, { orderBy: 'createdAt' }).map(toChatMessage)
+    return this.db()
+      .list('chat_messages', { chatId }, { orderBy: 'createdAt' })
+      .map(toChatMessage)
+      .map((message) =>
+        message.status === 'streaming'
+          ? { ...message, contentMd: this.partial.get(message.id) ?? message.contentMd }
+          : message,
+      )
   }
 
   private retrieve(question: string, subjectId: string | null): ChatSource[] {
@@ -354,6 +363,7 @@ export class AiService {
       signal: controller.signal,
       onText: (chunk) => {
         text += chunk
+        this.partial.set(assistant.id, text)
         this.deps.emitDelta({ chatId, messageId: assistant.id, text: chunk })
       },
     })
@@ -376,6 +386,7 @@ export class AiService {
       })
       .then((patch) => {
         this.running.delete(chatId)
+        this.partial.delete(assistant.id)
         try {
           const row = this.db().update('chat_messages', assistant.id, patch)
           if (row) this.deps.emitFinished({ chatId, message: toChatMessage(row) })

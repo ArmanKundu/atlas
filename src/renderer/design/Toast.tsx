@@ -65,7 +65,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <RadixToast.Action
                   altText={item.action.label}
                   onClick={item.action.onSelect}
-                  className="mt-2 inline-flex h-7 items-center rounded-full bg-accent px-3 font-medium text-accent-fg hover:bg-accent-hover"
+                  className="mt-2 inline-flex h-7 items-center rounded-md bg-accent px-2.5 font-medium text-accent-fg hover:bg-accent-hover"
                 >
                   {item.action.label}
                 </RadixToast.Action>

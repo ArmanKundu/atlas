@@ -94,6 +94,7 @@ export function Viewer() {
   ])
   const pages = useLive(['sources'], () => call('library:pages', { sourceId }), [sourceId])
   const isPdf = source.data?.mime === 'application/pdf'
+  const paneReady = Boolean(source.data)
   const doc = opened?.sourceId === sourceId ? opened.doc : null
   const failed = opened?.sourceId === sourceId ? opened.failed : null
 
@@ -133,7 +134,8 @@ export function Viewer() {
     const observer = new ResizeObserver(measure)
     observer.observe(element)
     return () => observer.disconnect()
-  }, [])
+    // The pane only exists once the file's details have loaded.
+  }, [paneReady])
 
   const goTo = (number: number): void => {
     document.getElementById(`page-${number}`)?.scrollIntoView({ block: 'start' })

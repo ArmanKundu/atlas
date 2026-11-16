@@ -65,7 +65,28 @@ Add a section here whenever a new file lands in this folder.
 - **Ours:** build the light-theme version: white container, soft shadow, grey control pills, dark send button. The mode pill maps to Ask modes; the model picker maps to connected providers.
 - **Where:** the Ask tab and the assistant panel.
 
-## The one direction
+### 06-operon-exam-viewer (added 2026-11-16, the owner's own earlier app)
+
+This is the look the owner wants for Atlas, together with "Apple, ChatGPT, Codex, Claude".
+
+- **Frame:** white app on a very light grey sidebar. Hairline dividers, almost no shadows.
+- **Sidebar:** app icon with name and a small subtitle; a search field with a ⌘K hint; primary items with outline icons at about 15 px; the selected item is a light grey rounded rectangle; count badges as small grey pills; a divider; a second group in lighter grey; at the bottom the mascot with its name and a line under it, an exam countdown ("0 days to go · Mon, 2 Nov"), then Shortcuts and Settings.
+- **Top bar:** page name with a quiet sub-label on the left; on the right small status items with a coloured dot ("Claude", "Synced"), text buttons ("Full screen", "Talk", "Ask") and the mascot avatar.
+- **Controls:** rounded rectangles (about 8 px), not pills. Primary is solid black ("Answer it", "View"); secondary is white with a hairline border ("Ask about it"). A segmented switch sits in a light grey track with the active side white.
+- **Accent:** blue for selection (the question box outline and tint, the active tool, links, the question tab) and for topic tags (blue tint). A green outlined pill for difficulty.
+- **Type:** system-style sans, bold headings around 20 px, body around 15 px, secondary text in mid grey.
+- **Paper viewer:** an Adobe-style two-row toolbar (page controls, find, zoom; then select, highlight, underline, comment, pen, undo/redo, delete, bookmark); the active tool in a blue-tinted square. The question is boxed in blue with a "Q1" tab. The right inspector has Overview / Practice / More tabs, the question cropped from the paper, "Answer it" and "Ask about it", and the solution blurred behind "Hidden so you can try it first" with a View button.
+
+## The one direction (revised 2026-11-16)
+
+**Clean white, grey sidebar, black buttons, blue for selection.** The warm editorial register below is retired at the owner's request; references 1 to 5 still apply for their patterns (toolbars, code input, calendar, composer), restyled to this look.
+
+- **Colour:** white surfaces, `#f7f7f8` sidebar, zinc greys for text and lines, black primary buttons, one blue for selection, links, focus and tags.
+- **Type:** the system font (San Francisco on Mac, Segoe UI on Windows), 14 px base, semibold headings.
+- **Shape:** 8 px controls, 12 px cards, 16 px dialogs. Pills only for tags and badges.
+- **Shadow:** only on popovers, dialogs and floating toolbars.
+
+## The first direction (superseded)
 
 **Quiet ink on soft grey.** One system, two registers that share the same tokens:
 

@@ -47,7 +47,7 @@ export function PageHeader({
     <header className="mb-7 flex items-end justify-between gap-6">
       <div className="min-w-0">
         {eyebrow ? <p className="mb-1 text-ink-3">{eyebrow}</p> : null}
-        <h1 className="text-[1.625rem] leading-8 font-semibold tracking-[-0.02em] text-ink">
+        <h1 className="text-[1.5rem] leading-8 font-semibold tracking-[-0.022em] text-ink">
           {title}
         </h1>
         {description ? <p className="mt-1.5 max-w-[60ch] text-ink-2">{description}</p> : null}
@@ -79,11 +79,7 @@ export function Section({
 }
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={cn('rounded-lg bg-surface ring-1 ring-line ring-inset', className)}>
-      {children}
-    </div>
-  )
+  return <div className={cn('rounded-lg border border-line bg-surface', className)}>{children}</div>
 }
 
 /** One row inside a `Card`: label and help text on the left, a control on the right. */

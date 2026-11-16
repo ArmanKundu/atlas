@@ -39,7 +39,7 @@ function Heading({
   return (
     <header className="mb-7">
       <p className="eyebrow text-paper-ink-2">{eyebrow}</p>
-      <h1 className="mt-2 font-serif text-[2rem] leading-[1.12] font-medium tracking-[-0.01em] text-balance">
+      <h1 className="mt-2 text-[1.75rem] leading-9 font-semibold tracking-[-0.025em] text-balance">
         {title}
       </h1>
       {children ? (
@@ -82,7 +82,7 @@ function SubjectsStep({ system }: { system: StudySystem }) {
         {subjects.map((subject) => (
           <span
             key={subject.id}
-            className="inline-flex h-8 items-center gap-2 rounded-full bg-surface pr-1 pl-3 font-medium text-ink shadow-pill"
+            className="inline-flex h-8 items-center gap-2 rounded-md bg-surface pr-1 pl-3 font-medium text-ink shadow-pill"
           >
             <SubjectDot colour={subject.colour} />
             {subject.name}
@@ -132,7 +132,7 @@ function SubjectsStep({ system }: { system: StudySystem }) {
                   key={s.name}
                   type="button"
                   onClick={() => void add.run(s.name, s.kind, s.code)}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-paper-ink ring-1 ring-paper-rule ring-inset hover:bg-surface"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-paper-ink ring-1 ring-paper-rule ring-inset hover:bg-surface"
                 >
                   <Plus className="size-3.5 text-paper-ink-2" aria-hidden />
                   {s.name}

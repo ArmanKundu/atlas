@@ -12,7 +12,7 @@ import { EmptyState } from '@/design/States'
 import { db, useAction, useLive } from '@/lib/api'
 import { call } from '@/lib/ipc'
 import { useNow } from '@/lib/now'
-import { Mascot } from '@/mascot/Mascot'
+import { Buddy } from '@/mascot/Buddy'
 
 const GRADES: { grade: Grade; label: string }[] = [
   { grade: 1, label: 'Again' },
@@ -57,8 +57,10 @@ function Review({ cards, onDone }: { cards: Flashcard[]; onDone: () => void }) {
   if (!card) {
     return (
       <div className="flex flex-col items-center py-12 text-center">
-        <Mascot size={96} mood="celebrating" />
-        <h2 className="mt-5 font-serif text-[1.6rem] font-medium">All caught up</h2>
+        <Buddy size={96} mood="celebrating" />
+        <h2 className="mt-5 text-[1.375rem] leading-8 font-semibold tracking-[-0.02em]">
+          All caught up
+        </h2>
         <p className="mt-1 text-ink-2">
           You reviewed {done} card{done === 1 ? '' : 's'}. The next ones come back when they are
           due.

@@ -3,5 +3,6 @@
 3. 03-segmented-code-input.mp4: big rounded digit boxes in two groups. Use for the profile PIN/unlock.
 4. 04-calendar-planner.mp4: sidebar + to-do groups + week grid with soft event cards. Use for the Planner.
 5. 05-composer-model-picker.mp4: dark pill composer with Add files, mode and model/effort pickers, mic. Use for the AI composer (light theme version).
+6. 06-operon-exam-viewer.webp: the owner's earlier Biology app. Use for the whole app's look (sidebar, top bar, buttons, tags) and for the paper viewer (toolbar, question box, right inspector with hidden solution).
 
 Each video has a matching *-frames.jpg still sheet, because Claude Code can view images but not videos. For new videos you add, extract frames first (e.g. ffmpeg -i clip.mp4 -vf fps=1 frames/%03d.jpg) or add screenshots.

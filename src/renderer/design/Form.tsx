@@ -93,14 +93,15 @@ export function Badge({
   className,
 }: {
   children: ReactNode
-  tone?: 'neutral' | 'success' | 'warn' | 'danger'
+  tone?: 'neutral' | 'blue' | 'success' | 'warn' | 'danger'
   className?: string
 }) {
   return (
     <span
       className={cn(
-        'inline-flex h-5 items-center gap-1 rounded-full px-2 text-2xs font-medium whitespace-nowrap',
-        tone === 'neutral' && 'bg-hover text-ink-2',
+        'inline-flex h-[22px] items-center gap-1 rounded-md px-1.5 text-2xs font-medium whitespace-nowrap',
+        tone === 'neutral' && 'bg-active text-ink-2',
+        tone === 'blue' && 'bg-blue-soft text-blue',
         tone === 'success' && 'bg-success-soft text-success',
         tone === 'warn' && 'bg-warn-soft text-warn',
         tone === 'danger' && 'bg-danger-soft text-danger',

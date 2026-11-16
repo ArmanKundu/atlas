@@ -19,3 +19,4 @@ random-inspo/**/*.jpeg
 random-inspo/**/*.png
 random-inspo/**/*.gif
 .claude/
+random-inspo/**/*.webp

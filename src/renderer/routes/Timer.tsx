@@ -9,7 +9,7 @@ import { db, useLive } from '@/lib/api'
 import { useSubjects } from '@/lib/app-state'
 import { cn } from '@/lib/cn'
 import { call } from '@/lib/ipc'
-import { Mascot } from '@/mascot/Mascot'
+import { Buddy } from '@/mascot/Buddy'
 
 function dayKey(date: Date): string {
   const p = (n: number): string => String(n).padStart(2, '0')
@@ -181,7 +181,7 @@ export function TimerRoute() {
           </div>
         </Card>
         <Card className="flex flex-col items-center justify-center gap-4 p-6 text-center">
-          <Mascot size={96} mood={timer.running ? 'thinking' : over ? 'celebrating' : 'idle'} />
+          <Buddy size={96} mood={timer.running ? 'thinking' : over ? 'celebrating' : 'idle'} />
           <dl className="grid w-full grid-cols-3 gap-2">
             {[
               ['Today', formatDuration(stats.data?.todaySeconds ?? 0)],

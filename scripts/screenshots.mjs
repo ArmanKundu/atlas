@@ -32,6 +32,9 @@ try {
     await page.waitForTimeout(500)
   }
 
+  // Light theme first, whatever the computer is set to; the last shots switch to dark.
+  await page.getByLabel('Your name').waitFor()
+  await page.evaluate(() => window.atlas.invoke('prefs:set', { theme: 'light' }))
   await page.getByLabel('Your name').fill('Sam')
   await shot('01-welcome')
   await page.getByRole('button', { name: 'Create profile' }).click()
@@ -98,6 +101,8 @@ try {
   await page.evaluate(() => window.atlas.invoke('prefs:set', { theme: 'dark' }))
   await go('#/')
   await shot('18-today-dark')
+  await go('#/assistant')
+  await shot('19-assistant-dark')
 } finally {
   if (errors.length) console.warn(`console errors:\n${[...new Set(errors)].join('\n')}`)
   await app.close()

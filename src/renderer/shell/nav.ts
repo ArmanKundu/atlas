@@ -1,12 +1,12 @@
 import {
   CalendarDays,
   FileText,
+  House,
   Layers,
   Library,
   MessageCircle,
   NotebookPen,
   Settings,
-  Sun,
   Timer,
   type LucideIcon,
 } from 'lucide-react'
@@ -22,41 +22,29 @@ export interface NavItem {
 export const NAV_TODAY: NavItem = {
   to: '/',
   label: 'Today',
-  icon: Sun,
+  icon: House,
   keywords: ['home', 'dashboard', 'study next'],
 }
 
-export const NAV_TOOLS: NavItem[] = [
+/** The main places, shown at full strength in the sidebar. */
+export const NAV_PRIMARY: NavItem[] = [
   {
     to: '/assistant',
     label: 'Assistant',
     icon: MessageCircle,
-    keywords: ['chat', 'ai', 'ask', 'tutor', 'bot'],
+    keywords: ['chat', 'ai', 'ask', 'tutor', 'bot', 'helper'],
   },
   {
     to: '/library',
     label: 'Library',
     icon: Library,
-    keywords: ['resources', 'import', 'files', 'pdf'],
-  },
-  { to: '/notes', label: 'Notes', icon: NotebookPen, keywords: ['write', 'markdown', 'summary'] },
-  {
-    to: '/flashcards',
-    label: 'Flashcards',
-    icon: Layers,
-    keywords: ['cards', 'review', 'spaced repetition'],
+    keywords: ['resources', 'import', 'files', 'pdf', 'papers'],
   },
   {
     to: '/planner',
     label: 'Planner',
     icon: CalendarDays,
-    keywords: ['calendar', 'week', 'schedule', 'to-do'],
-  },
-  {
-    to: '/timer',
-    label: 'Timer',
-    icon: Timer,
-    keywords: ['focus', 'pomodoro', 'stopwatch', 'stats'],
+    keywords: ['calendar', 'week', 'schedule', 'to-do', 'compass'],
   },
   {
     to: '/exam-builder',
@@ -65,6 +53,25 @@ export const NAV_TOOLS: NavItem[] = [
     keywords: ['practice exam', 'paper', 'generate'],
   },
 ]
+
+/** Study tools, shown in a quieter second group. */
+export const NAV_SECONDARY: NavItem[] = [
+  { to: '/notes', label: 'Notes', icon: NotebookPen, keywords: ['write', 'markdown', 'summary'] },
+  {
+    to: '/flashcards',
+    label: 'Flashcards',
+    icon: Layers,
+    keywords: ['cards', 'review', 'spaced repetition'],
+  },
+  {
+    to: '/timer',
+    label: 'Timer',
+    icon: Timer,
+    keywords: ['focus', 'pomodoro', 'stopwatch', 'stats'],
+  },
+]
+
+export const NAV_TOOLS: NavItem[] = [...NAV_PRIMARY, ...NAV_SECONDARY]
 
 export const NAV_SETTINGS: NavItem = {
   to: '/settings',

@@ -130,7 +130,7 @@ export function LibraryView({ subjectId }: { subjectId?: string }) {
                   type="button"
                   aria-pressed={filter === kind}
                   onClick={() => setFilter(kind)}
-                  className="h-7 rounded-full px-3 text-ink-2 ring-1 ring-line ring-inset hover:text-ink aria-pressed:bg-accent aria-pressed:text-accent-fg aria-pressed:ring-accent"
+                  className="h-7 rounded-md px-2.5 text-ink-2 ring-1 ring-line ring-inset hover:text-ink aria-pressed:bg-accent aria-pressed:text-accent-fg aria-pressed:ring-accent"
                 >
                   {kind === 'all' ? 'All' : SOURCE_KIND_LABELS[kind]}{' '}
                   <span className="opacity-60">{count}</span>

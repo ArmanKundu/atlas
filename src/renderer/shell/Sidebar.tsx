@@ -1,79 +1,110 @@
+import type { ReactElement, ReactNode } from 'react'
 import { NavLink } from 'react-router'
 import { Plus, Search } from 'lucide-react'
 import type { Subject } from '@shared/models'
+import { SYSTEM_PRESETS } from '@shared/presets'
 import { SubjectDot } from '@/design/Form'
 import { Kbd } from '@/design/Kbd'
 import { Tooltip } from '@/design/Tooltip'
+import { useLive } from '@/lib/api'
 import { useAppState, useSubjects } from '@/lib/app-state'
 import { cn } from '@/lib/cn'
+import { call } from '@/lib/ipc'
 import { isMac, modKey } from '@/lib/keys'
-import { MascotTile } from '@/mascot/Mascot'
+import { useNow } from '@/lib/now'
+import { Mascot, MascotTile } from '@/mascot/Mascot'
 import type { MascotAccessory, MascotColour } from '@/mascot/options'
-import { NAV_SETTINGS, NAV_TODAY, NAV_TOOLS, type NavItem } from './nav'
+import { NAV_PRIMARY, NAV_SECONDARY, NAV_SETTINGS, NAV_TODAY, type NavItem } from './nav'
+
+const DAY = 86_400_000
 
 const linkClass =
-  (collapsed: boolean) =>
+  (collapsed: boolean, quiet = false) =>
   ({ isActive }: { isActive: boolean }): string =>
     cn(
-      'flex h-8 items-center gap-2.5 rounded-md text-ink-2 select-none',
+      'flex h-8 items-center gap-2.5 rounded-md select-none',
       'transition-colors duration-150 ease-out hover:bg-hover hover:text-ink',
+      quiet ? 'text-ink-3' : 'text-ink-2',
       collapsed ? 'w-8 justify-center' : 'px-2',
       isActive && 'bg-active font-medium text-ink hover:bg-active',
     )
 
-function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
-  const link = (
-    <NavLink
-      to={item.to}
-      end={item.to === '/'}
-      aria-label={collapsed ? item.label : undefined}
-      className={linkClass(collapsed)}
-    >
-      <item.icon className="size-4 shrink-0" aria-hidden />
-      {collapsed ? null : <span className="truncate">{item.label}</span>}
-    </NavLink>
-  )
+/** In the icon rail every item gets a tooltip with its name. */
+function Wrap({
+  label,
+  collapsed,
+  children,
+}: {
+  label: string
+  collapsed: boolean
+  children: ReactElement
+}) {
   return collapsed ? (
-    <Tooltip label={item.label} side="right">
-      {link}
+    <Tooltip label={label} side="right">
+      {children}
     </Tooltip>
   ) : (
-    link
+    children
+  )
+}
+
+function SidebarLink({
+  item,
+  collapsed,
+  quiet,
+  badge,
+}: {
+  item: NavItem
+  collapsed: boolean
+  quiet?: boolean
+  badge?: ReactNode
+}) {
+  return (
+    <Wrap label={item.label} collapsed={collapsed}>
+      <NavLink
+        to={item.to}
+        end={item.to === '/'}
+        aria-label={collapsed ? item.label : undefined}
+        className={linkClass(collapsed, quiet)}
+      >
+        <item.icon className="size-4 shrink-0" aria-hidden />
+        {collapsed ? null : <span className="min-w-0 flex-1 truncate">{item.label}</span>}
+        {collapsed ? null : badge}
+      </NavLink>
+    </Wrap>
   )
 }
 
 function SubjectLink({ subject, collapsed }: { subject: Subject; collapsed: boolean }) {
-  const link = (
-    <NavLink
-      to={`/subjects/${subject.id}`}
-      aria-label={collapsed ? subject.name : undefined}
-      className={linkClass(collapsed)}
-    >
-      <span className="flex size-4 shrink-0 items-center justify-center">
-        <SubjectDot colour={subject.colour} className="size-2.5" />
-      </span>
-      {collapsed ? null : <span className="truncate">{subject.name}</span>}
-    </NavLink>
-  )
-  return collapsed ? (
-    <Tooltip label={subject.name} side="right">
-      {link}
-    </Tooltip>
-  ) : (
-    link
-  )
-}
-
-function SectionLabel({ children, action }: { children: string; action?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between px-2 pt-4 pb-1">
-      <p className="text-2xs font-medium text-ink-3 select-none">{children}</p>
-      {action}
-    </div>
+    <Wrap label={subject.name} collapsed={collapsed}>
+      <NavLink
+        to={`/subjects/${subject.id}`}
+        aria-label={collapsed ? subject.name : undefined}
+        className={linkClass(collapsed)}
+      >
+        <span className="flex size-4 shrink-0 items-center justify-center">
+          <SubjectDot colour={subject.colour} className="size-2.5" />
+        </span>
+        {collapsed ? null : <span className="truncate">{subject.name}</span>}
+      </NavLink>
+    </Wrap>
   )
 }
 
-/** Left sidebar (reference 4): profile, search, Today, subjects, tools, Settings. */
+function Divider({ collapsed }: { collapsed: boolean }) {
+  return (
+    <span
+      role="separator"
+      className={cn('my-2.5 block h-px shrink-0 bg-line', collapsed ? 'w-5' : 'mx-2')}
+    />
+  )
+}
+
+/**
+ * Left sidebar: the app and study system, search, the main places, subjects, a quieter group of
+ * study tools, and at the bottom the study buddy with the countdown to the next exam.
+ */
 export function Sidebar({
   collapsed,
   onOpenPalette,
@@ -82,44 +113,61 @@ export function Sidebar({
   onOpenPalette: () => void
 }) {
   const mac = isMac()
+  const now = useNow()
   const { meta } = useAppState()
   const subjects = useSubjects()
+  const stats = useLive(['stats', 'flashcards'], () => call('stats:summary'))
+
+  const colour = (meta?.avatarColour ?? 'ink') as MascotColour
+  const accessory = (meta?.avatarAccessory ?? 'none') as MascotAccessory
+  const subtitle = [
+    meta && meta.studySystem !== 'other' ? SYSTEM_PRESETS[meta.studySystem].label : null,
+    meta?.yearLevel,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const nextExam = subjects
+    .flatMap((subject) =>
+      subject.examDates
+        .filter((exam) => exam.date >= now - DAY)
+        .map((exam) => ({ ...exam, subject: subject.name })),
+    )
+    .sort((a, b) => a.date - b.date)[0]
+  const due = stats.data?.dueCards ?? 0
 
   return (
     <nav
       aria-label="Main"
       className={cn(
-        'flex h-full shrink-0 flex-col bg-canvas transition-[width] duration-200 ease-out',
-        collapsed ? 'w-[var(--atlas-sidebar-rail-w)]' : 'w-[var(--atlas-sidebar-w)]',
+        'flex h-full shrink-0 flex-col border-r border-line bg-canvas transition-[width] duration-200 ease-out',
+        collapsed ? 'w-[var(--atlas-sidebar-rail-w)] items-center' : 'w-[var(--atlas-sidebar-w)]',
       )}
     >
-      {/* Header row doubles as the window drag area. macOS keeps its traffic lights here. */}
+      {/* macOS keeps its window buttons in this strip; it also drags the window. */}
+      {mac ? <div className="app-drag h-9 w-full shrink-0" /> : null}
+
       <div
         className={cn(
-          'app-drag flex h-[var(--atlas-topbar-h)] shrink-0 items-center gap-2',
-          collapsed ? 'justify-center' : mac ? 'pr-3 pl-[84px]' : 'px-3',
+          'app-drag flex shrink-0 items-center gap-2.5',
+          collapsed ? 'h-12 justify-center' : 'px-3.5 pb-2',
+          !mac && !collapsed && 'pt-3.5',
         )}
       >
-        {collapsed && mac ? null : (
-          <>
-            <MascotTile
-              size={24}
-              colour={(meta?.avatarColour ?? 'ink') as MascotColour}
-              accessory={(meta?.avatarAccessory ?? 'none') as MascotAccessory}
-            />
-            {collapsed ? null : (
-              <span className="truncate text-[0.9375rem] font-semibold tracking-[-0.01em] text-ink select-none">
-                {meta?.name ?? 'Atlas'}
-              </span>
-            )}
-          </>
+        <MascotTile size={collapsed ? 28 : 34} colour={colour} accessory={accessory} />
+        {collapsed ? null : (
+          <div className="min-w-0 select-none">
+            <p className="truncate text-[0.9375rem] leading-5 font-semibold tracking-[-0.01em] text-ink">
+              Atlas
+            </p>
+            <p className="truncate text-2xs text-ink-3">{subtitle || 'Study workspace'}</p>
+          </div>
         )}
       </div>
 
       <div
         className={cn(
-          'flex min-h-0 flex-1 flex-col overflow-y-auto pb-3',
-          collapsed ? 'items-center px-0' : 'px-3',
+          'flex min-h-0 flex-1 flex-col overflow-y-auto pb-2',
+          collapsed ? 'items-center' : 'px-2.5',
         )}
       >
         {collapsed ? (
@@ -137,7 +185,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={onOpenPalette}
-            className="mb-2 flex h-8 w-full shrink-0 items-center gap-2.5 rounded-md bg-hover px-2 text-ink-3 select-none hover:bg-active hover:text-ink-2"
+            className="mt-1 mb-2.5 flex h-8 w-full shrink-0 items-center gap-2 rounded-md bg-surface px-2 text-ink-3 ring-1 ring-line ring-inset select-none hover:text-ink-2 hover:ring-line-strong"
           >
             <Search className="size-4 shrink-0" aria-hidden />
             <span className="flex-1 text-left">Search</span>
@@ -145,24 +193,25 @@ export function Sidebar({
           </button>
         )}
 
-        <SidebarLink item={NAV_TODAY} collapsed={collapsed} />
+        <div className={cn('flex flex-col gap-0.5', collapsed && 'items-center')}>
+          <SidebarLink item={NAV_TODAY} collapsed={collapsed} />
+          {NAV_PRIMARY.map((item) => (
+            <SidebarLink key={item.to} item={item} collapsed={collapsed} />
+          ))}
+        </div>
 
-        {collapsed ? (
-          <span role="separator" className="my-2 h-px w-5 shrink-0 bg-line" />
-        ) : (
-          <SectionLabel
-            action={
-              <NavLink
-                to="/settings?tab=subjects"
-                aria-label="Add a subject"
-                className="flex size-5 items-center justify-center rounded-sm text-ink-3 hover:bg-hover hover:text-ink"
-              >
-                <Plus className="size-3.5" aria-hidden />
-              </NavLink>
-            }
-          >
-            Subjects
-          </SectionLabel>
+        <Divider collapsed={collapsed} />
+        {collapsed ? null : (
+          <div className="flex items-center justify-between px-2 pb-1">
+            <p className="text-2xs font-medium text-ink-3 select-none">Subjects</p>
+            <NavLink
+              to="/settings?tab=subjects"
+              aria-label="Add a subject"
+              className="flex size-5 items-center justify-center rounded-sm text-ink-3 hover:bg-hover hover:text-ink"
+            >
+              <Plus className="size-3.5" aria-hidden />
+            </NavLink>
+          </div>
         )}
         <div className={cn('flex flex-col gap-0.5', collapsed && 'items-center')}>
           {subjects.map((subject) => (
@@ -173,20 +222,63 @@ export function Sidebar({
           ) : null}
         </div>
 
-        {collapsed ? (
-          <span role="separator" className="my-2 h-px w-5 shrink-0 bg-line" />
-        ) : (
-          <SectionLabel>Tools</SectionLabel>
-        )}
+        <Divider collapsed={collapsed} />
         <div className={cn('flex flex-col gap-0.5', collapsed && 'items-center')}>
-          {NAV_TOOLS.map((item) => (
-            <SidebarLink key={item.to} item={item} collapsed={collapsed} />
+          {NAV_SECONDARY.map((item) => (
+            <SidebarLink
+              key={item.to}
+              item={item}
+              collapsed={collapsed}
+              quiet
+              badge={
+                item.to === '/flashcards' && due > 0 ? (
+                  <span className="rounded-full bg-active px-1.5 text-2xs font-medium text-ink-2 tabular-nums">
+                    {due}
+                    <span className="sr-only"> due</span>
+                  </span>
+                ) : undefined
+              }
+            />
           ))}
         </div>
+      </div>
 
-        <div className="mt-auto pt-3">
-          <SidebarLink item={NAV_SETTINGS} collapsed={collapsed} />
-        </div>
+      <div
+        className={cn(
+          'w-full shrink-0 border-t border-line py-2',
+          collapsed ? 'flex flex-col items-center' : 'px-2.5',
+        )}
+      >
+        {collapsed ? null : (
+          <div className="px-2 pt-1 pb-2 select-none">
+            <div className="flex items-center gap-2.5">
+              <Mascot size={34} colour={colour} accessory={accessory} interactive={false} />
+              <div className="min-w-0">
+                <p className="truncate font-medium text-ink">{meta?.name ?? 'You'}</p>
+                <p className="truncate text-2xs text-ink-3">Your study buddy is here</p>
+              </div>
+            </div>
+            <p className="mt-2 truncate text-2xs text-ink-3">
+              {nextExam ? (
+                <>
+                  <span className="font-semibold text-ink">
+                    {Math.max(0, Math.ceil((nextExam.date - now) / DAY))} days
+                  </span>{' '}
+                  to go ·{' '}
+                  {new Date(nextExam.date).toLocaleDateString(undefined, {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                  })}{' '}
+                  · {nextExam.subject}
+                </>
+              ) : (
+                'No exam dates yet'
+              )}
+            </p>
+          </div>
+        )}
+        <SidebarLink item={NAV_SETTINGS} collapsed={collapsed} quiet />
       </div>
     </nav>
   )

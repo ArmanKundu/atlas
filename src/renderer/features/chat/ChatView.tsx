@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { ArrowUp, Copy, Layers, NotebookPen, Plus, Square, Trash2 } from 'lucide-react'
 import type { AgentInfo, Chat, ChatMessage } from '@shared/models'
 import { Button, IconButton } from '@/design/Button'
@@ -10,20 +10,9 @@ import { useToast } from '@/design/Toast'
 import { changed, db, useAction, useLive } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { call, subscribe } from '@/lib/ipc'
-import { Mascot } from '@/mascot/Mascot'
+import { Buddy } from '@/mascot/Buddy'
+import { providerName } from '@/features/ai/names'
 import { agentIcon } from './agents'
-
-const PROVIDER_NAMES: Record<string, string> = {
-  'claude-code': 'Claude',
-  codex: 'ChatGPT',
-  'gemini-cli': 'Gemini',
-  ollama: 'Ollama',
-  lmstudio: 'LM Studio',
-  'anthropic-api': 'Claude API',
-  'openai-api': 'OpenAI API',
-  'google-api': 'Google AI',
-  openrouter: 'OpenRouter',
-}
 
 function parseCards(text: string): { front: string; back: string }[] {
   const start = text.indexOf('[')
@@ -75,7 +64,7 @@ function MessageBubble({ message, subjectId }: { message: ChatMessage; subjectId
   if (message.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-xl rounded-br-sm bg-accent px-3.5 py-2 whitespace-pre-wrap text-accent-fg">
+        <div className="max-w-[80%] rounded-lg rounded-br-sm bg-sunken px-3.5 py-2 whitespace-pre-wrap text-ink">
           {message.contentMd}
         </div>
       </div>
@@ -100,7 +89,7 @@ function MessageBubble({ message, subjectId }: { message: ChatMessage; subjectId
               key={source.n}
               to={`/viewer/${source.sourceId}?page=${source.page}`}
               title={source.snippet}
-              className="inline-flex h-6 max-w-[260px] items-center gap-1.5 rounded-full bg-hover px-2 text-2xs text-ink-2 hover:bg-active hover:text-ink"
+              className="inline-flex h-6 max-w-[260px] items-center gap-1.5 rounded-md bg-hover px-2 text-2xs text-ink-2 hover:bg-active hover:text-ink"
             >
               <span className="font-mono">[{source.n}]</span>
               <span className="truncate">{source.title}</span>
@@ -111,9 +100,7 @@ function MessageBubble({ message, subjectId }: { message: ChatMessage; subjectId
       ) : null}
       {message.status === 'done' ? (
         <div className="flex items-center gap-1 text-ink-3">
-          {message.provider ? (
-            <Badge>Written by {PROVIDER_NAMES[message.provider] ?? message.provider}</Badge>
-          ) : null}
+          {message.provider ? <Badge>Written by {providerName(message.provider)}</Badge> : null}
           <IconButton
             label="Copy"
             size="sm"
@@ -157,7 +144,9 @@ function MessageBubble({ message, subjectId }: { message: ChatMessage; subjectId
  * in the student's own library. Used full-page and inside a subject's Ask tab.
  */
 export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [params] = useSearchParams()
+  // A chat started elsewhere (the Today page) opens straight away.
+  const [activeId, setActiveId] = useState<string | null>(() => params.get('chat'))
   const [loaded, setLoaded] = useState<{ chatId: string | null; items: ChatMessage[] }>({
     chatId: null,
     items: [],
@@ -335,8 +324,8 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
           <div className="mx-auto flex max-w-[760px] flex-col gap-5 px-6 py-6">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center pt-6 text-center">
-                <Mascot size={72} mood={streaming ? 'thinking' : 'idle'} />
-                <h2 className="mt-4 font-serif text-[1.6rem] leading-tight font-medium">
+                <Buddy size={72} mood={streaming ? 'thinking' : 'idle'} />
+                <h2 className="mt-4 text-[1.375rem] leading-8 font-semibold tracking-[-0.02em]">
                   What are we working on?
                 </h2>
                 <p className="mt-1.5 max-w-[48ch] text-ink-2">
@@ -367,7 +356,7 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
                               type="button"
                               onClick={() => newChat(item.id)}
                               aria-pressed={item.id === agentId}
-                              className="flex items-start gap-2.5 rounded-lg p-3 text-left ring-1 ring-line ring-inset hover:bg-sunken aria-pressed:ring-2 aria-pressed:ring-accent"
+                              className="flex items-start gap-2.5 rounded-lg p-3 text-left ring-1 ring-line ring-inset hover:bg-sunken aria-pressed:bg-blue-soft aria-pressed:ring-blue-line"
                             >
                               <Icon className="mt-0.5 size-4 shrink-0 text-ink-2" aria-hidden />
                               <span>
@@ -425,7 +414,7 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
               <Select
                 aria-label="Helper"
                 className={cn(
-                  'h-7 w-auto rounded-full bg-hover text-2xs ring-0',
+                  'h-7 w-auto rounded-md bg-hover text-2xs ring-0',
                   active && 'opacity-70',
                 )}
                 value={active?.agent ?? agentId}
@@ -440,7 +429,7 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
               </Select>
               <span className="min-w-0 flex-1 truncate text-2xs text-ink-3">
                 {config.data?.defaultProvider
-                  ? `Using ${PROVIDER_NAMES[config.data.defaultProvider] ?? config.data.defaultProvider}`
+                  ? `Using ${providerName(config.data.defaultProvider)}`
                   : 'No AI connected'}
               </span>
               {streaming ? (
