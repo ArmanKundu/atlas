@@ -20,6 +20,18 @@ Phases 1 to 4, 6, and the core of 8 to 13: scaffold and security, database and p
 - **Windows** has not been run at all. The installer is built by CI only.
 - **Installers are unsigned**, so macOS and Windows show a warning on first open (see the README).
 
+## Added after the first release
+
+- **26 assistant helpers**, grouped, with subject-specific ones for English, Maths, Science, Accounting and Languages.
+- **School calendar sync** from an iCal subscription link (Compass and other portals). Level 1 only: timetable and events. Tasks, results, feedback and the newsfeed (the read-only adapter) are not built. Times with a named time zone are read as this computer's local time.
+- **Exam paper layout** matched to a 2025 written examination (cover, running headers, alternating edge strip, marks column, answer lines). Not yet done: per-subject variants beyond lines versus working space (for example an English task book with a separate script book, or Accounting answer tables), "Question N continues on the next page" notes, and formula or data sheets.
+- **Look** moved toward Apple and ChatGPT (neutral greys, system font). A full redesign from the owner's reference screenshots is still to come.
+
+## Wanted next (from the owner)
+
+- **Paper viewer like the Operon screenshot:** question regions drawn on the PDF, a right-hand inspector with Overview, Practice and More, the solution and examiner report hidden until you try, annotation tools (highlight, pen, underline, comment), and marking your own paper. This needs the question bank (stage B ingestion or the manual question editor) first.
+- **Downloaded past papers** for Chemistry, English, Mathematical Methods and Specialist Mathematics are in `~/Downloads/Atlas-exams/` (outside this repo, never committed). Accounting papers could not be listed from the archive. Import the folder through Library to use them.
+
 ## Not built yet
 
 - **Ingestion stage B:** AI extraction of topic trees from study designs, questions from exams, answers from solutions and examiner reports, and tagging. Questions, answers, attempts and mistakes have tables but no screens.
