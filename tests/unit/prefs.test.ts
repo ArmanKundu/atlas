@@ -19,7 +19,11 @@ afterEach(async () => {
 describe('PrefsStore', () => {
   it('starts with defaults when there is no file', async () => {
     const store = new PrefsStore(file)
-    expect(await store.load()).toEqual({ theme: 'system', sidebarCollapsed: false })
+    expect(await store.load()).toEqual({
+      theme: 'system',
+      sidebarCollapsed: false,
+      lastProfileId: null,
+    })
   })
 
   it('saves a change and reads it back in a new store', async () => {
@@ -29,7 +33,11 @@ describe('PrefsStore', () => {
     await store.set({ sidebarCollapsed: true })
 
     const reopened = new PrefsStore(file)
-    expect(await reopened.load()).toEqual({ theme: 'dark', sidebarCollapsed: true })
+    expect(await reopened.load()).toEqual({
+      theme: 'dark',
+      sidebarCollapsed: true,
+      lastProfileId: null,
+    })
   })
 
   it('leaves no temp files behind and keeps the last of several quick writes', async () => {
@@ -42,6 +50,7 @@ describe('PrefsStore', () => {
     expect(JSON.parse(await readFile(file, 'utf8'))).toEqual({
       theme: 'dark',
       sidebarCollapsed: true,
+      lastProfileId: null,
     })
     expect(await readdir(join(dir, 'nested'))).toEqual(['prefs.json'])
   })
@@ -49,7 +58,11 @@ describe('PrefsStore', () => {
   it('falls back to defaults on a damaged file and keeps a copy of it', async () => {
     const store = new PrefsStore(join(dir, 'prefs.json'))
     await writeFile(join(dir, 'prefs.json'), '{ this is not json', 'utf8')
-    expect(await store.load()).toEqual({ theme: 'system', sidebarCollapsed: false })
+    expect(await store.load()).toEqual({
+      theme: 'system',
+      sidebarCollapsed: false,
+      lastProfileId: null,
+    })
     expect(await readFile(join(dir, 'prefs.json.corrupt'), 'utf8')).toBe('{ this is not json')
   })
 
@@ -62,6 +75,10 @@ describe('PrefsStore', () => {
   it('fills in defaults for keys added after the file was written', async () => {
     await writeFile(join(dir, 'prefs.json'), JSON.stringify({ theme: 'light' }), 'utf8')
     const store = new PrefsStore(join(dir, 'prefs.json'))
-    expect(await store.load()).toEqual({ theme: 'light', sidebarCollapsed: false })
+    expect(await store.load()).toEqual({
+      theme: 'light',
+      sidebarCollapsed: false,
+      lastProfileId: null,
+    })
   })
 })

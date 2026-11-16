@@ -1,16 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AtlasError } from '@shared/errors'
-import { IPC_CHANNELS, ipcContract, ipcEvents, IPC_EVENTS } from '@shared/ipc'
+import { ipcContract, ipcEvents, IPC_EVENTS } from '@shared/ipc'
+import { CHANNEL_PATTERN } from '@shared/ipc-channels'
 import { createIpcRegistry, runHandler, type IpcMainLike } from '../../src/main/ipc/registry'
 
 const quietLog = { warn: vi.fn(), error: vi.fn() }
 
-const prefs = { theme: 'dark', sidebarCollapsed: false } as const
+const prefs = { theme: 'dark', sidebarCollapsed: false, lastProfileId: null } as const
 
 describe('ipc contract', () => {
-  it('has a schema for every channel and event name', () => {
-    expect(Object.keys(ipcContract).sort()).toEqual([...IPC_CHANNELS].sort())
+  it('has a schema for every event name, and channel names the preload will pass through', () => {
     expect(Object.keys(ipcEvents).sort()).toEqual([...IPC_EVENTS].sort())
+    for (const channel of Object.keys(ipcContract)) expect(channel).toMatch(CHANNEL_PATTERN)
+    expect('__proto__').not.toMatch(CHANNEL_PATTERN)
+    expect('fs:read file').not.toMatch(CHANNEL_PATTERN)
   })
 })
 

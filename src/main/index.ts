@@ -11,12 +11,16 @@ import {
   type IpcMainInvokeEvent,
 } from 'electron'
 import { APP_NAME, APP_SCHEME } from '@shared/constants'
+import { AiService } from './ai/service'
+import { SecretStore } from './ai/secrets'
 import { broadcast, registerAppHandlers } from './ipc/handlers/app'
+import { registerDataHandlers } from './ipc/handlers/data'
 import { createIpcRegistry } from './ipc/registry'
 import { createFileLogger } from './log'
 import { PrefsStore } from './prefs'
+import { ProfileManager } from './profiles'
 import { buildCsp, isAppUrl, resolveRendererPath } from './security'
-import { createMainWindow } from './window'
+import { createMainWindow, printRouteToPdf } from './window'
 
 // Set by electron-vite while `npm run dev` is running; absent in a built app.
 const devServerUrl = (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) || undefined
@@ -70,6 +74,29 @@ async function main(): Promise<void> {
     log,
   })
   registerAppHandlers({ registry, prefs, log, windows })
+
+  const profiles = new ProfileManager(join(app.getPath('userData'), 'profiles'), log)
+  const secrets = new SecretStore(join(app.getPath('userData'), 'secrets.json'))
+  const ai = new AiService({
+    profiles,
+    secrets,
+    log,
+    emitDelta: (payload) => broadcast(windows(), 'ai:delta', payload),
+    emitFinished: (payload) => broadcast(windows(), 'ai:finished', payload),
+  })
+  registerDataHandlers({
+    registry,
+    profiles,
+    prefs,
+    ai,
+    log,
+    emit: {
+      profileChanged: (activeId) => broadcast(windows(), 'profile:changed', { activeId }),
+      libraryChanged: (sourceId) => broadcast(windows(), 'library:changed', { sourceId }),
+    },
+    printRoute: (hash) => printRouteToPdf({ devServerUrl, hash }),
+  })
+  app.on('will-quit', () => profiles.lock())
   const missing = registry.missing()
   if (missing.length > 0) log.warn(`ipc channels without a handler: ${missing.join(', ')}`)
 

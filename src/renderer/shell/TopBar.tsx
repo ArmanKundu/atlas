@@ -4,6 +4,7 @@ import { ChevronRight, PanelLeft, Search, Timer } from 'lucide-react'
 import { IconButton } from '@/design/Button'
 import { Kbd } from '@/design/Kbd'
 import { Tooltip } from '@/design/Tooltip'
+import { formatClock, useTimer } from '@/features/timer/TimerProvider'
 import { cn } from '@/lib/cn'
 import { isMac, modKey } from '@/lib/keys'
 import { platform } from '@/lib/ipc'
@@ -38,6 +39,12 @@ export function TopBar({
   onOpenPalette: () => void
 }) {
   const crumbs = useCrumbs()
+  const timer = useTimer()
+  const clock = formatClock(
+    timer.mode === 'focus' && timer.active
+      ? Math.max(0, timer.target - timer.elapsed)
+      : timer.elapsed,
+  )
   // Windows draws its window buttons over the right end of the bar.
   const reserveRight = platform() === 'win32'
 
@@ -99,14 +106,23 @@ export function TopBar({
         <Kbd>{modKey('K')}</Kbd>
       </button>
 
-      <Tooltip label="Open the timer">
+      <Tooltip label={timer.active ? 'Open the timer' : 'Start a focus session'}>
         <Link
           to="/timer"
-          aria-label="Timer, not running"
-          className="app-no-drag flex h-8 items-center gap-1.5 rounded-full bg-surface px-3 font-medium text-ink-2 tabular-nums shadow-pill select-none hover:text-ink"
+          aria-label={
+            timer.running
+              ? `Timer running, ${clock}`
+              : timer.active
+                ? `Timer paused, ${clock}`
+                : 'Timer, not running'
+          }
+          className={cn(
+            'app-no-drag flex h-8 items-center gap-1.5 rounded-full px-3 font-medium tabular-nums shadow-pill select-none',
+            timer.running ? 'bg-accent text-accent-fg' : 'bg-surface text-ink-2 hover:text-ink',
+          )}
         >
           <Timer className="size-3.5" aria-hidden />
-          0:00
+          {clock}
         </Link>
       </Tooltip>
     </header>

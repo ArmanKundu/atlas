@@ -27,5 +27,6 @@ export function globalShortcuts(): ShortcutInfo[] {
     { keys: modKey('\\'), description: 'Show or hide the sidebar' },
     { keys: modKey(','), description: 'Open Settings' },
     { keys: modKey('1'), description: 'Go to Today' },
+    { keys: modKey('J'), description: 'Open the assistant' },
   ]
 }

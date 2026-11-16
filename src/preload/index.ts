@@ -1,28 +1,27 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import { IPC_CHANNELS, IPC_EVENTS } from '../shared/ipc-channels'
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
+import { CHANNEL_PATTERN, IPC_EVENTS } from '../shared/ipc-channels'
 import type { AtlasBridge, IpcResult, Platform } from '../shared/ipc'
 
 /**
  * The only bridge between the sandboxed renderer and the main process.
  *
- * It exposes two functions and nothing from Electron or Node. Channel and event names are checked
- * against the contract here, and the main process validates every payload again with zod.
+ * It exposes three functions and nothing else from Electron or Node. The main process is the
+ * authority: only channels in the contract have a handler, it checks the sender, and it validates
+ * every payload with zod. A call to anything else comes back as a `forbidden` result.
  */
-const channels = new Set<string>(IPC_CHANNELS)
 const events = new Set<string>(IPC_EVENTS)
+
+const forbidden: IpcResult<never> = {
+  ok: false,
+  error: { code: 'forbidden', message: 'That action is not available.' },
+}
 
 const bridge: AtlasBridge = {
   platform: process.platform as Platform,
 
   invoke(channel: string, payload?: unknown) {
-    if (!channels.has(channel)) {
-      const blocked: IpcResult<never> = {
-        ok: false,
-        error: { code: 'forbidden', message: 'That action is not available.' },
-      }
-      return Promise.resolve(blocked)
-    }
-    return ipcRenderer.invoke(channel, payload)
+    if (!CHANNEL_PATTERN.test(channel)) return Promise.resolve(forbidden)
+    return ipcRenderer.invoke(channel, payload).catch(() => forbidden)
   },
 
   on(event: string, listener: (payload: never) => void) {
@@ -34,6 +33,10 @@ const bridge: AtlasBridge = {
     return () => {
       ipcRenderer.removeListener(event, wrapped)
     }
+  },
+
+  pathForFile(file: File) {
+    return webUtils.getPathForFile(file)
   },
 }
 

@@ -71,3 +71,44 @@ export function createMainWindow(options: { devServerUrl?: string; log: Logger }
   void window.loadURL(devServerUrl ?? `${APP_ORIGIN}/index.html`)
   return window
 }
+
+/**
+ * Renders one app route in a hidden window and returns it as an A4 PDF. The route signals that
+ * it has finished laying out by setting the document title to `atlas-print-ready`.
+ */
+export async function printRouteToPdf(options: {
+  devServerUrl?: string
+  hash: string
+}): Promise<Buffer> {
+  const window = new BrowserWindow({
+    show: false,
+    width: 900,
+    height: 1200,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  })
+  try {
+    const ready = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('print view timed out')), 25_000)
+      window.webContents.on('page-title-updated', (_event, title) => {
+        if (title === 'atlas-print-ready') {
+          clearTimeout(timer)
+          resolve()
+        }
+      })
+    })
+    await window.loadURL(`${options.devServerUrl ?? `${APP_ORIGIN}/index.html`}#${options.hash}`)
+    await ready
+    return await window.webContents.printToPDF({
+      pageSize: 'A4',
+      printBackground: true,
+      margins: { top: 0.7, bottom: 0.7, left: 0.7, right: 0.7 },
+    })
+  } finally {
+    window.destroy()
+  }
+}

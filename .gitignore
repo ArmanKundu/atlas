@@ -18,3 +18,4 @@ random-inspo/**/*.jpg
 random-inspo/**/*.jpeg
 random-inspo/**/*.png
 random-inspo/**/*.gif
+.claude/

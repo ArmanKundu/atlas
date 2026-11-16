@@ -32,8 +32,6 @@ export async function launchAtlas(userData?: string): Promise<Launched> {
   })
   page.on('pageerror', (error) => errors.push(error.message))
   await page.waitForLoadState('domcontentloaded')
-  // The shell (and its keyboard shortcuts) is ready once the sidebar is on screen.
-  await page.getByRole('navigation', { name: 'Main' }).waitFor()
 
   return {
     app,
@@ -45,6 +43,24 @@ export async function launchAtlas(userData?: string): Promise<Launched> {
       if (!userData) await rm(dir, { recursive: true, force: true })
     },
   }
+}
+
+/** Creates the first profile and clicks through first-run setup with AI left off. */
+export async function completeSetup(page: Page, name = 'Sam'): Promise<void> {
+  await page.getByLabel('Your name').fill(name)
+  await page.getByRole('button', { name: 'Create profile' }).click()
+  await page.getByRole('button', { name: 'Get started' }).click()
+  for (let step = 0; step < 5; step++) await page.getByRole('button', { name: 'Next' }).click()
+  await page.getByRole('button', { name: 'Open Atlas' }).click()
+  // The shell (and its keyboard shortcuts) is ready once the sidebar is on screen.
+  await page.getByRole('navigation', { name: 'Main' }).waitFor()
+}
+
+/** Launches and gets straight to the app with a fresh profile. */
+export async function launchReady(): Promise<Launched> {
+  const atlas = await launchAtlas()
+  await completeSetup(atlas.page)
+  return atlas
 }
 
 export const mod = process.platform === 'darwin' ? 'Meta' : 'Control'

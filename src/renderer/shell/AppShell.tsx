@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { Monitor, Moon, Palette, PanelLeft, Sun } from 'lucide-react'
 import type { Theme } from '@shared/ipc'
+import { processImportQueue } from '@/features/library/ingest'
+import { changed } from '@/lib/api'
 import { useAppState } from '@/lib/app-state'
+import { subscribe } from '@/lib/ipc'
 import { isModOnly, modKey } from '@/lib/keys'
 import { CommandPalette } from './CommandPalette'
 import { useRegisterCommands, type Command } from './commands'
@@ -71,6 +74,15 @@ export function AppShell() {
   )
   useRegisterCommands('shell', commands)
 
+  // Make imported PDFs searchable: on launch, and whenever the library changes.
+  useEffect(() => {
+    void processImportQueue()
+    return subscribe('library:changed', () => {
+      changed('sources')
+      void processImportQueue()
+    })
+  }, [])
+
   // Global shortcuts. One listener for the whole shell.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -80,6 +92,7 @@ export function AppShell() {
       else if (key === '\\') toggleSidebar()
       else if (key === ',') void navigate('/settings')
       else if (key === '1') void navigate('/')
+      else if (key === 'j') void navigate('/assistant')
       else return
       event.preventDefault()
     }

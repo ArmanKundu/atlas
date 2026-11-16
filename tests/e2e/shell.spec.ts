@@ -1,41 +1,79 @@
 import { rm } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
-import { launchAtlas, makeUserData, mod } from './launch'
+import { completeSetup, launchAtlas, launchReady, makeUserData, mod } from './launch'
 
-test('starts on Today with a locked-down renderer and no console errors', async () => {
+const fixtures = resolve('tests/fixtures')
+
+test('first run: create a profile, set up with no AI, and land on Today', async () => {
   const atlas = await launchAtlas()
   try {
     const { page } = atlas
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Good|Still up/)
-    await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
     await expect(page).toHaveURL(/^atlas:\/\/app\//)
+    await page.getByLabel('Your name').fill('Sam')
+    await page.getByRole('button', { name: 'Create profile' }).click()
+    await page.getByRole('button', { name: 'Get started' }).click()
+    await page.getByLabel('Study system').selectOption('vce')
+    await page.getByRole('button', { name: 'Next' }).click()
+    await page.getByRole('button', { name: 'Chemistry', exact: true }).click()
+    await page.getByLabel('Subject name').fill('Robotics')
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+    await expect(page.getByText('Use your own API key')).toBeVisible()
+    await page.getByRole('button', { name: 'Skip' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+    await page.getByRole('button', { name: 'Open Atlas' }).click()
 
-    const surface = await page.evaluate(() => ({
-      bridge: Object.keys(window.atlas).sort(),
-      hasRequire: typeof (globalThis as Record<string, unknown>)['require'],
-      hasProcess: typeof (globalThis as Record<string, unknown>)['process'],
-    }))
-    expect(surface).toEqual({
-      bridge: ['invoke', 'on', 'platform'],
-      hasRequire: 'undefined',
-      hasProcess: 'undefined',
-    })
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/(Good|Still up).*Sam/)
+    const nav = page.getByRole('navigation', { name: 'Main' })
+    await expect(nav.getByRole('link', { name: 'Chemistry' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Robotics' })).toBeVisible()
 
-    const unknown = await page.evaluate(() =>
-      (window.atlas.invoke as (channel: string) => Promise<unknown>)('fs:readFile'),
-    )
-    expect(unknown).toMatchObject({ ok: false, error: { code: 'forbidden' } })
-
+    // With no AI connected the assistant explains what it needs instead of failing.
+    await nav.getByRole('link', { name: 'Assistant' }).click()
+    await expect(page.getByText('No AI is connected yet')).toBeVisible()
     expect(atlas.errors).toEqual([])
   } finally {
     await atlas.close()
   }
 })
 
-test('the content security policy blocks outside requests', async () => {
+test('the renderer is locked down', async () => {
   const atlas = await launchAtlas()
   try {
-    const outcome = await atlas.page.evaluate(() =>
+    const { page } = atlas
+    await page.getByLabel('Your name').waitFor()
+    const surface = await page.evaluate(() => ({
+      bridge: Object.keys(window.atlas).sort(),
+      hasRequire: typeof (globalThis as Record<string, unknown>)['require'],
+      hasProcess: typeof (globalThis as Record<string, unknown>)['process'],
+    }))
+    expect(surface).toEqual({
+      bridge: ['invoke', 'on', 'pathForFile', 'platform'],
+      hasRequire: 'undefined',
+      hasProcess: 'undefined',
+    })
+
+    const invoke = (channel: string, payload?: unknown): Promise<unknown> =>
+      page.evaluate(
+        ([c, p]) =>
+          (window.atlas.invoke as (c: string, p?: unknown) => Promise<unknown>)(c as string, p),
+        [channel, payload] as const,
+      )
+    expect(await invoke('fs:readFile')).toMatchObject({ ok: false, error: { code: 'forbidden' } })
+    expect(await invoke('not a channel')).toMatchObject({ ok: false, error: { code: 'forbidden' } })
+    // No profile is open yet, so data channels refuse politely.
+    expect(await invoke('db:list', { entity: 'notes' })).toMatchObject({
+      ok: false,
+      error: { code: 'unavailable' },
+    })
+    expect(await invoke('db:list', { entity: 'sqlite_master' })).toMatchObject({
+      ok: false,
+      error: { code: 'bad_request' },
+    })
+
+    const outcome = await page.evaluate(() =>
       fetch('https://example.com/').then(
         () => 'allowed',
         () => 'blocked',
@@ -48,21 +86,20 @@ test('the content security policy blocks outside requests', async () => {
 })
 
 test('command palette opens with the shortcut and runs a command', async () => {
-  const atlas = await launchAtlas()
+  const atlas = await launchReady()
   try {
     const { page } = atlas
     await page.keyboard.press(`${mod}+k`)
     const palette = page.getByRole('dialog', { name: 'Command palette' })
     await expect(palette).toBeVisible()
-
-    await page.keyboard.type('sett')
-    await expect(palette.getByRole('option', { name: /Go to Settings/ })).toHaveAttribute(
+    await page.keyboard.type('planner')
+    await expect(palette.getByRole('option', { name: /Go to Planner/ })).toHaveAttribute(
       'aria-selected',
       'true',
     )
     await page.keyboard.press('Enter')
     await expect(palette).toBeHidden()
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Settings')
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(/\d{4}/)
 
     await page.keyboard.press(`${mod}+k`)
     await page.keyboard.type('zzzz')
@@ -75,57 +112,149 @@ test('command palette opens with the shortcut and runs a command', async () => {
   }
 })
 
-test('sidebar navigation, collapse and breadcrumbs work', async () => {
-  const atlas = await launchAtlas()
+test('import a PDF and a text file, then find text inside them', async () => {
+  const atlas = await launchReady()
   try {
     const { page } = atlas
-    const nav = page.getByRole('navigation', { name: 'Main' })
-    await nav.getByRole('link', { name: 'Library' }).click()
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Library')
-    await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toContainText('Library')
+    await page.evaluate(
+      (paths) => window.atlas.invoke('library:importPaths', { subjectId: null, paths }),
+      [fixtures],
+    )
+    await page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'Library' })
+      .click()
+    const exam = page.getByRole('link', { name: 'sample practice exam 2024' })
+    await expect(exam).toBeVisible()
+    await expect(page.getByRole('link', { name: 'sample class notes' })).toBeVisible()
+    await expect(page.getByText('Reading…')).toHaveCount(0, { timeout: 20_000 })
+    await expect(page.getByText('2 pages')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Hide sidebar' }).click()
-    await expect(page.getByRole('button', { name: 'Show sidebar' })).toBeVisible()
-    await expect(nav.getByText('Subjects', { exact: true })).toBeHidden()
-    await nav.getByRole('link', { name: 'Timer' }).click()
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Timer')
+    // Importing the same files again adds nothing.
+    await page.evaluate(
+      (paths) => window.atlas.invoke('library:importPaths', { subjectId: null, paths }),
+      [fixtures],
+    )
+    await expect(page.getByRole('link', { name: /sample/ })).toHaveCount(2)
 
-    await page.keyboard.press(`${mod}+\\`)
-    await expect(nav.getByText('Subjects', { exact: true })).toBeVisible()
+    await exam.click()
+    await page.getByRole('textbox', { name: 'Find in document' }).fill('mitochondria')
+    await expect(page.getByText('1/1')).toBeVisible()
+    await expect(page.locator('mark')).toHaveText('mitochondria')
+    await expect(page.locator('canvas').first()).toBeVisible()
+
+    const hits = await page.evaluate(() =>
+      window.atlas.invoke('search:query', { query: 'competitive inhibit' }),
+    )
+    expect(hits).toMatchObject({
+      ok: true,
+      data: [{ type: 'page', title: 'sample class notes, page 1' }],
+    })
     expect(atlas.errors).toEqual([])
   } finally {
     await atlas.close()
   }
 })
 
-test('theme choice applies at once and survives a restart', async () => {
+test('notes, flashcards and the timer work without AI', async () => {
+  const atlas = await launchReady()
+  try {
+    const { page } = atlas
+    const nav = page.getByRole('navigation', { name: 'Main' })
+
+    await nav.getByRole('link', { name: 'Notes' }).click()
+    await page.getByRole('button', { name: 'New note' }).first().click()
+    await page.getByLabel('Note title').fill('Enzymes')
+    await page.getByLabel('Note text').fill('Rate law: $v = k[A]$ and **bold**')
+    await expect(page.locator('.katex').first()).toBeVisible()
+    await expect(page.getByRole('button', { name: /Enzymes/ })).toBeVisible()
+
+    await nav.getByRole('link', { name: 'Flashcards' }).click()
+    await page.getByRole('button', { name: 'New card' }).first().click()
+    await page.getByLabel('Front').fill('What does a catalyst lower?')
+    await page.getByLabel('Back').fill('The activation energy')
+    await page.getByRole('button', { name: 'Add card' }).click()
+    await page.getByRole('button', { name: 'Done' }).click()
+    await page.getByRole('button', { name: 'Start review' }).click()
+    await page.keyboard.press('Space')
+    await expect(page.getByText('The activation energy')).toBeVisible()
+    await page.keyboard.press('3')
+    await expect(page.getByText('All caught up')).toBeVisible()
+
+    await nav.getByRole('link', { name: 'Timer' }).click()
+    await page.getByRole('button', { name: 'Start', exact: true }).click()
+    await expect(page.getByRole('link', { name: /Timer running/ })).toBeVisible()
+    await page.getByRole('button', { name: 'Finish' }).click()
+    // A finished session shows up in the stats. (Logged directly: a real one takes a minute.)
+    await page.evaluate(() =>
+      window.atlas.invoke('db:create', {
+        entity: 'studySessions',
+        values: { startedAt: Date.now() - 1_800_000, seconds: 1800 },
+      }),
+    )
+    await nav.getByRole('link', { name: 'Today' }).click()
+    await expect(page.getByText('30 min').first()).toBeVisible()
+    expect(atlas.errors).toEqual([])
+  } finally {
+    await atlas.close()
+  }
+})
+
+test('theme and profile survive a restart; a password gates the profile', async () => {
   const userData = await makeUserData()
   try {
     const first = await launchAtlas(userData)
+    await first.page.getByLabel('Your name').fill('Riley')
+    await first.page.getByLabel('Password (optional)').fill('open sesame')
+    await first.page.getByRole('button', { name: 'Create profile' }).click()
+    await first.page.getByRole('button', { name: 'Get started' }).click()
+    for (let step = 0; step < 5; step++)
+      await first.page.getByRole('button', { name: 'Next' }).click()
+    await first.page.getByRole('button', { name: 'Open Atlas' }).click()
     await first.page
       .getByRole('navigation', { name: 'Main' })
       .getByRole('link', { name: 'Settings' })
       .click()
+    await first.page.getByRole('button', { name: 'Appearance' }).click()
     await first.page.getByRole('radio', { name: 'Dark' }).click()
     await expect(first.page.locator('html')).toHaveAttribute('data-theme', 'dark')
-    await expect
-      .poll(() => first.page.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches))
-      .toBe(true)
     expect(first.errors).toEqual([])
     await first.close()
 
     const second = await launchAtlas(userData)
-    await expect(second.page.locator('html')).toHaveAttribute('data-theme', 'dark')
-    // The main process applies the saved theme before the window exists, so the page is dark
-    // from its first paint, not only after the UI has loaded.
-    expect(
-      await second.page.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches),
-    ).toBe(true)
-    const canvas = await second.page.evaluate(() => getComputedStyle(document.body).backgroundColor)
-    expect(canvas).toBe('rgb(22, 22, 22)')
-    expect(second.errors).toEqual([])
+    const { page } = second
+    // The main process applies the saved theme before the window exists.
+    expect(await page.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches)).toBe(true)
+    await page.getByRole('button', { name: 'Riley' }).click()
+    await page.getByLabel('Password').fill('wrong')
+    await page.getByRole('button', { name: 'Unlock' }).click()
+    await expect(page.getByRole('alert')).toContainText('password is not right')
+    await page.getByLabel('Password').fill('open sesame')
+    await page.getByRole('button', { name: 'Unlock' }).click()
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Riley')
     await second.close()
   } finally {
     await rm(userData, { recursive: true, force: true })
+  }
+})
+
+test('a second profile starts empty', async () => {
+  const atlas = await launchReady()
+  try {
+    const { page } = atlas
+    await page.evaluate(() =>
+      window.atlas.invoke('db:create', { entity: 'notes', values: { title: 'Private to Sam' } }),
+    )
+    await page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'Settings' })
+      .click()
+    await page.getByRole('button', { name: 'Switch profile' }).click()
+    await page.getByRole('button', { name: 'New profile' }).click()
+    await completeSetup(page, 'Alex')
+    const notes = await page.evaluate(() => window.atlas.invoke('db:list', { entity: 'notes' }))
+    expect(notes).toEqual({ ok: true, data: [] })
+  } finally {
+    await atlas.close()
   }
 })

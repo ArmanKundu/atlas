@@ -64,3 +64,24 @@ The repo is initialised locally and commits are made after each phase. Creating 
 ### D-012 Sidebar scope
 
 The sidebar starts with the brief's list (Today, subjects, Exam builder, Timer, Library, Settings). Planner, Results, Studio and the assistant are added to the navigation in the phase that builds them, so nothing in the shell leads to a dead end.
+
+## Phases 2 to 13 (working app pass)
+
+### D-013 Built-in SQLite instead of better-sqlite3 and Drizzle
+
+The database uses Node's built-in `node:sqlite` (shipped in Electron 45, with FTS5) through a small typed repository (`src/main/db/`), not `better-sqlite3` + Drizzle as the brief names. A native module would need rebuilding for every Electron version and architecture, and one Mac could not build both Apple silicon and Intel installers. The schema, versioned migrations, transactions and FTS5 search are the same; swapping the driver later only touches `src/main/db/database.ts`.
+
+### D-014 PDF text is extracted in the interface
+
+pdf.js runs in the renderer (where it is designed to run) for both viewing and text extraction; the extracted text is sent to the main process and stored. Imports are queued in the database, so a quit mid-import resumes on the next launch.
+
+### D-015 AI adapters
+
+- Subscription sign-ins run the provider's own CLI (`claude`, `codex`, `gemini`) in an empty temp folder with a minimal environment. Atlas never reads their credential files. The Claude path is verified live; the Codex and Gemini paths are written from their documented interfaces and not yet run against a real install.
+- API keys use the official SDKs: `@anthropic-ai/sdk` for Anthropic (default model `claude-opus-5-5`, server-side refusal fallback on), and the `openai` SDK for OpenAI, OpenRouter, Google's OpenAI-compatible endpoint, Ollama and LM Studio.
+- Keys are encrypted with Electron `safeStorage` in `userData/secrets.json`, per profile, and never returned to the interface.
+- Profile passwords are hashed with scrypt (Node built-in) rather than argon2, to avoid a native module. The password gates the profile; it does not encrypt the database file.
+
+### D-016 Generic, schema-checked data channels
+
+Instead of one IPC channel per operation per table, `db:list/get/create/update/remove` take an entity name from a fixed list and validate values against that entity's zod schema. Table and column names never come from the interface.
