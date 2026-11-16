@@ -40,6 +40,7 @@ export function PrintExam() {
       bodyMd={(solutions ? exam.data.solutionsMd : exam.data.bodyMd) ?? ''}
       subjectName={subject.data?.name ?? ''}
       kind={subject.data?.kind ?? 'other'}
+      colour={subject.data?.colour}
       minutes={Number((exam.data.config as { minutes?: number }).minutes ?? 60)}
       solutions={solutions}
     />

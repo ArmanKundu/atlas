@@ -224,6 +224,7 @@ export function ExamBuilder() {
                 bodyMd={(tab === 'paper' ? active.bodyMd : active.solutionsMd) ?? ''}
                 subjectName={subjects.find((item) => item.id === active.subjectId)?.name ?? ''}
                 kind={subjects.find((item) => item.id === active.subjectId)?.kind ?? 'other'}
+                colour={subjects.find((item) => item.id === active.subjectId)?.colour}
                 minutes={Number((active.config as { minutes?: number }).minutes ?? 60)}
                 solutions={tab === 'solutions'}
               />

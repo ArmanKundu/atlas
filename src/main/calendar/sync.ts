@@ -100,13 +100,11 @@ export class CalendarSync {
       const events = parseIcs(await this.download(url))
         .filter((e) => e.end > now - 30 * DAY && e.start < now + 200 * DAY)
         .slice(0, 4000)
-      const subjects = db
-        .list('subjects')
-        .map((s) => ({
-          id: String(s['id']),
-          name: String(s['name']),
-          code: (s['code'] as string | null) ?? null,
-        }))
+      const subjects = db.list('subjects').map((s) => ({
+        id: String(s['id']),
+        name: String(s['name']),
+        code: (s['code'] as string | null) ?? null,
+      }))
       db.tx(() => {
         db.run("DELETE FROM calendar_events WHERE source = 'compass_ical'")
         for (const event of events) {

@@ -6,6 +6,8 @@
  *   **a.** Explain ... (2 marks)                  (a part; a line ending in marks gets answer space)
  */
 export interface ExamChunk {
+  /** Part label such as "a." or "ii.", when the chunk is a labelled part. */
+  label: string | null
   markdown: string
   /** Marks this chunk is worth; answer space is sized from it. 0 means no answer space. */
   marks: number
@@ -33,6 +35,17 @@ export interface ParsedExam {
   structured: boolean
 }
 
+const PART_LABEL = /^\s*(?:\*\*)?\(?([a-h]|[ivx]{1,4})[.)](?:\*\*)?\s+/
+
+/** Splits a part into its label ("a."), its text without the marks suffix, and its marks. */
+function toChunk(text: string, marks: number): ExamChunk {
+  let markdown = text.trim()
+  const label = PART_LABEL.exec(markdown)
+  if (label) markdown = markdown.slice(label[0].length)
+  if (marks > 0) markdown = markdown.replace(MARKS_AT_END, '').trim()
+  return { label: label ? `${label[1]}.` : null, markdown, marks }
+}
+
 const MARKS_AT_END = /\((\d+)\s*marks?\)\s*\**\s*$/i
 
 export function parseExam(markdown: string): ParsedExam {
@@ -48,22 +61,24 @@ export function parseExam(markdown: string): ParsedExam {
     const chunks: ExamChunk[] = []
     let buffer: string[] = []
     for (const line of question.lines) {
+      // A labelled part starts a new chunk, so the stem above it stands on its own.
+      if (PART_LABEL.test(line) && buffer.join('').trim()) {
+        chunks.push(toChunk(buffer.join('\n'), 0))
+        buffer = []
+      }
       buffer.push(line)
       const marks = MARKS_AT_END.exec(line.trim())
       if (marks && !section.multipleChoice) {
-        chunks.push({ markdown: buffer.join('\n').trim(), marks: Number(marks[1]) })
+        chunks.push(toChunk(buffer.join('\n'), Number(marks[1])))
         buffer = []
       }
     }
     const rest = buffer.join('\n').trim()
     const partMarks = chunks.reduce((sum, c) => sum + c.marks, 0)
     if (rest)
-      chunks.push({
-        markdown: rest,
-        marks: partMarks === 0 && !section.multipleChoice ? headingMarks : 0,
-      })
-    else if (partMarks === 0 && chunks.length === 0)
-      chunks.push({ markdown: '', marks: section.multipleChoice ? 0 : headingMarks })
+      chunks.push(toChunk(rest, partMarks === 0 && !section.multipleChoice ? headingMarks : 0))
+    else if (chunks.length === 0)
+      chunks.push(toChunk('', section.multipleChoice ? 0 : headingMarks))
     const marks = partMarks || headingMarks || (section.multipleChoice ? 1 : 0)
     section.questions.push({
       heading: question.heading.replace(MARKS_AT_END, '').trim(),
@@ -120,8 +135,9 @@ export function answerSpace(
   kind: string,
 ): { type: 'lines' | 'blank'; count: number } {
   if (marks <= 0) return { type: 'lines', count: 0 }
-  if (kind === 'maths') return { type: 'blank', count: Math.min(14, Math.max(3, marks * 2)) }
+  // Measured from current papers: a short response gets its marks plus two lines.
+  if (kind === 'maths') return { type: 'blank', count: Math.min(16, Math.max(4, marks * 2 + 2)) }
   if (kind === 'essay' || kind === 'language')
-    return { type: 'lines', count: Math.min(56, Math.max(6, marks * 3)) }
-  return { type: 'lines', count: Math.min(30, marks * 2 + 1) }
+    return { type: 'lines', count: Math.min(60, Math.max(6, marks * 3)) }
+  return { type: 'lines', count: Math.min(28, marks + 2) }
 }

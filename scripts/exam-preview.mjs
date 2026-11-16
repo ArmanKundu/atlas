@@ -74,7 +74,7 @@ try {
   await page.waitForTimeout(400)
   await page.screenshot({ path: join(outDir, 'exam-questions.png') })
   await page.getByRole('button', { name: 'Save as PDF' }).click()
-  await page.getByText('PDF saved').waitFor({ timeout: 40000 })
+  await page.getByText('PDF saved').first().waitFor({ timeout: 40000 })
   console.warn('saved', pdf)
 } finally {
   await app.close()

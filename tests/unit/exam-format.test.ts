@@ -37,7 +37,13 @@ describe('parseExam', () => {
     expect(mc?.chunks[0]?.markdown).toContain('**A.**')
     const [q1, q2] = exam.sections[1]?.questions ?? []
     expect(q1?.heading).toBe('Question 1')
-    expect(q1?.chunks.map((c) => c.marks)).toEqual([1, 3, 2])
+    expect(q1?.chunks.map((c) => [c.label, c.marks])).toEqual([
+      [null, 0],
+      ['a.', 1],
+      ['b.', 3],
+      ['c.', 2],
+    ])
+    expect(q1?.chunks[1]?.markdown).toBe('Write a balanced equation.')
     expect(q2?.chunks.map((c) => c.marks)).toEqual([3])
   })
 
@@ -48,9 +54,9 @@ describe('parseExam', () => {
 
 describe('answerSpace', () => {
   it('uses lines for sciences, more lines for essays and blank working for maths', () => {
-    expect(answerSpace(3, 'science')).toEqual({ type: 'lines', count: 7 })
+    expect(answerSpace(3, 'science')).toEqual({ type: 'lines', count: 5 })
     expect(answerSpace(10, 'essay')).toEqual({ type: 'lines', count: 30 })
-    expect(answerSpace(2, 'maths')).toEqual({ type: 'blank', count: 4 })
+    expect(answerSpace(2, 'maths')).toEqual({ type: 'blank', count: 6 })
     expect(answerSpace(0, 'science').count).toBe(0)
   })
 })
