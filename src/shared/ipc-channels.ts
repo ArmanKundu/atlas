@@ -13,6 +13,7 @@ export const IPC_EVENTS = [
   'ai:delta',
   'ai:finished',
   'library:changed',
+  'calendar:changed',
 ] as const
 
 export type IpcEvent = (typeof IPC_EVENTS)[number]

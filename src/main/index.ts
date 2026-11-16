@@ -12,6 +12,7 @@ import {
 } from 'electron'
 import { APP_NAME, APP_SCHEME } from '@shared/constants'
 import { AiService } from './ai/service'
+import { CalendarSync } from './calendar/sync'
 import { SecretStore } from './ai/secrets'
 import { broadcast, registerAppHandlers } from './ipc/handlers/app'
 import { registerDataHandlers } from './ipc/handlers/data'
@@ -84,11 +85,15 @@ async function main(): Promise<void> {
     emitDelta: (payload) => broadcast(windows(), 'ai:delta', payload),
     emitFinished: (payload) => broadcast(windows(), 'ai:finished', payload),
   })
+  const calendar = new CalendarSync(profiles, secrets, log, () =>
+    broadcast(windows(), 'calendar:changed', { at: Date.now() }),
+  )
   registerDataHandlers({
     registry,
     profiles,
     prefs,
     ai,
+    calendar,
     log,
     emit: {
       profileChanged: (activeId) => broadcast(windows(), 'profile:changed', { activeId }),

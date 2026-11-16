@@ -83,6 +83,9 @@ export function AppShell() {
     })
   }, [])
 
+  // The school calendar syncs in the background; refresh anything showing events.
+  useEffect(() => subscribe('calendar:changed', () => changed('calendarEvents', 'calendar')), [])
+
   // Global shortcuts. One listener for the whole shell.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {

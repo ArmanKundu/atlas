@@ -3,11 +3,11 @@ import { Download, FilePlus2, Trash2 } from 'lucide-react'
 import type { Exam } from '@shared/models'
 import { Button, IconButton } from '@/design/Button'
 import { Badge, Field, Input, Select, Textarea } from '@/design/Form'
-import { Markdown } from '@/design/Markdown'
 import { Card, Page, PageHeader } from '@/design/Page'
 import { Segmented } from '@/design/Segmented'
 import { EmptyState, ErrorState } from '@/design/States'
 import { useToast } from '@/design/Toast'
+import { ExamPaper } from '@/features/exam/ExamPaper'
 import { db, useAction, useLive } from '@/lib/api'
 import { useSubjects } from '@/lib/app-state'
 import { call } from '@/lib/ipc'
@@ -218,9 +218,16 @@ export function ExamBuilder() {
                 {exportPdf.error}
               </ErrorState>
             ) : null}
-            <Markdown>
-              {(tab === 'paper' ? active.bodyMd : active.solutionsMd) || 'Nothing here.'}
-            </Markdown>
+            <div className="exam-sheet overflow-hidden rounded-sm">
+              <ExamPaper
+                title={active.title}
+                bodyMd={(tab === 'paper' ? active.bodyMd : active.solutionsMd) ?? ''}
+                subjectName={subjects.find((item) => item.id === active.subjectId)?.name ?? ''}
+                kind={subjects.find((item) => item.id === active.subjectId)?.kind ?? 'other'}
+                minutes={Number((active.config as { minutes?: number }).minutes ?? 60)}
+                solutions={tab === 'solutions'}
+              />
+            </div>
             <p className="mt-6 border-t border-line pt-3 text-2xs text-ink-3">
               AI-written practice questions. Check them against your course before relying on them.
             </p>

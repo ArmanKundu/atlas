@@ -9,6 +9,7 @@ import {
   type ProfileMeta,
 } from '@shared/models'
 import type { AiService } from '../../ai/service'
+import type { CalendarSync } from '../../calendar/sync'
 import type { Database, Row } from '../../db/database'
 import {
   getPages,
@@ -30,6 +31,7 @@ export interface DataHandlerDeps {
   profiles: ProfileManager
   prefs: PrefsStore
   ai: AiService
+  calendar: CalendarSync
   log: Logger
   emit: {
     profileChanged: (activeId: string | null) => void
@@ -90,6 +92,7 @@ export function registerDataHandlers(deps: DataHandlerDeps): void {
 
   registry.handle('profile:create', async (input) => {
     const summary = profiles.create(input)
+    deps.calendar.start()
     await prefs.set({ lastProfileId: summary.id })
     emit.profileChanged(summary.id)
     return summary
@@ -97,6 +100,7 @@ export function registerDataHandlers(deps: DataHandlerDeps): void {
 
   registry.handle('profile:unlock', async ({ id, password }) => {
     const summary = profiles.unlock(id, password)
+    deps.calendar.start()
     await prefs.set({ lastProfileId: summary.id })
     emit.profileChanged(summary.id)
     return summary
@@ -274,6 +278,13 @@ export function registerDataHandlers(deps: DataHandlerDeps): void {
   registry.handle('ai:complete', ({ task, prompt, subjectId }) =>
     ai.complete(task, prompt, subjectId ?? null),
   )
+
+  /* ---------- School calendar ---------- */
+
+  registry.handle('calendar:status', () => deps.calendar.status())
+  registry.handle('calendar:connect', ({ url }) => deps.calendar.connect(url))
+  registry.handle('calendar:sync', () => deps.calendar.sync())
+  registry.handle('calendar:disconnect', () => deps.calendar.disconnect())
 
   /* ---------- Exam builder ---------- */
 

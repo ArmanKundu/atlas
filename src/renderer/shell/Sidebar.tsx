@@ -18,7 +18,7 @@ const linkClass =
       'flex h-8 items-center gap-2.5 rounded-md text-ink-2 select-none',
       'transition-colors duration-150 ease-out hover:bg-hover hover:text-ink',
       collapsed ? 'w-8 justify-center' : 'px-2',
-      isActive && 'bg-surface font-medium text-ink shadow-pill hover:bg-surface',
+      isActive && 'bg-active font-medium text-ink hover:bg-active',
     )
 
 function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {

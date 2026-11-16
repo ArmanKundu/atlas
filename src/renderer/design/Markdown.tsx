@@ -4,6 +4,8 @@ import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import 'katex/dist/katex.min.css'
+// Chemistry notation: \\ce{H2SO4}, reaction arrows and state symbols.
+import 'katex/contrib/mhchem'
 import { cn } from '@/lib/cn'
 
 /** Models often write \( \) and \[ \]; remark-math reads $ and $$. */

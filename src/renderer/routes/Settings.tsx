@@ -13,7 +13,7 @@ import { Segmented, type SegmentedOption } from '@/design/Segmented'
 import { ErrorState } from '@/design/States'
 import { useToast } from '@/design/Toast'
 import { AiProviders } from '@/features/ai/AiProviders'
-import { db, useAction, useLive } from '@/lib/api'
+import { changed, db, useAction, useLive } from '@/lib/api'
 import { useAppState, useSubjects } from '@/lib/app-state'
 import { cn } from '@/lib/cn'
 import { call } from '@/lib/ipc'
@@ -27,12 +27,13 @@ import {
   type MascotColour,
 } from '@/mascot/options'
 
-const TABS = ['profile', 'subjects', 'ai', 'backups', 'appearance', 'about'] as const
+const TABS = ['profile', 'subjects', 'ai', 'calendar', 'backups', 'appearance', 'about'] as const
 type Tab = (typeof TABS)[number]
 const TAB_LABELS: Record<Tab, string> = {
   profile: 'Profile',
   subjects: 'Subjects',
   ai: 'AI',
+  calendar: 'School calendar',
   backups: 'Backups and export',
   appearance: 'Appearance',
   about: 'About',
@@ -334,6 +335,130 @@ function BackupsTab() {
   )
 }
 
+function CalendarTab() {
+  const toast = useToast()
+  const [url, setUrl] = useState('')
+  const status = useLive(['calendar'], () => call('calendar:status'))
+  const after = (): void => {
+    status.reload()
+    changed('calendarEvents')
+  }
+  const connect = useAction(async () => {
+    const result = await call('calendar:connect', { url })
+    setUrl('')
+    after()
+    toast({
+      title: 'Calendar connected',
+      description: `${result.events} events added to your Planner.`,
+    })
+  })
+  const sync = useAction(async () => {
+    const result = await call('calendar:sync')
+    after()
+    if (!result.error) toast({ title: 'Calendar synced', description: `${result.events} events.` })
+  })
+  const disconnect = useAction(async () => {
+    await call('calendar:disconnect')
+    after()
+  })
+  const connected = status.data?.connected ?? false
+
+  return (
+    <>
+      <Section
+        title="School calendar"
+        description="Shows your timetable, assessments and events in the Planner and on Today. Atlas only reads the calendar; it never changes anything in your school portal."
+      >
+        <Card className="p-4">
+          <p className="font-semibold">Compass</p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-ink-2">
+            <li>
+              Open Compass in your browser and go to{' '}
+              <span className="font-medium text-ink">Calendar</span>.
+            </li>
+            <li>
+              Click the sync button at the top right of the calendar (it may be under the cog) and
+              choose <span className="font-medium text-ink">Sync my schedule</span>.
+            </li>
+            <li>
+              Copy the link it shows. It starts with{' '}
+              <span className="font-mono text-2xs">https://</span> or{' '}
+              <span className="font-mono text-2xs">webcal://</span>.
+            </li>
+            <li>Paste it below.</li>
+          </ol>
+          <p className="mt-3 text-ink-3">
+            Canvas, Google Classroom, SEQTA, Schoolbox and Outlook also have a calendar subscription
+            (iCal) link, and any of them work here.
+          </p>
+        </Card>
+      </Section>
+
+      <Section title={connected ? 'Connected' : 'Connect'}>
+        <Card>
+          {connected ? (
+            <>
+              <Row
+                label={`${status.data?.events ?? 0} events from your school calendar`}
+                hint={
+                  status.data?.lastSyncedAt
+                    ? `Last synced ${new Date(status.data.lastSyncedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}. Syncs every hour while Atlas is open.`
+                    : 'Not synced yet.'
+                }
+              >
+                <Button disabled={sync.pending} onClick={() => void sync.run()}>
+                  {sync.pending ? 'Syncing…' : 'Sync now'}
+                </Button>
+              </Row>
+              <Row
+                label="Disconnect"
+                hint="Removes the saved link and the events it added. Events you made yourself stay."
+              >
+                <Button
+                  variant="danger"
+                  disabled={disconnect.pending}
+                  onClick={() => void disconnect.run()}
+                >
+                  Disconnect
+                </Button>
+              </Row>
+            </>
+          ) : (
+            <form
+              className="flex gap-2 p-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (url.trim()) void connect.run()
+              }}
+            >
+              <Input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="Paste your calendar link"
+                aria-label="Calendar link"
+                type="password"
+                autoComplete="off"
+              />
+              <Button type="submit" variant="primary" disabled={!url.trim() || connect.pending}>
+                {connect.pending ? 'Connecting…' : 'Connect'}
+              </Button>
+            </form>
+          )}
+        </Card>
+        <p className="mt-2 text-2xs text-ink-3">
+          The link is private, so it is kept in this computer’s keychain, not in the database or in
+          exports.
+        </p>
+        {connect.error || sync.error || disconnect.error || status.data?.error ? (
+          <ErrorState title="The calendar did not sync" className="mt-3">
+            {connect.error ?? sync.error ?? disconnect.error ?? status.data?.error}
+          </ErrorState>
+        ) : null}
+      </Section>
+    </>
+  )
+}
+
 function AppearanceTab() {
   const { prefs, setPrefs } = useAppState()
   const [error, setError] = useState<string | null>(null)
@@ -453,6 +578,7 @@ export function Settings() {
               <AiProviders />
             </Section>
           ) : null}
+          {tab === 'calendar' ? <CalendarTab /> : null}
           {tab === 'backups' ? <BackupsTab /> : null}
           {tab === 'appearance' ? <AppearanceTab /> : null}
           {tab === 'about' ? <AboutTab /> : null}

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useParams, useSearchParams } from 'react-router'
-import { Markdown } from '@/design/Markdown'
+import { ExamPaper } from '@/features/exam/ExamPaper'
 import { db, useLive } from '@/lib/api'
 
 /**
@@ -12,6 +12,12 @@ export function PrintExam() {
   const [params] = useSearchParams()
   const solutions = params.get('variant') === 'solutions'
   const exam = useLive([], () => db.get('exams', examId), [examId])
+  const subjectId = exam.data?.subjectId ?? null
+  const subject = useLive(
+    [],
+    () => (subjectId ? db.get('subjects', subjectId) : Promise.resolve(null)),
+    [subjectId],
+  )
 
   useEffect(() => {
     document.documentElement.dataset.theme = 'light'
@@ -19,20 +25,23 @@ export function PrintExam() {
     document.body.style.background = '#fff'
   }, [])
 
+  const ready = !exam.loading && !subject.loading
   useEffect(() => {
-    if (exam.loading) return
+    if (!ready) return
     void document.fonts.ready.then(() =>
       requestAnimationFrame(() => (document.title = 'atlas-print-ready')),
     )
-  }, [exam.loading])
+  }, [ready])
 
-  if (!exam.data) return null
+  if (!exam.data || !ready) return null
   return (
-    <main className="mx-auto max-w-[760px] bg-white p-2 text-black">
-      <p className="mb-4 border-b border-black/20 pb-2 font-mono text-[0.7rem] tracking-wider text-black/60 uppercase">
-        {solutions ? 'Solutions booklet' : 'Question booklet'} · Practice paper
-      </p>
-      <Markdown>{(solutions ? exam.data.solutionsMd : exam.data.bodyMd) ?? ''}</Markdown>
-    </main>
+    <ExamPaper
+      title={exam.data.title}
+      bodyMd={(solutions ? exam.data.solutionsMd : exam.data.bodyMd) ?? ''}
+      subjectName={subject.data?.name ?? ''}
+      kind={subject.data?.kind ?? 'other'}
+      minutes={Number((exam.data.config as { minutes?: number }).minutes ?? 60)}
+      solutions={solutions}
+    />
   )
 }

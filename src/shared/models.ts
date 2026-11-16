@@ -425,6 +425,10 @@ export const AgentInfoSchema = z.object({
   description: z.string(),
   icon: z.string(),
   placeholder: z.string(),
+  /** Heading the helper is listed under. */
+  group: z.string(),
+  /** Subject kinds this helper is made for. Missing means every subject. */
+  kinds: z.array(z.string()).optional(),
 })
 export type AgentInfo = z.infer<typeof AgentInfoSchema>
 

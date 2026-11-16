@@ -65,6 +65,14 @@ export const RendererErrorSchema = z.object({
   stack: z.string().max(8000).optional(),
 })
 
+export const CalendarStatusSchema = z.object({
+  connected: z.boolean(),
+  lastSyncedAt: z.number().nullable(),
+  events: z.number(),
+  error: z.string().nullable(),
+})
+export type CalendarStatus = z.infer<typeof CalendarStatusSchema>
+
 const id = z.string().min(1).max(64)
 const entity = z.enum(ENTITY_NAMES)
 const row = z.record(z.string(), z.unknown())
@@ -199,6 +207,15 @@ export const ipcContract = {
     response: z.object({ text: z.string(), provider: z.string(), model: z.string().nullable() }),
   },
 
+  // School calendar (iCal subscription link, read-only)
+  'calendar:status': { request: none, response: CalendarStatusSchema },
+  'calendar:connect': {
+    request: z.object({ url: z.string().min(8).max(2000) }),
+    response: CalendarStatusSchema,
+  },
+  'calendar:sync': { request: none, response: CalendarStatusSchema },
+  'calendar:disconnect': { request: none, response: CalendarStatusSchema },
+
   // Exam builder
   'exam:exportPdf': {
     request: z.object({ examId: id, variant: z.enum(['paper', 'solutions']) }),
@@ -216,6 +233,7 @@ export const ipcEvents = {
   'ai:delta': z.object({ chatId: z.string(), messageId: z.string(), text: z.string() }),
   'ai:finished': z.object({ chatId: z.string(), message: ChatMessageSchema }),
   'library:changed': z.object({ sourceId: z.string().nullable() }),
+  'calendar:changed': z.object({ at: z.number() }),
 } as const satisfies Record<IpcEvent, z.ZodType>
 
 export type IpcRequest<C extends IpcChannel> = z.input<(typeof ipcContract)[C]['request']>

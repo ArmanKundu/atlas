@@ -58,8 +58,12 @@
 }
 
 @theme inline {
-  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-serif: 'Newsreader Variable', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter Variable', 'Segoe UI', system-ui,
+    sans-serif;
+  --font-serif:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter Variable', 'Segoe UI', system-ui,
+    sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
   --color-canvas: var(--atlas-canvas);
@@ -114,7 +118,7 @@
     font-family: var(--font-sans);
     font-size: var(--text-ui);
     line-height: var(--text-ui--line-height);
-    font-feature-settings: 'cv11', 'ss03';
+    letter-spacing: -0.003em;
   }
 
   ::selection {
@@ -299,5 +303,225 @@
   .atlas-prose li,
   .atlas-prose table {
     break-inside: avoid;
+  }
+}
+
+/* Practice exam paper: the layout conventions of an official written examination. */
+.exam-paper {
+  position: relative;
+  background: #fff;
+  color: #000;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11pt;
+  line-height: 1.35;
+  padding: 16mm 24mm 16mm 18mm;
+}
+.exam-paper .atlas-prose {
+  color: #000;
+  font-size: 11pt;
+  line-height: 1.4;
+}
+.exam-band {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 9mm;
+  background: #3b3b3b;
+  color: #fff;
+  overflow: hidden;
+}
+.exam-band span {
+  position: sticky;
+  top: 40%;
+  display: block;
+  writing-mode: vertical-rl;
+  margin: 0 auto;
+  padding-top: 20mm;
+  font-size: 9pt;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.exam-cover {
+  min-height: 250mm;
+  text-align: center;
+}
+.exam-cover h1 {
+  margin-top: 26mm;
+  font-size: 22pt;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.exam-cover h2 {
+  margin: 12mm 0 8mm;
+  font-size: 14pt;
+  font-weight: 700;
+}
+.exam-kind {
+  margin-top: 3mm;
+  font-size: 15pt;
+  font-weight: 700;
+}
+.exam-meta {
+  margin-top: 2.5mm;
+  font-size: 12pt;
+  font-weight: 700;
+}
+.exam-student {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2mm;
+}
+.exam-student-label {
+  font-size: 9pt;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.exam-student-boxes {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+}
+.exam-student-boxes span {
+  width: 9mm;
+  height: 11mm;
+  border: 0.4mm solid #000;
+  margin-left: -0.4mm;
+}
+.exam-student-boxes em {
+  margin: 0 2mm 0 5mm;
+  font-size: 8pt;
+  font-style: normal;
+}
+.exam-table-title,
+.exam-rules-title {
+  margin: 4mm 0 2mm;
+  font-size: 11pt;
+  font-weight: 700;
+  text-align: center;
+}
+.exam-rules-title {
+  text-align: left;
+}
+.exam-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10pt;
+}
+.exam-table th,
+.exam-table td {
+  border: 0.3mm solid #000;
+  padding: 2mm 3mm;
+  text-align: center;
+  font-style: italic;
+  font-weight: 400;
+}
+.exam-table td {
+  font-style: normal;
+}
+.exam-table .exam-total {
+  text-align: right;
+  font-weight: 700;
+}
+.exam-rules {
+  margin: 4mm 0 0;
+  padding-left: 6mm;
+  list-style: disc;
+  text-align: left;
+  font-size: 10pt;
+}
+.exam-rules li {
+  margin: 1.2mm 0;
+}
+.exam-footnote {
+  margin-top: 12mm;
+  border-top: 0.3mm solid #000;
+  padding-top: 3mm;
+  font-size: 8pt;
+  color: #333;
+}
+.exam-section {
+  break-before: page;
+  margin-top: 14mm;
+}
+.exam-section-title {
+  margin-bottom: 5mm;
+  font-size: 14pt;
+  font-weight: 700;
+  text-align: center;
+}
+.exam-instructions {
+  margin-bottom: 7mm;
+  border: 0.4mm solid #000;
+  padding: 3mm 5mm 4mm;
+}
+.exam-instructions-title {
+  margin-bottom: 1.5mm;
+  font-weight: 700;
+  text-align: center;
+}
+.exam-instructions ul {
+  list-style: disc;
+  padding-left: 6mm;
+}
+.exam-question {
+  margin: 0 0 8mm;
+}
+.exam-question-heading {
+  margin-bottom: 1.5mm;
+  font-weight: 700;
+}
+.exam-question-heading span {
+  font-weight: 400;
+}
+.exam-chunk {
+  break-inside: avoid;
+  margin-bottom: 3mm;
+}
+.exam-lines {
+  margin-top: 2mm;
+}
+.exam-line {
+  height: 9mm;
+  border-bottom: 0.25mm solid #555;
+}
+.exam-blank {
+  margin-top: 2mm;
+}
+.exam-end {
+  margin-top: 10mm;
+  font-size: 10pt;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+/* On screen the paper sits on the page like a sheet. */
+.exam-sheet {
+  margin: 0 auto;
+  max-width: 210mm;
+  box-shadow: var(--atlas-shadow-pop);
+}
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  .exam-paper {
+    padding: 0 24mm 0 18mm;
+  }
+  .exam-band {
+    position: fixed;
+  }
+  .exam-cover {
+    padding-top: 16mm;
+  }
+  .exam-section {
+    padding-top: 16mm;
+    margin-top: 0;
+  }
+  .exam-question {
+    padding-top: 2mm;
   }
 }

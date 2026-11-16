@@ -85,3 +85,13 @@ pdf.js runs in the renderer (where it is designed to run) for both viewing and t
 ### D-016 Generic, schema-checked data channels
 
 Instead of one IPC channel per operation per table, `db:list/get/create/update/remove` take an entity name from a fixed list and validate values against that entity's zod schema. Table and column names never come from the interface.
+
+### D-017 Look revised toward Apple and ChatGPT
+
+At the owner's request the look moved away from the warm editorial paper: cool neutral greys (`#f5f5f7`), the system font (San Francisco on Mac, Segoe UI on Windows, Inter as the bundled fallback) for both body and headings, a plain grey pill for the selected sidebar item, and Apple blue for focus. Ink stays the accent. The token names are unchanged, so a fuller redesign from the owner's reference screenshots only needs new values.
+
+### D-018 More helpers, school calendar, exam layout
+
+- **Helpers:** 26 assistants grouped by purpose, with subject-specific ones (English, Maths, Science, Accounting, Languages) shown first inside a matching subject.
+- **School calendar:** read-only sync from an iCal subscription link (Compass and other portals), hourly, with events matched to subjects by name or code. The link is kept in the keychain. Times with a named time zone are read as this computer's local time.
+- **Exam layout:** practice papers follow the layout conventions of an official written examination (cover with student-number boxes and a structure table, section instructions, answer lines sized by marks, a "Do not write in this area" strip). They carry no examining body's name or branding and are labelled as AI-written practice papers.

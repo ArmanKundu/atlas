@@ -19,11 +19,19 @@ Task: turn the provided material into tight revision notes in Markdown: a title 
 
 Task: write a practice exam to the specification the student gives (subject, topics, number of multiple-choice questions, extended-response marks, time). These are practice questions you write yourself; do not reproduce questions from published papers.
 Requirements: number every question, show the mark allocation in brackets at the end of each question or part, like "(3 marks)", use command terms appropriate to the course, and make the total match the request.
-Output format, exactly:
+Output format, exactly (the app lays the paper out from these headings):
 # <exam title>
-<the question paper in Markdown, with "## Section A" style headings>
+## Section A - Multiple-choice questions
+### Question 1
+<question text, then the options on separate lines as "A. ...", "B. ...", "C. ...", "D. ...">
+## Section B - Short-answer and extended-response questions
+### Question 1 (6 marks)
+<stem or context for the question, if any>
+**a.** <part text> (2 marks)
+**b.** <part text> (4 marks)
+Rules: every question starts with a "### Question N" heading; in written sections the heading carries the question's total marks, and every part ends its line with its marks in brackets; a question with no parts ends with its marks in brackets. Leave out a section that has no questions. Restart numbering in each section.
 ===SOLUTIONS===
-<a solutions booklet: for each question, the answer and the marking points, one per mark>`,
+<a solutions booklet in Markdown: for each question, the answer and the marking points, one per mark>`,
 
   plan: `${HOUSE_RULES}
 

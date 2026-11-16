@@ -168,6 +168,26 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
   const input = useRef<HTMLTextAreaElement>(null)
 
   const agents = useLive([], () => call('ai:agents'))
+  const subject = useLive(
+    ['subjects'],
+    () => (subjectId ? db.get('subjects', subjectId) : Promise.resolve(null)),
+    [subjectId],
+  )
+  // Helpers grouped by purpose. Inside a subject, the ones made for that kind of subject come
+  // first and helpers for other kinds of subject are left out.
+  const agentGroups = useMemo(() => {
+    const kind = subject.data?.kind
+    const groups = new Map<string, AgentInfo[]>()
+    for (const item of agents.data ?? []) {
+      const made = item.kinds && kind ? item.kinds.includes(kind) : false
+      if (subjectId && item.kinds && !made) continue
+      const group = made ? `For ${subject.data?.name ?? 'this subject'}` : item.group
+      groups.set(group, [...(groups.get(group) ?? []), item])
+    }
+    return [...groups]
+      .map(([group, items]) => ({ group, items }))
+      .sort((a, b) => Number(b.group.startsWith('For ')) - Number(a.group.startsWith('For ')))
+  }, [agents.data, subject.data, subjectId])
   const chats = useLive(
     ['chats'],
     () =>
@@ -334,27 +354,34 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
                     </Link>
                   </div>
                 ) : null}
-                <div className="mt-6 grid w-full grid-cols-2 gap-2 text-left min-[1150px]:grid-cols-3">
-                  {agents.data?.map((item) => {
-                    const Icon = agentIcon(item.icon)
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => newChat(item.id)}
-                        aria-pressed={item.id === agentId}
-                        className="flex items-start gap-2.5 rounded-lg p-3 text-left ring-1 ring-line ring-inset hover:bg-sunken aria-pressed:ring-2 aria-pressed:ring-accent"
-                      >
-                        <Icon className="mt-0.5 size-4 shrink-0 text-ink-2" aria-hidden />
-                        <span>
-                          <span className="block font-medium text-ink">{item.name}</span>
-                          <span className="block text-2xs leading-4 text-ink-3">
-                            {item.description}
-                          </span>
-                        </span>
-                      </button>
-                    )
-                  })}
+                <div className="mt-6 flex w-full flex-col gap-5 text-left">
+                  {agentGroups.map(({ group, items }) => (
+                    <section key={group}>
+                      <h3 className="mb-2 text-2xs font-medium text-ink-3">{group}</h3>
+                      <div className="grid grid-cols-2 gap-2 min-[1150px]:grid-cols-3">
+                        {items.map((item) => {
+                          const Icon = agentIcon(item.icon)
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => newChat(item.id)}
+                              aria-pressed={item.id === agentId}
+                              className="flex items-start gap-2.5 rounded-lg p-3 text-left ring-1 ring-line ring-inset hover:bg-sunken aria-pressed:ring-2 aria-pressed:ring-accent"
+                            >
+                              <Icon className="mt-0.5 size-4 shrink-0 text-ink-2" aria-hidden />
+                              <span>
+                                <span className="block font-medium text-ink">{item.name}</span>
+                                <span className="block text-2xs leading-4 text-ink-3">
+                                  {item.description}
+                                </span>
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </section>
+                  ))}
                 </div>
               </div>
             ) : (

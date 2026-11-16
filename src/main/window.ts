@@ -5,7 +5,7 @@ import type { Logger } from './log'
 import { isAppUrl, isSafeExternalUrl } from './security'
 
 /** Window background per theme, matching `--atlas-canvas`, so there is no flash before paint. */
-const CANVAS = { light: '#f1f1ef', dark: '#161616' } as const
+const CANVAS = { light: '#f5f5f7', dark: '#1c1c1e' } as const
 
 export function canvasColor(): string {
   return nativeTheme.shouldUseDarkColors ? CANVAS.dark : CANVAS.light
@@ -106,7 +106,8 @@ export async function printRouteToPdf(options: {
     return await window.webContents.printToPDF({
       pageSize: 'A4',
       printBackground: true,
-      margins: { top: 0.7, bottom: 0.7, left: 0.7, right: 0.7 },
+      preferCSSPageSize: true,
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
     })
   } finally {
     window.destroy()
