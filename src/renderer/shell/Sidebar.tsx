@@ -116,7 +116,7 @@ export function Sidebar({
   const now = useNow()
   const { meta } = useAppState()
   const subjects = useSubjects()
-  const stats = useLive(['stats', 'flashcards'], () => call('stats:summary'))
+  const stats = useLive(['stats', 'flashcards', 'mistakes'], () => call('stats:summary'))
 
   const colour = (meta?.avatarColour ?? 'ink') as MascotColour
   const accessory = (meta?.avatarAccessory ?? 'none') as MascotAccessory
@@ -134,6 +134,7 @@ export function Sidebar({
     )
     .sort((a, b) => a.date - b.date)[0]
   const due = stats.data?.dueCards ?? 0
+  const mistakes = stats.data?.openMistakes ?? 0
 
   return (
     <nav
@@ -235,6 +236,11 @@ export function Sidebar({
                   <span className="rounded-full bg-active px-1.5 text-2xs font-medium text-ink-2 tabular-nums">
                     {due}
                     <span className="sr-only"> due</span>
+                  </span>
+                ) : item.to === '/questions' && mistakes > 0 ? (
+                  <span className="rounded-full bg-active px-1.5 text-2xs font-medium text-ink-2 tabular-nums">
+                    {mistakes}
+                    <span className="sr-only"> open mistakes</span>
                   </span>
                 ) : undefined
               }

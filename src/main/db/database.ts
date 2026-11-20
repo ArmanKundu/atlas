@@ -43,6 +43,11 @@ CREATE TABLE profile_meta (
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE ai_usage (day TEXT NOT NULL, provider TEXT NOT NULL, calls INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, provider));`,
   },
+  {
+    version: 2,
+    name: 'question regions',
+    sql: `ALTER TABLE questions ADD COLUMN regions TEXT NOT NULL DEFAULT '[]';`,
+  },
 ]
 
 export function latestVersion(migrations: Migration[] = MIGRATIONS): number {

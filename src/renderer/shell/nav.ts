@@ -3,6 +3,7 @@ import {
   FileText,
   House,
   Layers,
+  ListChecks,
   Library,
   MessageCircle,
   NotebookPen,
@@ -56,6 +57,12 @@ export const NAV_PRIMARY: NavItem[] = [
 
 /** Study tools, shown in a quieter second group. */
 export const NAV_SECONDARY: NavItem[] = [
+  {
+    to: '/questions',
+    label: 'Questions',
+    icon: ListChecks,
+    keywords: ['practice', 'past papers', 'mistakes', 'marking', 'question bank'],
+  },
   { to: '/notes', label: 'Notes', icon: NotebookPen, keywords: ['write', 'markdown', 'summary'] },
   {
     to: '/flashcards',

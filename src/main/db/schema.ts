@@ -364,8 +364,17 @@ export const SCHEMA_V1 = {
   },
 } as const satisfies Record<string, TableDef>
 
-/** The current shape of every table. Equal to v1 until a later migration changes something. */
-export const TABLES: Record<string, TableDef> = SCHEMA_V1
+/**
+ * The current shape of every table: v1 plus later migrations.
+ * v2 adds `questions.regions`, the boxes drawn around a question on its source's pages.
+ */
+export const TABLES: Record<string, TableDef> = {
+  ...SCHEMA_V1,
+  questions: {
+    ...SCHEMA_V1.questions,
+    cols: { ...SCHEMA_V1.questions.cols, regions: 'json[]' },
+  },
+}
 export type TableName = keyof typeof SCHEMA_V1
 
 function columnSql(name: string, type: ColumnType): string {

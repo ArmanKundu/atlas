@@ -191,6 +191,16 @@ export const MistakeInput = z.object({
   reviewDue: ts.nullable().default(null),
 })
 
+/** A box on a source page, as fractions of the page (0 to 1) so it survives any zoom. */
+export const RegionSchema = z.object({
+  page: z.number().int().min(1),
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  w: z.number().min(0).max(1),
+  h: z.number().min(0).max(1),
+})
+export type Region = z.infer<typeof RegionSchema>
+
 export const QuestionInput = z.object({
   subjectId: id,
   sourceId: refId,
@@ -203,6 +213,7 @@ export const QuestionInput = z.object({
   stemMd: text().min(1),
   parts: z.array(z.unknown()).default([]),
   pageRefs: z.array(z.number().int()).default([]),
+  regions: z.array(RegionSchema).max(20).default([]),
   topicIds: z.array(z.string()).default([]),
   difficulty: optInt,
   stateAverage: optNum,
@@ -291,6 +302,10 @@ export type Assessment = EntityRow<'assessments'>
 export type Exam = EntityRow<'exams'>
 export type Chat = EntityRow<'chats'>
 export type Memory = EntityRow<'memories'>
+export type Question = EntityRow<'questions'>
+export type Answer = EntityRow<'answers'>
+export type Attempt = EntityRow<'attempts'>
+export type Mistake = EntityRow<'mistakes'>
 
 /** A source row as stored: the editable fields plus what the import pipeline recorded. */
 export type Source = EntityRow<'sources'> & {

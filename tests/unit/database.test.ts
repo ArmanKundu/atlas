@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Database, latestVersion, newId, toFtsQuery } from '../../src/main/db/database'
+import { Database, latestVersion, MIGRATIONS, newId, toFtsQuery } from '../../src/main/db/database'
 import { importPaths, savePages, search } from '../../src/main/library'
 import { writeFileSync } from 'node:fs'
 
@@ -33,6 +33,28 @@ describe('migrations', () => {
     expect(() => db.migrate(bad)).toThrow()
     expect(db.version).toBe(latestVersion())
     expect(db.one("SELECT name FROM sqlite_master WHERE name = 'ok_table'")).toBeUndefined()
+  })
+})
+
+describe('question regions (migration 2)', () => {
+  it('upgrade a version 1 database and store boxes on questions', () => {
+    const oldDir = mkdtempSync(join(tmpdir(), 'atlas-v1-'))
+    const old = new Database(join(oldDir, 'atlas.db'))
+    try {
+      old.migrate(MIGRATIONS.filter((m) => m.version === 1))
+      expect(old.version).toBe(1)
+      old.migrate()
+      const subject = old.insert('subjects', { name: 'Chem', kind: 'science', colour: 'teal' })
+      const q = old.insert('questions', {
+        subjectId: subject['id'],
+        stemMd: 'Question 1',
+        regions: [{ page: 2, x: 0.1, y: 0.2, w: 0.5, h: 0.3 }],
+      })
+      expect(q['regions']).toEqual([{ page: 2, x: 0.1, y: 0.2, w: 0.5, h: 0.3 }])
+    } finally {
+      old.close()
+      rmSync(oldDir, { recursive: true, force: true })
+    }
   })
 })
 

@@ -258,3 +258,67 @@ test('a second profile starts empty', async () => {
     await atlas.close()
   }
 })
+
+test('mark a question on a paper, practise it and log a mistake', async () => {
+  const atlas = await launchReady()
+  try {
+    const { page } = atlas
+    await page.evaluate(
+      async (paths) => {
+        await window.atlas.invoke('db:create', {
+          entity: 'subjects',
+          values: { name: 'Chemistry', kind: 'science', colour: 'teal' },
+        })
+        await window.atlas.invoke('library:importPaths', { subjectId: null, paths })
+      },
+      [resolve('tests/fixtures/sample-practice-exam-2024.pdf')],
+    )
+    await page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'Library' })
+      .click()
+    await expect(page.getByText('Reading…')).toHaveCount(0, { timeout: 20_000 })
+    await page.getByRole('link', { name: 'sample practice exam 2024' }).click()
+
+    // Draw a box around Question 1 on page 1.
+    await page.getByRole('button', { name: 'Mark questions' }).click()
+    const firstPage = page.locator('#page-1')
+    await expect(firstPage.locator('canvas')).toBeVisible()
+    const box = await firstPage.boundingBox()
+    if (!box) throw new Error('page 1 has no box')
+    await page.mouse.move(box.x + box.width * 0.08, box.y + box.height * 0.2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.33, { steps: 8 })
+    await page.mouse.up()
+
+    // Atlas read the number and marks from the text in the box.
+    await expect(page.getByRole('button', { name: 'Open Question 1' })).toBeVisible()
+    await expect(page.getByText('3 marks')).toBeVisible()
+    await page.keyboard.press('Escape')
+
+    // Add a solution, then practise with it hidden.
+    await page.getByRole('radio', { name: 'Details' }).click()
+    await page.getByLabel(/^Solution/).fill('A catalyst lowers the activation energy.')
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await page.getByRole('radio', { name: 'Practice' }).click()
+    await expect(page.getByText('lowers the activation energy')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Check answer' }).click()
+    await expect(page.getByText('A catalyst lowers the activation energy.')).toBeVisible()
+    await page.getByRole('radio', { name: '1', exact: true }).click()
+    await page.getByRole('button', { name: 'Save mark' }).click()
+    await page.getByLabel(/^Note to yourself/).fill('Mention activation energy')
+    await page.getByRole('button', { name: 'Log mistake' }).click()
+    await expect(page.getByText('Saved: 1 out of 3')).toBeVisible()
+
+    // The mistake is waiting on the Questions page.
+    await page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: /Questions/ })
+      .click()
+    await page.getByRole('radio', { name: /Mistakes/ }).click()
+    await expect(page.getByText('Mention activation energy')).toBeVisible()
+    expect(atlas.errors).toEqual([])
+  } finally {
+    await atlas.close()
+  }
+})

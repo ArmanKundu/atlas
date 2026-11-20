@@ -71,6 +71,32 @@ try {
   await page.waitForTimeout(1500)
   await page.getByRole('textbox', { name: 'Find in document' }).fill('mitochondria')
   await shot('08-viewer')
+  // Mark Question 1 and open it in the inspector.
+  await page.getByRole('button', { name: 'Clear' }).click()
+  await page.getByRole('button', { name: 'Mark questions' }).click()
+  const pageBox = await page.locator('#page-1').boundingBox()
+  if (pageBox) {
+    await page.mouse.move(pageBox.x + pageBox.width * 0.08, pageBox.y + pageBox.height * 0.2)
+    await page.mouse.down()
+    await page.mouse.move(pageBox.x + pageBox.width * 0.9, pageBox.y + pageBox.height * 0.33, {
+      steps: 8,
+    })
+    await page.mouse.up()
+  }
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+  await shot('08b-viewer-question')
+  await page.getByRole('button', { name: 'Check answer' }).click()
+  await page.getByRole('radio', { name: '2', exact: true }).click()
+  await page.getByRole('button', { name: 'Save mark' }).click()
+  await page.getByRole('button', { name: 'Log mistake' }).click()
+  await go('#/questions')
+  await page
+    .getByRole('button', { name: /Question 1/ })
+    .first()
+    .click()
+  await page.waitForTimeout(600)
+  await shot('08c-questions')
   await go('#/assistant')
   await shot('09-assistant')
   await go('#/notes')

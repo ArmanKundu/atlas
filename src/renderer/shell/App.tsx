@@ -10,6 +10,7 @@ import { AppStateProvider, useAppState } from '@/lib/app-state'
 import { DesignSystem } from '@/routes/DesignSystem'
 import { ExamBuilder } from '@/routes/ExamBuilder'
 import { Planner } from '@/routes/Planner'
+import { Questions } from '@/routes/Questions'
 import { PrintExam } from '@/routes/PrintExam'
 import { Settings } from '@/routes/Settings'
 import { SubjectRoute } from '@/routes/Subject'
@@ -34,6 +35,7 @@ const router = createHashRouter([
       { path: 'library', element: <LibraryRoute />, handle: { crumb: 'Library' } },
       { path: 'viewer/:sourceId', element: <Viewer />, handle: { crumb: 'Library' } },
       { path: 'notes', element: <NotesRoute />, handle: { crumb: 'Notes' } },
+      { path: 'questions', element: <Questions />, handle: { crumb: 'Questions' } },
       { path: 'flashcards', element: <FlashcardsRoute />, handle: { crumb: 'Flashcards' } },
       { path: 'planner', element: <Planner />, handle: { crumb: 'Planner' } },
       { path: 'timer', element: <TimerRoute />, handle: { crumb: 'Timer' } },
