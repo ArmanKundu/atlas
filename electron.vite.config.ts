@@ -9,7 +9,13 @@ export default defineConfig({
   main: {
     resolve: { alias: { '@shared': shared } },
     build: {
-      rollupOptions: { input: resolve(__dirname, 'src/main/index.ts') },
+      rollupOptions: {
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          // Kokoro speech runs on its own thread (src/main/voice.ts).
+          'voice-worker': resolve(__dirname, 'src/main/voice-worker.ts'),
+        },
+      },
     },
   },
   preload: {

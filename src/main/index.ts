@@ -198,6 +198,7 @@ async function main(): Promise<void> {
   registry.handle('voice:speak', (input) => voice.speak(input))
   app.on('will-quit', () => {
     updater.stop()
+    voice.stop()
     profiles.lock()
   })
   const missing = registry.missing()

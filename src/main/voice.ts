@@ -1,40 +1,27 @@
 import { join } from 'node:path'
+import { Worker } from 'node:worker_threads'
 import { app } from 'electron'
 import { AtlasError } from '@shared/errors'
 import type { Logger } from './log'
 
 /**
  * Narration for the whiteboard with Kokoro, an open-source (Apache 2.0) text-to-speech model.
- * It runs on this computer. The model (about 90 MB) downloads from Hugging Face the first time
- * and is cached in Atlas's own folder; nothing you type is sent anywhere.
+ * It runs on this computer in a worker thread. The model (about 90 MB) downloads from Hugging
+ * Face the first time and is cached in Atlas's own folder; nothing you type is sent anywhere.
  */
-const MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX'
-
-export const VOICES = [
-  { id: 'af_heart', name: 'Heart', accent: 'American' },
-  { id: 'af_bella', name: 'Bella', accent: 'American' },
-  { id: 'am_michael', name: 'Michael', accent: 'American' },
-  { id: 'bf_emma', name: 'Emma', accent: 'British' },
-  { id: 'bm_george', name: 'George', accent: 'British' },
-] as const
-
-interface Tts {
-  generate(
-    text: string,
-    options: { voice: string; speed?: number },
-  ): Promise<{
-    audio: Float32Array
-    sampling_rate: number
-    toWav(): ArrayBuffer
-  }>
-}
-
 export type VoiceState = 'missing' | 'downloading' | 'ready' | 'error'
 
+type Reply =
+  | { type: 'progress'; loaded: number; total: number }
+  | { type: 'done'; id: number; wav?: Uint8Array; seconds?: number }
+  | { type: 'error'; id: number; message: string }
+type Done = Extract<Reply, { type: 'done' }>
+
 export class Voice {
-  private tts: Promise<Tts> | null = null
   state: VoiceState = 'missing'
-  private queue: Promise<unknown> = Promise.resolve()
+  private worker: Worker | null = null
+  private nextId = 1
+  private pending = new Map<number, { resolve: (r: Done) => void; reject: (e: Error) => void }>()
 
   constructor(
     private readonly deps: {
@@ -43,81 +30,75 @@ export class Voice {
     },
   ) {}
 
-  private load(): Promise<Tts> {
-    if (this.tts) return this.tts
-    this.state = 'downloading'
-    const files = new Map<string, { loaded: number; total: number }>()
-    const report = (): void => {
-      let loaded = 0
-      let total = 0
-      for (const f of files.values()) {
-        loaded += f.loaded
-        total += f.total
+  private thread(): Worker {
+    if (this.worker) return this.worker
+    const worker = new Worker(join(__dirname, 'voice-worker.js'), {
+      workerData: { cacheDir: join(app.getPath('userData'), 'models') },
+    })
+    worker.on('message', (reply: Reply) => {
+      if (reply.type === 'progress') {
+        this.deps.progress({ id: 'voice', state: 'downloading', ...reply })
+        return
       }
-      this.deps.progress({ id: 'voice', state: this.state, loaded, total })
-    }
-    this.tts = (async () => {
-      const transformers = await import('@huggingface/transformers')
-      transformers.env.cacheDir = join(app.getPath('userData'), 'models')
-      transformers.env.allowLocalModels = false
-      const { KokoroTTS } = await import('kokoro-js')
-      const tts = await KokoroTTS.from_pretrained(MODEL, {
-        dtype: 'q8',
-        device: 'cpu',
-        progress_callback: (info: {
-          status: string
-          file?: string
-          loaded?: number
-          total?: number
-        }) => {
-          if (info.status === 'progress' && info.file) {
-            files.set(info.file, { loaded: info.loaded ?? 0, total: info.total ?? 0 })
-            report()
-          }
-        },
-      })
-      this.state = 'ready'
-      report()
-      return tts as unknown as Tts
-    })().catch((cause: unknown) => {
-      this.tts = null
+      const job = this.pending.get(reply.id)
+      if (!job) return
+      this.pending.delete(reply.id)
+      if (reply.type === 'done') {
+        if (this.state !== 'ready') {
+          this.state = 'ready'
+          this.deps.progress({ id: 'voice', state: 'ready', loaded: 0, total: 0 })
+        }
+        job.resolve(reply)
+        return
+      }
       this.state = 'error'
-      report()
-      this.deps.log.warn(`voice failed to load: ${String(cause)}`)
-      throw new AtlasError(
-        'unavailable',
-        'The voice could not be downloaded. Check the internet and try again.',
+      this.deps.progress({ id: 'voice', state: 'error', loaded: 0, total: 0 })
+      this.deps.log.warn(`voice failed: ${reply.message}`)
+      job.reject(
+        new AtlasError(
+          'unavailable',
+          'The voice could not be downloaded. Check the internet and try again.',
+        ),
       )
     })
-    return this.tts
+    worker.on('error', (err) => {
+      this.deps.log.warn(`voice worker stopped: ${String(err)}`)
+      for (const job of this.pending.values())
+        job.reject(new AtlasError('unavailable', 'The voice stopped. Try again.'))
+      this.pending.clear()
+      this.worker = null
+      this.state = 'error'
+    })
+    this.worker = worker
+    return worker
+  }
+
+  private send(msg: Record<string, unknown>): Promise<Done> {
+    const id = this.nextId++
+    if (this.state !== 'ready') this.state = 'downloading'
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject })
+      this.thread().postMessage({ id, ...msg })
+    })
   }
 
   async prepare(): Promise<VoiceState> {
-    await this.load()
+    await this.send({ prepare: true })
     return this.state
   }
 
-  /** Speaks `text` and returns a WAV file. Requests run one at a time. */
-  speak(input: {
+  /** Speaks `text` and returns a WAV file. */
+  async speak(input: {
     text: string
     voice?: string
     speed?: number
   }): Promise<{ wav: Uint8Array<ArrayBuffer>; seconds: number }> {
-    const run = async (): Promise<{ wav: Uint8Array<ArrayBuffer>; seconds: number }> => {
-      const tts = await this.load()
-      const text = input.text.replace(/\s+/g, ' ').trim().slice(0, 1200)
-      if (!text) return { wav: new Uint8Array(), seconds: 0 }
-      const audio = await tts.generate(text, {
-        voice: input.voice ?? 'af_heart',
-        speed: input.speed ?? 1,
-      })
-      return {
-        wav: new Uint8Array(audio.toWav()),
-        seconds: audio.audio.length / audio.sampling_rate,
-      }
-    }
-    const next = this.queue.then(run, run)
-    this.queue = next.catch(() => undefined)
-    return next
+    const reply = await this.send(input)
+    return { wav: new Uint8Array(reply.wav ?? new Uint8Array()), seconds: reply.seconds ?? 0 }
+  }
+
+  stop(): void {
+    void this.worker?.terminate()
+    this.worker = null
   }
 }
