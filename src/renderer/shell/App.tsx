@@ -8,11 +8,14 @@ import { ProfileGate } from '@/features/session/ProfileGate'
 import { TimerProvider } from '@/features/timer/TimerProvider'
 import { AppStateProvider, useAppState } from '@/lib/app-state'
 import { DesignSystem } from '@/routes/DesignSystem'
+import { Exam } from '@/routes/Exam'
 import { ExamBuilder } from '@/routes/ExamBuilder'
+import { PaperWorkspace } from '@/routes/PaperWorkspace'
 import { Planner } from '@/routes/Planner'
 import { Questions } from '@/routes/Questions'
 import { PrintExam } from '@/routes/PrintExam'
 import { Settings } from '@/routes/Settings'
+import { Sit } from '@/routes/Sit'
 import { SubjectRoute } from '@/routes/Subject'
 import { TimerRoute } from '@/routes/Timer'
 import { Today } from '@/routes/Today'
@@ -25,6 +28,8 @@ import { AppShell } from './AppShell'
 const router = createHashRouter([
   // Print layouts render without the app frame; the main process turns them into PDFs.
   { path: '/print/exam/:examId', element: <PrintExam /> },
+  // Sitting an exam takes the whole window: no sidebar, nothing to wander off to.
+  { path: '/sit/:paperId', element: <Sit /> },
   {
     path: '/',
     element: <AppShell />,
@@ -35,6 +40,8 @@ const router = createHashRouter([
       { path: 'library', element: <LibraryRoute />, handle: { crumb: 'Library' } },
       { path: 'viewer/:sourceId', element: <Viewer />, handle: { crumb: 'Library' } },
       { path: 'notes', element: <NotesRoute />, handle: { crumb: 'Notes' } },
+      { path: 'exam', element: <Exam />, handle: { crumb: 'Exam' } },
+      { path: 'paper/:paperId', element: <PaperWorkspace />, handle: { crumb: 'Exam' } },
       { path: 'questions', element: <Questions />, handle: { crumb: 'Questions' } },
       { path: 'flashcards', element: <FlashcardsRoute />, handle: { crumb: 'Flashcards' } },
       { path: 'planner', element: <Planner />, handle: { crumb: 'Planner' } },

@@ -364,20 +364,54 @@ export const SCHEMA_V1 = {
   },
 } as const satisfies Record<string, TableDef>
 
+/** v3: a past paper, made of a paper PDF and optionally its report, solutions and data book. */
+export const PAPERS_V3: TableDef = {
+  soft: true,
+  indexes: [['subject_id'], ['paper_source_id']],
+  cols: {
+    subject_id: 'text',
+    title: 'text!',
+    grp: 'text!',
+    year: 'int',
+    sitting: 'text!',
+    exam: 'text',
+    paper_source_id: 'text!',
+    report_source_id: 'text',
+    solutions_source_id: 'text',
+    aid_source_id: 'text',
+    structure: 'text',
+    total_marks: 'real',
+    minutes: 'int',
+    reading_minutes: 'int',
+  },
+}
+
+/** v3 additions to questions: report boxes, multiple choice, command terms, type, report quotes. */
+export const QUESTION_COLS_V3 = {
+  report_regions: 'json[]',
+  command_terms: 'json[]',
+  qtype: 'text',
+  mc: 'json{}',
+  report_mistakes: 'json[]',
+  sample_md: 'text',
+} as const satisfies Record<string, ColumnType>
+
 /**
  * The current shape of every table: v1 plus later migrations.
  * v2 adds `questions.regions`, the boxes drawn around a question on its source's pages.
+ * v3 adds `papers` and more question fields for the paper workspace.
  */
 export const TABLES: Record<string, TableDef> = {
   ...SCHEMA_V1,
   questions: {
     ...SCHEMA_V1.questions,
-    cols: { ...SCHEMA_V1.questions.cols, regions: 'json[]' },
+    cols: { ...SCHEMA_V1.questions.cols, regions: 'json[]', ...QUESTION_COLS_V3 },
   },
+  papers: PAPERS_V3,
 }
 export type TableName = keyof typeof SCHEMA_V1
 
-function columnSql(name: string, type: ColumnType): string {
+export function columnDdl(name: string, type: ColumnType): string {
   switch (type) {
     case 'text':
       return `${name} TEXT`
@@ -407,7 +441,7 @@ export function buildDdl(schema: Record<string, TableDef>): string {
       'created_at INTEGER NOT NULL',
       'updated_at INTEGER NOT NULL',
       ...(def.soft ? ['deleted_at INTEGER'] : []),
-      ...Object.entries(def.cols).map(([name, type]) => columnSql(name, type)),
+      ...Object.entries(def.cols).map(([name, type]) => columnDdl(name, type)),
     ]
     out.push(`CREATE TABLE ${table} (${cols.join(', ')});`)
     for (const index of def.indexes ?? []) {

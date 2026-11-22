@@ -1,6 +1,14 @@
 import { randomBytes } from 'node:crypto'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
-import { buildDdl, SCHEMA_V1, TABLES, type TableDef } from './schema'
+import {
+  buildDdl,
+  columnDdl,
+  PAPERS_V3,
+  QUESTION_COLS_V3,
+  SCHEMA_V1,
+  TABLES,
+  type TableDef,
+} from './schema'
 
 export type Row = Record<string, unknown>
 
@@ -47,6 +55,14 @@ CREATE TABLE ai_usage (day TEXT NOT NULL, provider TEXT NOT NULL, calls INTEGER 
     version: 2,
     name: 'question regions',
     sql: `ALTER TABLE questions ADD COLUMN regions TEXT NOT NULL DEFAULT '[]';`,
+  },
+  {
+    version: 3,
+    name: 'papers and question details',
+    sql: `${buildDdl({ papers: PAPERS_V3 })}
+${Object.entries(QUESTION_COLS_V3)
+  .map(([name, type]) => `ALTER TABLE questions ADD COLUMN ${columnDdl(name, type)};`)
+  .join('\n')}`,
   },
 ]
 

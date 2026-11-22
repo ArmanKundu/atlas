@@ -322,3 +322,76 @@ test('mark a question on a paper, practise it and log a mistake', async () => {
     await atlas.close()
   }
 })
+
+test('exam: open a paper, mark a question, keyboard views, practise and deep link', async () => {
+  const atlas = await launchReady()
+  try {
+    const { page } = atlas
+    await page.evaluate(
+      async (paths) => {
+        const subject = (await window.atlas.invoke('db:create', {
+          entity: 'subjects',
+          values: { name: 'Chemistry', kind: 'science', colour: 'teal' },
+        })) as unknown as { data: { id: string } }
+        await window.atlas.invoke('library:importPaths', { subjectId: subject.data.id, paths })
+      },
+      [resolve('tests/fixtures/sample-practice-exam-2024.pdf')],
+    )
+
+    // The paper appears in the library on the Exam page by itself.
+    await page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'Exam', exact: true })
+      .click()
+    await expect(page.getByRole('heading', { name: 'Exam', level: 1 })).toBeVisible()
+    const open = page.getByRole('button', { name: 'Open', exact: true })
+    await expect(open).toBeVisible({ timeout: 20_000 })
+    await open.click()
+    await expect(page).toHaveURL(/#\/paper\//)
+
+    // Draw a box around Question 1.
+    const firstPage = page.locator('#pdf-page-1')
+    await expect(firstPage.locator('canvas')).toBeVisible()
+    await page.getByRole('button', { name: /Mark a question/ }).click()
+    const box = await firstPage.boundingBox()
+    if (!box) throw new Error('page 1 has no box')
+    await page.mouse.move(box.x + box.width * 0.08, box.y + box.height * 0.2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.33, { steps: 8 })
+    await page.mouse.up()
+    const inspector = page.getByRole('complementary', { name: 'Question inspector' })
+    await expect(inspector.getByRole('tab', { name: 'overview' })).toBeVisible()
+    await expect(page.locator('[data-question-box]')).toHaveCount(1)
+    await expect(page).toHaveURL(/q=/)
+
+    // 2 asks for the examiner report, which this paper does not have.
+    await page.locator('body').click({ position: { x: 5, y: 5 } })
+    await page.keyboard.press('2')
+    await expect(page.getByText('No examiner report for this paper')).toBeVisible()
+
+    // A opens Practice; self-mark and log a mistake.
+    await page.keyboard.press('a')
+    await expect(inspector.getByRole('tab', { name: 'practice' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await inspector.getByLabel('Answer').fill('The catalyst speeds it up.')
+    await inspector.getByRole('button', { name: 'Self-mark against the report' }).click()
+    await inspector.getByRole('button', { name: '1', exact: true }).click()
+    await expect(inspector.getByText('1 out of 3. Log a mistake?')).toBeVisible()
+    await inspector.getByRole('button', { name: 'Log mistake' }).click()
+    await expect(page.getByText('Added to your mistakes')).toBeVisible()
+
+    // The link survives a reload: same question, same tab, answer kept.
+    await page.reload()
+    await expect(inspector.getByRole('tab', { name: 'practice' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(inspector.getByLabel('Answer')).toHaveValue('The catalyst speeds it up.')
+    await expect(inspector.getByText('last: 1/3')).toBeVisible()
+    expect(atlas.errors).toEqual([])
+  } finally {
+    await atlas.close()
+  }
+})

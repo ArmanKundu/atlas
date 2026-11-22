@@ -200,7 +200,19 @@ export const ipcContract = {
   'ai:cancel': { request: z.object({ chatId: id }), response: none },
   'ai:complete': {
     request: z.object({
-      task: z.enum(['flashcards', 'summary', 'exam', 'plan', 'quiz', 'topics', 'title']),
+      task: z.enum([
+        'flashcards',
+        'summary',
+        'exam',
+        'plan',
+        'quiz',
+        'topics',
+        'title',
+        'explain_options',
+        'model_answer',
+        'sample',
+        'mark',
+      ]),
       prompt: z.string().min(1).max(400_000),
       subjectId: id.nullable().optional(),
     }),

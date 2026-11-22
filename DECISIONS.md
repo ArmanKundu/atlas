@@ -105,3 +105,16 @@ The owner asked for a look closer to their earlier app (the Operon screenshot ke
 - **Shell:** the sidebar has the app and study system at the top, search, the main places, subjects, a quieter group of study tools, and the study buddy with the next-exam countdown at the bottom. The top bar shows the page name, AI status with a dot, search, the timer, an Ask button and the profile.
 - **Today:** opens with an ask box and one-tap helpers (ChatGPT-style), then today's progress, the next exam and shortcuts.
 - A reply in progress now keeps its text in the main process, so a chat opened from another screen mid-reply shows what has streamed so far.
+
+### D-020 Exam system modelled on the owner's earlier exam viewer
+
+The owner's brief asks for an exam home, a three-pane paper workspace (questions, the paper, an inspector) and an exam-conditions mode, for every subject. The reference screenshots and code it names (`reference/operon-exam/`, `EXAM_SYSTEM_PROMPT.md`) were not on this computer, so the layout follows the written brief and `random-inspo/references/06-operon-exam-viewer.webp`.
+
+- **Papers** are their own table. Exam files in the library become papers automatically, paired with their examiner report and solutions by file name; papers from before the current study design are grouped apart.
+- **Questions** keep page-fraction boxes on the paper and on the report, multiple-choice state percentages, command terms, parts with mark tables, and the report's comments on common mistakes.
+- **Question boxes do not block text selection.** The PDF pane reports pointer positions as page fractions and the workspace hit-tests them, so the text layer stays selectable underneath.
+- **Solutions stay hidden** behind a blurred cover until revealed; a reveal is remembered.
+- **Answers per subject:** maths shows a LaTeX preview, accounting a ledger grid with running totals, English a word count and time.
+- **Three ways to check an answer:** an instant check with no AI (command term, length against marks, key words from the solution), ticking the report's marking points, or marking by the connected AI ("Score: n/max").
+- **Exam mode** runs outside the app frame, with reading time that locks answers, warnings, autosave and resume.
+- Small UI state (open panes, revealed answers, drafts, notes) lives in the settings table, not in new tables.

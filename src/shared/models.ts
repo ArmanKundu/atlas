@@ -29,6 +29,7 @@ export const SUBJECT_KINDS = [
   'language',
   'other',
 ] as const
+export type SubjectKind = (typeof SUBJECT_KINDS)[number]
 export const SUBJECT_COLOURS = [
   'red',
   'orange',
@@ -201,6 +202,63 @@ export const RegionSchema = z.object({
 })
 export type Region = z.infer<typeof RegionSchema>
 
+export const McSchema = z.object({
+  answer: z.string().max(4).optional(),
+  options: z.array(z.string().max(4)).max(8).optional(),
+  pct: z.record(z.string().max(4), z.number().min(0).max(100)).optional(),
+  comment: z.string().max(5000).optional(),
+})
+export type Mc = z.infer<typeof McSchema>
+
+/** One part of a question, with the report's mark distribution and the expected answer. */
+export const QuestionPartSchema = z.object({
+  part: z.string().max(10),
+  marks: z.number().nullable().optional(),
+  /** Mark distribution: `labels` like ["0","1","2","Average"], `pct` the matching percentages. */
+  stats: z
+    .object({ labels: z.array(z.string().max(12)), pct: z.array(z.number()) })
+    .nullable()
+    .optional(),
+  text: z.string().max(20_000).optional(),
+  latex: z.string().max(20_000).optional(),
+})
+export type QuestionPart = z.infer<typeof QuestionPartSchema>
+
+export const PAPER_GROUPS = ['official', 'nht', 'earlier', 'mine'] as const
+export type PaperGroup = (typeof PAPER_GROUPS)[number]
+
+export const PaperInput = z.object({
+  subjectId: refId,
+  title: text(200).min(1),
+  grp: z.enum(PAPER_GROUPS).default('mine'),
+  year: optInt,
+  sitting: z.enum(['main', 'nht', 'sample', 'other']).default('main'),
+  exam: optText(10),
+  paperSourceId: id,
+  reportSourceId: refId,
+  solutionsSourceId: refId,
+  aidSourceId: refId,
+  structure: optText(120),
+  totalMarks: optNum,
+  minutes: optInt,
+  readingMinutes: optInt,
+})
+
+export const AnnotationInput = z.object({
+  targetType: z.enum(['source', 'note']).default('source'),
+  targetId: id,
+  page: optInt,
+  rect: RegionSchema.partial().default({}),
+  kind: z.enum(['highlight', 'underline', 'pen', 'marker', 'comment', 'flag', 'bookmark']),
+  color: optText(20),
+  path: z.array(z.array(z.number())).max(4000).default([]),
+  bodyMd: optText(5000),
+  marksDelta: optNum,
+  author: z.enum(['me', 'ai', 'teacher']).default('me'),
+  thread: z.array(z.unknown()).default([]),
+  resolved: z.boolean().default(false),
+})
+
 export const QuestionInput = z.object({
   subjectId: id,
   sourceId: refId,
@@ -211,9 +269,18 @@ export const QuestionInput = z.object({
   label: optText(80),
   marks: optNum,
   stemMd: text().min(1),
-  parts: z.array(z.unknown()).default([]),
+  parts: z.array(QuestionPartSchema).max(20).default([]),
   pageRefs: z.array(z.number().int()).default([]),
   regions: z.array(RegionSchema).max(20).default([]),
+  /** Where this question is discussed in the paper's examiner report. */
+  reportRegions: z.array(RegionSchema).max(20).default([]),
+  commandTerms: z.array(z.string().max(40)).max(12).default([]),
+  qtype: optText(40),
+  /** Multiple choice: the answer, the share of students choosing each option, the report's comment. */
+  mc: McSchema.default({}),
+  /** Sentences from the examiner report about common mistakes. */
+  reportMistakes: z.array(z.string().max(2000)).max(20).default([]),
+  sampleMd: optText(),
   topicIds: z.array(z.string()).default([]),
   difficulty: optInt,
   stateAverage: optNum,
@@ -284,6 +351,8 @@ export const ENTITIES = {
   memories: { table: 'memories', input: MemoryInput, create: true },
   exams: { table: 'exams_generated', input: ExamInput, create: true },
   chats: { table: 'chats', input: ChatInput, create: true },
+  papers: { table: 'papers', input: PaperInput, create: true },
+  annotations: { table: 'annotations', input: AnnotationInput, create: true },
 } as const
 
 export type EntityName = keyof typeof ENTITIES
@@ -306,6 +375,8 @@ export type Question = EntityRow<'questions'>
 export type Answer = EntityRow<'answers'>
 export type Attempt = EntityRow<'attempts'>
 export type Mistake = EntityRow<'mistakes'>
+export type Paper = EntityRow<'papers'>
+export type Annotation = EntityRow<'annotations'>
 
 /** A source row as stored: the editable fields plus what the import pipeline recorded. */
 export type Source = EntityRow<'sources'> & {

@@ -1,6 +1,17 @@
 import { HOUSE_RULES } from './agents'
 
-export type CompleteTask = 'flashcards' | 'summary' | 'exam' | 'plan' | 'quiz' | 'topics' | 'title'
+export type CompleteTask =
+  | 'flashcards'
+  | 'summary'
+  | 'exam'
+  | 'plan'
+  | 'quiz'
+  | 'topics'
+  | 'title'
+  | 'explain_options'
+  | 'model_answer'
+  | 'sample'
+  | 'mark'
 
 /** System prompts for one-shot jobs. Each states the exact output format the app parses. */
 export const TASK_PROMPTS: Record<CompleteTask, string> = {
@@ -53,6 +64,25 @@ Task: extract the topic tree from the provided syllabus or study design text.
 Output ONLY JSON, with no commentary and no code fence:
 [{"title": "Unit or area title", "code": "short code or empty", "children": [{"title": "...", "code": "...", "children": []}]}]
 Use the document's own wording and codes. Do not add topics that are not in the text.`,
+
+  explain_options: `${HOUSE_RULES}
+
+Task: a multiple-choice question, its correct answer and the examiner's comment follow. For each option, in order, say in one or two sentences why it is right or wrong, naming the misconception behind each wrong one. Use Markdown with a bold option letter starting each item. Be accurate to the given answer; do not change it.`,
+
+  model_answer: `${HOUSE_RULES}
+
+Task: write a model answer to the exam question that follows, at the standard of a top student. Match the command term and the marks: one clear point per mark, with working shown for calculations. Use the marking notes and examiner comments if given. Output only the answer in Markdown.`,
+
+  sample: `${HOUSE_RULES}
+
+Task: write a full-mark sample response to the exam question that follows, hitting every marking point in the marking notes and avoiding the common mistakes listed. Keep it the length a student could write in the time. Output only the response in Markdown.`,
+
+  mark: `${HOUSE_RULES}
+
+Task: mark the student's answer to the exam question that follows, against the marking notes and examiner comments given, as a strict but fair examiner.
+Output format, exactly:
+Score: <n>/<max>
+Then a Markdown list of what earned marks and what lost them, quoting the student's words, and one line starting "Next time:" with the single most useful fix.`,
 
   title: `Write a title of at most six words for a conversation that starts with the message below. Output only the title, with no quotes and no full stop.`,
 }

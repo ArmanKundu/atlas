@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   FileText,
+  GraduationCap,
   House,
   Layers,
   ListChecks,
@@ -34,6 +35,12 @@ export const NAV_PRIMARY: NavItem[] = [
     label: 'Assistant',
     icon: MessageCircle,
     keywords: ['chat', 'ai', 'ask', 'tutor', 'bot', 'helper'],
+  },
+  {
+    to: '/exam',
+    label: 'Exam',
+    icon: GraduationCap,
+    keywords: ['past papers', 'vcaa', 'examiner report', 'sit', 'practice', 'find a question'],
   },
   {
     to: '/library',
