@@ -12,6 +12,8 @@ import { SCANNER_PAGE } from './scanner-page'
 
 const MAX_IMAGE = 25 * 1024 * 1024
 const MAX_PAGES = 60
+/** Page slots per scan; removed and retaken pages use new slots. */
+const MAX_SLOTS = 600
 const LIFETIME = 30 * 60_000
 
 /** True for addresses on a home or school network (and this computer). */
@@ -78,6 +80,7 @@ export class PhoneScanner {
         paths: string[]
       }) => Promise<{ id: string; title: string }[]>
       onReceived: (item: { id: string; title: string; pages: number }) => void
+      onProgress: (pages: number) => void
     },
   ) {}
 
@@ -134,12 +137,76 @@ export class PhoneScanner {
 
   async stop(): Promise<void> {
     if (this.session) clearTimeout(this.session.timer)
+    // Pages that arrived but were never sent as a finished scan are still saved.
+    const session = this.session
+    if (session) {
+      for (const [id, batch] of this.batches) {
+        if (batch.pages.size === 0) continue
+        await this.save(id, batch, session.subjectId, '', 'pdf', null).catch(() => undefined)
+      }
+    }
     this.session = null
     this.batches.clear()
     const server = this.server
     this.server = null
     if (server) await new Promise<void>((resolve) => server.close(() => resolve()))
     await rm(this.dir(), { recursive: true, force: true }).catch(() => undefined)
+  }
+
+  private pending(): number {
+    let n = 0
+    for (const b of this.batches.values()) n += b.pages.size
+    return n
+  }
+
+  /** Turns a batch into PDFs in the library (one PDF, or one per photo). Returns how many. */
+  private async save(
+    id: string,
+    batch: Batch,
+    subjectId: string | null,
+    rawTitle: string,
+    mode: 'pdf' | 'photos',
+    order: number[] | null,
+  ): Promise<number> {
+    const stamp = new Date()
+      .toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
+      .replace(/,/g, '')
+    const title =
+      rawTitle
+        .replace(/[\\/:*?"<>|]+/g, ' ')
+        .trim()
+        .slice(0, 80) || `Scan ${stamp.replace(/[\\/:*?"<>|]+/g, '.')}`
+    const keys = order?.filter((k) => batch.pages.has(k)) ?? []
+    const slots = keys.length ? keys : [...batch.pages.keys()].sort((a, b) => a - b)
+    const ordered = slots.map((k) => batch.pages.get(k)).filter((p): p is string => !!p)
+    this.batches.delete(id)
+    this.deps.onProgress(this.pending())
+    if (ordered.length === 0) return 0
+
+    // The library reads PDFs, so photos mode makes one single-page PDF per photo.
+    const groups = mode === 'photos' ? ordered.map((p) => [p]) : [ordered]
+    const paths: string[] = []
+    for (const [n, group] of groups.entries()) {
+      const name = groups.length > 1 ? `${title} (${n + 1})` : title
+      const pdf = await PDFDocument.create()
+      pdf.setTitle(name)
+      pdf.setProducer('Atlas phone scanner')
+      for (const page of group) {
+        const bytes = await readFile(page)
+        const image = page.endsWith('.png') ? await pdf.embedPng(bytes) : await pdf.embedJpg(bytes)
+        // A4 width in points; height follows the photo.
+        const width = 595
+        const height = (image.height / image.width) * width
+        pdf.addPage([width, height]).drawImage(image, { x: 0, y: 0, width, height })
+      }
+      const out = join(this.dir(), `${name}.pdf`)
+      await writeFile(out, await pdf.save())
+      paths.push(out)
+    }
+    const imported = await this.deps.importFiles({ subjectId, paths })
+    const first = imported[0]
+    if (first) this.deps.onReceived({ id: first.id, title, pages: ordered.length })
+    return imported.length
   }
 
   private async handle(
@@ -165,8 +232,11 @@ export class PhoneScanner {
     if (req.method === 'POST' && action === 'page') {
       const batch = (url.searchParams.get('batch') ?? '').replace(/[^\w-]/g, '').slice(0, 40)
       const index = Number(url.searchParams.get('index'))
-      if (!batch || !Number.isInteger(index) || index < 0 || index >= MAX_PAGES)
+      if (!batch || !Number.isInteger(index) || index < 0 || index >= MAX_SLOTS)
         return text(400, 'Bad page')
+      const current = this.batches.get(batch)
+      if (current && !current.pages.has(index) && current.pages.size >= MAX_PAGES)
+        return text(400, 'That is the most pages for one scan (60).')
       const bytes = await body(req, MAX_IMAGE)
       const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8
       const isPng = bytes[0] === 0x89 && bytes[1] === 0x50
@@ -178,53 +248,45 @@ export class PhoneScanner {
       const entry = this.batches.get(batch) ?? { pages: new Map() }
       entry.pages.set(index, path)
       this.batches.set(batch, entry)
+      this.deps.onProgress(this.pending())
+      return text(200, 'ok')
+    }
+
+    if (req.method === 'POST' && action === 'drop') {
+      const entry = this.batches.get(url.searchParams.get('batch') ?? '')
+      const index = Number(url.searchParams.get('index'))
+      const path = entry?.pages.get(index)
+      if (entry && path) {
+        entry.pages.delete(index)
+        await rm(path, { force: true })
+        this.deps.onProgress(this.pending())
+      }
       return text(200, 'ok')
     }
 
     if (req.method === 'POST' && action === 'finish') {
-      const raw = JSON.parse((await body(req, 10_000)).toString('utf8')) as {
+      const raw = JSON.parse((await body(req, 20_000)).toString('utf8')) as {
         batch?: string
         title?: string
         mode?: string
+        order?: unknown
       }
-      const batch = this.batches.get(String(raw.batch ?? ''))
+      const id = String(raw.batch ?? '')
+      const batch = this.batches.get(id)
       if (!batch || batch.pages.size === 0) return text(400, 'No pages arrived')
-      const title =
-        (raw.title ?? '')
-          .replace(/[\\/:*?"<>|]+/g, ' ')
-          .trim()
-          .slice(0, 80) || `Scan ${new Date().toLocaleString()}`
-      const ordered = [...batch.pages.entries()].sort((a, b) => a[0] - b[0]).map(([, p]) => p)
-      // The library reads PDFs, so photos mode makes one single-page PDF per photo.
-      const groups = raw.mode === 'photos' ? ordered.map((p) => [p]) : [ordered]
-      const paths: string[] = []
-      for (const [n, group] of groups.entries()) {
-        const name = groups.length > 1 ? `${title} (${n + 1})` : title
-        const pdf = await PDFDocument.create()
-        pdf.setTitle(name)
-        pdf.setProducer('Atlas phone scanner')
-        for (const page of group) {
-          const bytes = await readFile(page)
-          const image = page.endsWith('.png')
-            ? await pdf.embedPng(bytes)
-            : await pdf.embedJpg(bytes)
-          // A4 width in points; height follows the photo.
-          const width = 595
-          const height = (image.height / image.width) * width
-          pdf.addPage([width, height]).drawImage(image, { x: 0, y: 0, width, height })
-        }
-        const out = join(this.dir(), `${name}.pdf`)
-        await writeFile(out, await pdf.save())
-        paths.push(out)
-      }
-      const imported = await this.deps.importFiles({ subjectId: this.session.subjectId, paths })
-      this.batches.delete(String(raw.batch))
-      const first = imported[0]
-      if (first) this.deps.onReceived({ id: first.id, title, pages: ordered.length })
+      const order = Array.isArray(raw.order) ? raw.order.map(Number) : null
+      const count = await this.save(
+        id,
+        batch,
+        this.session.subjectId,
+        String(raw.title ?? ''),
+        raw.mode === 'photos' ? 'photos' : 'pdf',
+        order,
+      )
       return {
         status: 200,
         type: 'application/json',
-        data: JSON.stringify({ ok: true, count: imported.length }),
+        data: JSON.stringify({ ok: true, count }),
       }
     }
 

@@ -220,6 +220,7 @@ async function main(): Promise<void> {
       return rows.map((r) => ({ id: String(r['id']), title: String(r['title'] ?? '') }))
     },
     onReceived: (item) => broadcast(windows(), 'scanner:received', item),
+    onProgress: (pages) => broadcast(windows(), 'scanner:progress', { pages }),
   })
   registry.handle('scanner:start', ({ subjectId }) => scanner.start({ subjectId }))
   registry.handle('scanner:stop', () => scanner.stop())

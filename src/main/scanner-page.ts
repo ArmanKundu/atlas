@@ -35,6 +35,7 @@ export const SCANNER_PAGE = `<!doctype html>
   .pages { display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .pg { position:relative; border-radius: 10px; overflow:hidden; background: #000; aspect-ratio: 3/4; }
   .pg img { width:100%; height:100%; object-fit: cover; display:block; }
+  .pg .st { position:absolute; left:6px; bottom:6px; background: rgba(0,0,0,.6); color:#fff; font: 600 11px system-ui; padding: 2px 7px; border-radius: 99px; }
   .pg .n { position:absolute; left:6px; top:6px; background: rgba(0,0,0,.6); color:#fff; font: 600 12px system-ui; padding: 2px 7px; border-radius: 99px; }
   .pg .tools { position:absolute; inset:auto 0 0 0; display:flex; justify-content: space-between; padding: 4px; background: linear-gradient(transparent, rgba(0,0,0,.65)); }
   .pg .tools button { border:0; background: rgba(255,255,255,.18); color:#fff; width: 30px; height: 30px; border-radius: 99px; font-size: 15px; }
@@ -118,7 +119,7 @@ export const SCANNER_PAGE = `<!doctype html>
 
 <div class="bar" id="bar">
   <div class="progress" id="prog"><i></i></div>
-  <button class="send" id="send" type="button" disabled>Send to Atlas</button>
+  <button class="send" id="send" type="button" disabled>Save in Atlas</button>
 </div>
 
 <div class="live" id="liveView">
@@ -142,7 +143,8 @@ export const SCANNER_PAGE = `<!doctype html>
 (() => {
   const $ = (id) => document.getElementById(id)
   const base = location.pathname.replace(/\\/$/, '')
-  const pages = []   // { blob, url, rotation }
+  const pages = []   // { blob, url, rotation, slot, upload }
+  let slots = 0
   let mode = 'pdf'
   const batch = Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 
@@ -151,11 +153,12 @@ export const SCANNER_PAGE = `<!doctype html>
     pages.forEach((p, i) => {
       const el = document.createElement('div'); el.className = 'pg'
       el.innerHTML = '<img alt=""><span class="n">' + (i + 1) + '</span><div class="tools"><button data-a="left" aria-label="Move earlier">‹</button><button data-a="rot" aria-label="Rotate">⟳</button><button data-a="del" aria-label="Remove">✕</button></div>'
+      if (p.state) { const s = document.createElement('span'); s.className = 'st'; s.textContent = p.state; el.appendChild(s) }
       const img = el.querySelector('img'); img.src = p.url; img.style.transform = 'rotate(' + p.rotation + 'deg)'
       el.querySelectorAll('button').forEach((b) => b.onclick = () => {
         const a = b.dataset.a
-        if (a === 'del') { URL.revokeObjectURL(p.url); pages.splice(i, 1) }
-        if (a === 'rot') p.rotation = (p.rotation + 90) % 360
+        if (a === 'del') { URL.revokeObjectURL(p.url); pages.splice(i, 1); drop(p) }
+        if (a === 'rot') { p.rotation = (p.rotation + 90) % 360; upload(p) }
         if (a === 'left' && i > 0) { pages.splice(i, 1); pages.splice(i - 1, 0, p) }
         render()
       })
@@ -163,12 +166,31 @@ export const SCANNER_PAGE = `<!doctype html>
     })
     $('empty').style.display = pages.length ? 'none' : 'block'
     $('send').disabled = !pages.length
-    $('send').textContent = pages.length ? 'Send ' + pages.length + ' page' + (pages.length === 1 ? '' : 's') + ' to Atlas' : 'Send to Atlas'
+    $('send').textContent = pages.length ? 'Save ' + pages.length + ' page' + (pages.length === 1 ? '' : 's') + ' in Atlas' : 'Save in Atlas'
   }
 
   function add(blob) {
     if (pages.length >= 60) { $('err').textContent = 'That is the most pages for one scan (60).'; return }
-    pages.push({ blob, url: URL.createObjectURL(blob), rotation: 0 }); render()
+    const p = { blob, url: URL.createObjectURL(blob), rotation: 0, slot: slots++ }
+    pages.push(p); upload(p)
+  }
+
+  // Each photo goes to the computer as soon as it is taken (again if it is rotated).
+  function upload(p) {
+    p.state = 'Sending…'; render()
+    p.upload = (async () => {
+      const jpeg = await prepare(p)
+      const r = await fetch(base + '/page?batch=' + batch + '&index=' + p.slot, { method: 'POST', body: jpeg })
+      if (!r.ok) throw new Error(await r.text())
+    })()
+    p.upload.then(
+      () => { p.state = '✓ On computer'; render() },
+      (e) => { p.state = 'Not sent'; $('err').textContent = (e && e.message) || 'Could not reach the computer. Is Atlas still open?'; render() },
+    )
+  }
+
+  function drop(p) {
+    fetch(base + '/drop?batch=' + batch + '&index=' + p.slot, { method: 'POST' }).catch(() => {})
   }
 
   // Shrinks big photos, applies rotation and the optional document clean-up, returns a JPEG.
@@ -201,13 +223,12 @@ export const SCANNER_PAGE = `<!doctype html>
     try {
       for (let i = 0; i < pages.length; i++) {
         $('send').textContent = 'Sending page ' + (i + 1) + ' of ' + pages.length + '…'
-        const jpeg = await prepare(pages[i])
-        const r = await fetch(base + '/page?batch=' + batch + '&index=' + i, { method: 'POST', body: jpeg })
-        if (!r.ok) throw new Error(await r.text())
+        const p = pages[i]
+        try { await p.upload } catch { upload(p); await p.upload }
         bar.style.width = ((i + 1) / (pages.length + 1) * 100) + '%'
       }
       $('send').textContent = 'Saving…'
-      const r = await fetch(base + '/finish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch, title: $('title').value, mode }) })
+      const r = await fetch(base + '/finish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch, title: $('title').value, mode, order: pages.map((p) => p.slot) }) })
       if (!r.ok) throw new Error(await r.text())
       bar.style.width = '100%'
       $('app').style.display = 'none'; $('bar').style.display = 'none'; $('done').style.display = 'block'
@@ -225,6 +246,7 @@ export const SCANNER_PAGE = `<!doctype html>
   $('pick').onclick = () => $('fPick').click()
   for (const id of ['fBack', 'fFront', 'fPick']) $(id).onchange = (e) => { for (const f of e.target.files) add(f); e.target.value = '' }
   $('send').onclick = send
+  $('enhance').onchange = () => pages.forEach(upload)
   $('again').onclick = () => location.reload()
 
   /* ----- Live camera: only where the browser allows it (secure pages). ----- */

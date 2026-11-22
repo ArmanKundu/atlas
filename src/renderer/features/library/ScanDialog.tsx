@@ -39,12 +39,14 @@ export function ScanDialog({
   const [session, setSession] = useState<ScanSession | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [received, setReceived] = useState<Received[]>([])
+  const [arriving, setArriving] = useState(0)
 
   const [wasOpen, setWasOpen] = useState(false)
   if (open !== wasOpen) {
     setWasOpen(open)
     if (open) {
       setReceived([])
+      setArriving(0)
       setError(null)
       setSession(null)
     }
@@ -65,6 +67,8 @@ export function ScanDialog({
       call('scanner:stop').catch(() => undefined)
     }
   }, [open, folder])
+
+  useEffect(() => subscribe('scanner:progress', ({ pages }) => setArriving(pages)), [])
 
   useEffect(
     () =>
@@ -148,8 +152,8 @@ export function ScanDialog({
           <ol className="flex flex-col gap-2 text-ink-2">
             {[
               'Open the camera on your phone and scan the code.',
-              'Take a photo of each page. Your camera’s flash and flip buttons work.',
-              'Tap Send. A multi-page PDF lands here in your library.',
+              'Take a photo of each page. Each one comes straight here.',
+              'Tap Save in Atlas when you are done, or just close this window.',
             ].map((line, i) => (
               <li key={line} className="flex gap-2.5">
                 <span className="grid size-5 shrink-0 place-items-center rounded-full bg-sunken text-2xs font-semibold text-ink">
@@ -168,6 +172,13 @@ export function ScanDialog({
         </div>
       </div>
 
+      {arriving > 0 ? (
+        <p className="mt-5 flex items-center gap-2 rounded-lg bg-blue-soft px-3 py-2 text-ink">
+          <Smartphone className="size-4 shrink-0" aria-hidden />
+          {arriving} page{arriving === 1 ? '' : 's'} arrived. Tap Save in Atlas on your phone, or
+          close this window, to put {arriving === 1 ? 'it' : 'them'} in your library.
+        </p>
+      ) : null}
       {received.length > 0 ? (
         <div className="mt-5 flex flex-col gap-2 border-t border-line pt-4">
           {received.map((item) => (

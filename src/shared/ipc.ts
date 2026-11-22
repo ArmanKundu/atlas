@@ -406,6 +406,8 @@ export const ipcEvents = {
   'calendar:changed': z.object({ at: z.number() }),
   'update:changed': UpdateStatusSchema,
   'scanner:received': z.object({ id: z.string(), title: z.string(), pages: z.number() }),
+  /** Pages that reached this computer but are not saved yet. */
+  'scanner:progress': z.object({ pages: z.number() }),
   'models:progress': z.object({
     id: z.string(),
     state: z.enum(['missing', 'downloading', 'ready', 'error']),
