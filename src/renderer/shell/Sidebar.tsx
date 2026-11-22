@@ -6,6 +6,7 @@ import { SYSTEM_PRESETS } from '@shared/presets'
 import { SubjectDot } from '@/design/Form'
 import { Kbd } from '@/design/Kbd'
 import { Tooltip } from '@/design/Tooltip'
+import { useSharedStatus } from '@/features/shared/useSharedStatus'
 import { useLive } from '@/lib/api'
 import { useAppState, useSubjects } from '@/lib/app-state'
 import { cn } from '@/lib/cn'
@@ -135,6 +136,8 @@ export function Sidebar({
     .sort((a, b) => a.date - b.date)[0]
   const due = stats.data?.dueCards ?? 0
   const mistakes = stats.data?.openMistakes ?? 0
+  const shared = useSharedStatus()
+  const unread = shared.data?.unread ?? 0
 
   return (
     <nav
@@ -197,7 +200,19 @@ export function Sidebar({
         <div className={cn('flex flex-col gap-0.5', collapsed && 'items-center')}>
           <SidebarLink item={NAV_TODAY} collapsed={collapsed} />
           {NAV_PRIMARY.map((item) => (
-            <SidebarLink key={item.to} item={item} collapsed={collapsed} />
+            <SidebarLink
+              key={item.to}
+              item={item}
+              collapsed={collapsed}
+              badge={
+                item.to === '/shared' && unread > 0 ? (
+                  <span className="rounded-full bg-blue px-1.5 text-2xs font-medium text-white tabular-nums">
+                    {unread}
+                    <span className="sr-only"> new in your inbox</span>
+                  </span>
+                ) : undefined
+              }
+            />
           ))}
         </div>
 

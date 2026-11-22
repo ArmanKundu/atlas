@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Download, ExternalLink, Heart, Repeat2, Trash2, X } from 'lucide-react'
-import { formatBytes, type SharedItem } from '@shared/community'
+import { Download, ExternalLink, Pencil, Repeat2, Trash2, X } from 'lucide-react'
+import { formatBytes, type SharedItem, type Space } from '@shared/community'
 import { Button, IconButton } from '@/design/Button'
 import { Badge } from '@/design/Form'
 import { Markdown } from '@/design/Markdown'
@@ -11,6 +11,8 @@ import { changed, useAction, useLive } from '@/lib/api'
 import { call } from '@/lib/ipc'
 import { KindIcon } from './KindIcon'
 import { KIND_LABEL, timeAgo } from './kinds'
+import { EditItemDialog } from './EditItemDialog'
+import { Reactions } from './Reactions'
 import { ShareDialog } from './ShareDialog'
 
 const REMIX_LABEL = {
@@ -20,23 +22,26 @@ const REMIX_LABEL = {
   link: 'Open link',
 } as const
 
-/** The right-hand panel: the full item, with Like, Remix and (for your own) Remove. */
+/** The right-hand panel: the full item, with reactions, Remix and (if allowed) Edit and Remove. */
 export function SharedPreview({
   id,
   meId,
+  spaces,
   onClose,
 }: {
   id: string
   meId: string | null
+  spaces: Space[]
   onClose: () => void
 }) {
   const toast = useToast()
   const navigate = useNavigate()
   const item = useLive(['shared', `shared:${id}`], () => call('shared:get', { id }), [id])
   const [sharingBack, setSharingBack] = useState(false)
+  const [editing, setEditing] = useState(false)
 
-  const like = useAction(async (it: SharedItem) => {
-    await call('shared:like', { id: it.id, liked: !it.liked })
+  const react = useAction(async (it: SharedItem, value: -1 | 0 | 1) => {
+    await call('shared:react', { id: it.id, value })
     changed('shared')
   })
   const remix = useAction(async (it: SharedItem) => {
@@ -103,7 +108,7 @@ export function SharedPreview({
                   {it.title}
                 </h2>
                 <p className="mt-1 text-ink-3">
-                  {it.author} · {timeAgo(it.createdAt)}
+                  {it.author} · {it.spaceName} · {timeAgo(it.createdAt)}
                   {it.subject ? ` · ${it.subject}` : ''}
                 </p>
               </div>
@@ -122,7 +127,6 @@ export function SharedPreview({
             ) : null}
             {it.description ? <p className="mt-4 text-ink-2">{it.description}</p> : null}
             <p className="mt-4 flex gap-4 text-2xs text-ink-3">
-              <span>{it.likes} likes</span>
               <span>{it.downloads} saves</span>
               <span>{it.remixes} remixes</span>
             </p>
@@ -146,25 +150,30 @@ export function SharedPreview({
                 <p className="truncate rounded-lg bg-sunken px-4 py-3 text-ink-2">{it.linkUrl}</p>
               )}
             </div>
-            {remix.error || like.error || remove.error ? (
-              <ErrorState className="mt-4">{remix.error ?? like.error ?? remove.error}</ErrorState>
+            {it.updatedAt !== it.createdAt ? (
+              <p className="mt-1 text-2xs text-ink-3">Edited {timeAgo(it.updatedAt)}</p>
+            ) : null}
+            {remix.error || react.error || remove.error ? (
+              <ErrorState className="mt-4">{remix.error ?? react.error ?? remove.error}</ErrorState>
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-2 border-t border-line px-4 py-3">
-            <IconButton
-              label={it.liked ? 'Unlike' : 'Like'}
-              onClick={() => void like.run(it)}
-              aria-pressed={it.liked}
-            >
-              <Heart
-                className={it.liked ? 'size-4 fill-danger text-danger' : 'size-4'}
-                aria-hidden
-              />
-            </IconButton>
-            {it.owner === meId ? (
-              <IconButton label="Remove from the library" onClick={() => void remove.run(it)}>
-                <Trash2 className="size-4" aria-hidden />
-              </IconButton>
+            <Reactions
+              ups={it.ups}
+              downs={it.downs}
+              mine={it.myReaction}
+              disabled={react.pending}
+              onReact={(value) => void react.run(it, value)}
+            />
+            {it.canEdit ? (
+              <>
+                <IconButton label="Edit" onClick={() => setEditing(true)}>
+                  <Pencil className="size-4" aria-hidden />
+                </IconButton>
+                <IconButton label="Remove from the space" onClick={() => void remove.run(it)}>
+                  <Trash2 className="size-4" aria-hidden />
+                </IconButton>
+              </>
             ) : null}
             <div className="flex-1" />
             {it.kind === 'note' && it.owner !== meId ? (
@@ -191,8 +200,12 @@ export function SharedPreview({
           <ShareDialog
             open={sharingBack}
             onOpenChange={setSharingBack}
-            remixOf={{ id: it.id, title: it.title }}
+            spaces={spaces}
+            remixOf={{ id: it.id, title: it.title, spaceId: it.spaceId }}
           />
+          {it.canEdit ? (
+            <EditItemDialog open={editing} onOpenChange={setEditing} item={it} />
+          ) : null}
         </>
       )}
     </aside>

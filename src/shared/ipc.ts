@@ -2,12 +2,22 @@ import { z } from 'zod'
 import { UpdateStatusSchema } from './update'
 import {
   CommunityStatusSchema,
+  INVITE_ROLES,
+  JoinResultSchema,
+  NotificationSchema,
+  PickedFileSchema,
+  ProfileInputSchema,
+  ProfileSchema,
   PublishSchema,
   RemixResultSchema,
   SharedCardSchema,
   SharedItemSchema,
   SharedListSchema,
   SharedQuerySchema,
+  SharedUpdateSchema,
+  SpaceInputSchema,
+  SpacePeopleSchema,
+  SpaceSchema,
 } from './community'
 import type { IpcEvent } from './ipc-channels'
 import {
@@ -112,34 +122,62 @@ export const ipcContract = {
   'update:install': { request: none, response: UpdateStatusSchema },
   // Shared library (Supabase)
   'shared:status': { request: none, response: CommunityStatusSchema },
-  'shared:signUp': {
-    request: z.object({ email: z.email().max(200), password: z.string().min(6).max(200) }),
-    response: CommunityStatusSchema,
-  },
-  'shared:signIn': {
-    request: z.object({ email: z.email().max(200), password: z.string().min(1).max(200) }),
+  'shared:sendCode': { request: z.object({ email: z.email().max(200) }), response: none },
+  'shared:verifyCode': {
+    request: z.object({ email: z.email().max(200), code: z.string().min(4).max(12) }),
     response: CommunityStatusSchema,
   },
   'shared:signOut': { request: none, response: CommunityStatusSchema },
-  'shared:join': {
-    request: z.object({ code: z.string().min(1).max(100), name: z.string().trim().min(1).max(60) }),
-    response: CommunityStatusSchema,
+  'shared:usernameFree': {
+    request: z.object({ username: z.string().max(40) }),
+    response: z.boolean(),
+  },
+  'shared:saveProfile': { request: ProfileInputSchema, response: CommunityStatusSchema },
+  'shared:spaces': { request: none, response: z.array(SpaceSchema) },
+  'shared:createSpace': { request: SpaceInputSchema, response: SpaceSchema },
+  'shared:updateSpace': { request: SpaceInputSchema.extend({ id }), response: none },
+  'shared:deleteSpace': { request: z.object({ id }), response: none },
+  'shared:regenerateCode': { request: z.object({ spaceId: id }), response: z.string() },
+  'shared:joinByCode': {
+    request: z.object({ code: z.string().min(4).max(20) }),
+    response: JoinResultSchema,
+  },
+  'shared:people': { request: z.object({ spaceId: id }), response: SpacePeopleSchema },
+  'shared:searchUsers': {
+    request: z.object({ q: z.string().max(200) }),
+    response: z.array(ProfileSchema),
+  },
+  'shared:invite': {
+    request: z.object({ spaceId: id, userId: id, role: z.enum(INVITE_ROLES) }),
+    response: none,
+  },
+  'shared:setRole': {
+    request: z.object({ spaceId: id, userId: id, role: z.enum(INVITE_ROLES) }),
+    response: none,
+  },
+  'shared:removeMember': { request: z.object({ spaceId: id, userId: id }), response: none },
+  'shared:leave': { request: z.object({ spaceId: id }), response: none },
+  'shared:inbox': { request: none, response: z.array(NotificationSchema) },
+  'shared:markRead': { request: none, response: none },
+  'shared:respondInvite': { request: z.object({ id, accept: z.boolean() }), response: none },
+  'shared:decideRequest': {
+    request: z.object({ id, approve: z.boolean(), role: z.enum(INVITE_ROLES) }),
+    response: none,
   },
   'shared:list': { request: SharedQuerySchema, response: SharedListSchema },
   'shared:get': { request: z.object({ id }), response: SharedItemSchema },
+  'shared:pickFile': { request: none, response: PickedFileSchema.nullable() },
+  'shared:describeFile': {
+    request: z.object({ path: z.string().max(4000) }),
+    response: PickedFileSchema,
+  },
   'shared:publish': { request: PublishSchema, response: SharedCardSchema },
-  'shared:update': {
-    request: z.object({
-      id,
-      title: z.string().trim().min(1).max(200),
-      description: z.string().max(2000),
-      subject: z.string().max(80),
-      tags: z.array(z.string().max(40)).max(12),
-    }),
+  'shared:update': { request: SharedUpdateSchema, response: none },
+  'shared:remove': { request: z.object({ id }), response: none },
+  'shared:react': {
+    request: z.object({ id, value: z.union([z.literal(-1), z.literal(0), z.literal(1)]) }),
     response: none,
   },
-  'shared:remove': { request: z.object({ id }), response: none },
-  'shared:like': { request: z.object({ id, liked: z.boolean() }), response: none },
   'shared:remix': { request: z.object({ id }), response: RemixResultSchema },
   'update:revealBackup': { request: z.object({ path: z.string().max(1000) }), response: none },
 

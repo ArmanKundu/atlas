@@ -13,6 +13,8 @@ import { Segmented, type SegmentedOption } from '@/design/Segmented'
 import { ErrorState } from '@/design/States'
 import { useToast } from '@/design/Toast'
 import { AiProviders } from '@/features/ai/AiProviders'
+import { EmailSignIn } from '@/features/shared/EmailSignIn'
+import { useSharedStatus } from '@/features/shared/useSharedStatus'
 import { changed, db, useAction, useLive } from '@/lib/api'
 import { useAppState, useSubjects } from '@/lib/app-state'
 import { cn } from '@/lib/cn'
@@ -179,7 +181,37 @@ function ProfileTab() {
           </Row>
         </Card>
       </Section>
+
+      <SharedAccountSection />
     </>
+  )
+}
+
+function SharedAccountSection() {
+  const status = useSharedStatus()
+  const signOut = useAction(async () => {
+    await call('shared:signOut')
+    changed('shared')
+  })
+  if (!status.data?.configured) return null
+  return (
+    <Section
+      title="Shared library"
+      description="Your account for spaces with friends. Only what you share goes online."
+    >
+      <Card>
+        <div className="px-4 py-4">
+          <EmailSignIn status={status.data} />
+        </div>
+        {status.data.signedIn ? (
+          <Row label="Sign out" hint="Your spaces stay; sign in again with the same email.">
+            <Button onClick={() => void signOut.run()} disabled={signOut.pending}>
+              Sign out
+            </Button>
+          </Row>
+        ) : null}
+      </Card>
+    </Section>
   )
 }
 

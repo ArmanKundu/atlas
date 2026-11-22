@@ -5,7 +5,9 @@ import { SYSTEM_PRESETS } from '@shared/presets'
 import { Button } from '@/design/Button'
 import { Field, Input, Select, SubjectDot } from '@/design/Form'
 import { AiProviders } from '@/features/ai/AiProviders'
-import { db, useAction } from '@/lib/api'
+import { EmailSignIn } from '@/features/shared/EmailSignIn'
+import { db, useAction, useLive } from '@/lib/api'
+import { call } from '@/lib/ipc'
 import { useAppState, useSubjects } from '@/lib/app-state'
 import { cn } from '@/lib/cn'
 import { Mascot } from '@/mascot/Mascot'
@@ -22,6 +24,7 @@ const STEPS = [
   'About you',
   'Subjects',
   'Connect AI',
+  'Shared library',
   'Goals',
   'Your mascot',
   'Ready',
@@ -47,6 +50,16 @@ function Heading({
       ) : null}
     </header>
   )
+}
+
+function SharedAccountStep() {
+  const status = useLive(['shared'], () => call('shared:status'))
+  if (status.error) return <p className="text-ink-2">{status.error}</p>
+  if (!status.data) return <p className="text-ink-3">Loading…</p>
+  if (!status.data.configured) {
+    return <p className="text-ink-2">The shared library is not available in this build.</p>
+  }
+  return <EmailSignIn status={status.data} />
 }
 
 function SubjectsStep({ system }: { system: StudySystem }) {
@@ -307,6 +320,19 @@ export function Onboarding() {
 
             {step === 4 ? (
               <>
+                <Heading eyebrow="Shared library" title="Share notes with your friends">
+                  Optional. Sign in with your email to join spaces with friends, swap notes, files
+                  and flashcards, and remix them into your own. Everything else in Atlas stays on
+                  this laptop.
+                </Heading>
+                <div className="max-w-xl rounded-xl bg-canvas p-5 text-ink">
+                  <SharedAccountStep />
+                </div>
+              </>
+            ) : null}
+
+            {step === 5 ? (
+              <>
                 <Heading eyebrow="Goals" title="What are you aiming for?">
                   Goals steer what Atlas suggests you study next. Any score or rank Atlas shows from
                   them is an estimate, never a prediction.
@@ -368,7 +394,7 @@ export function Onboarding() {
               </>
             ) : null}
 
-            {step === 5 ? (
+            {step === 6 ? (
               <>
                 <Heading eyebrow="Your mascot" title="Pick a study companion">
                   It keeps you company in the timer, thinks while AI works and celebrates finished
@@ -419,7 +445,7 @@ export function Onboarding() {
               </>
             ) : null}
 
-            {step === 6 ? (
+            {step === 7 ? (
               <Heading eyebrow="Ready" title="Your study space is set up">
                 Next, import your own resources in the Library: study designs, past exams,
                 solutions, examiner reports, textbooks and notes. Atlas copies them onto this

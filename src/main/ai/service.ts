@@ -102,7 +102,26 @@ export class AiService {
   /** Text streamed so far for each reply in progress, by message id. */
   private readonly partial = new Map<string, string>()
 
+  /** Extra context from the shared library (spaces, matching items, how to share). */
+  private sharedContext: ((question: string) => Promise<string | null>) | null = null
+
   constructor(private readonly deps: AiServiceDeps) {}
+
+  setSharedContext(fn: (question: string) => Promise<string | null>): void {
+    this.sharedContext = fn
+  }
+
+  /** The shared-library context, or nothing if it is slow, offline or signed out. */
+  private async shared(question: string): Promise<string | null> {
+    if (!this.sharedContext) return null
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+    try {
+      return await Promise.race([this.sharedContext(question), timeout])
+    } catch (error) {
+      this.deps.log.warn(`shared context failed: ${String(error)}`)
+      return null
+    }
+  }
 
   private db(): Database {
     return this.deps.profiles.db()
@@ -304,12 +323,16 @@ export class AiService {
   }
 
   /** Saves the user's message, starts the reply, and streams it through `ai:delta` events. */
-  send(chatId: string, content: string): { user: ChatMessage; assistant: ChatMessage } {
-    const db = this.db()
-    const chat = db.get('chats', chatId)
+  async send(
+    chatId: string,
+    content: string,
+  ): Promise<{ user: ChatMessage; assistant: ChatMessage }> {
+    const chat = this.db().get('chats', chatId)
     if (!chat) throw new AtlasError('not_found', 'That chat no longer exists.')
     if (this.running.has(chatId))
       throw new AtlasError('conflict', 'Wait for the current reply to finish, or stop it.')
+    const shared = await this.shared(content)
+    const db = this.db()
 
     const subjectId = (chat['subjectId'] as string | null) ?? null
     const history: ChatTurn[] = this.messages(chatId)
@@ -348,6 +371,7 @@ export class AiService {
       sources.length
         ? `Sources from the student's own library. Cite them as [n].\n\n${sources.map((s) => `[${s.n}] ${s.title}, page ${s.page}\n${s.snippet}`).join('\n\n')}`
         : "No matching pages were found in the student's library for this message.",
+      ...(shared ? [shared] : []),
     ].join('\n\n')
 
     const controller = new AbortController()

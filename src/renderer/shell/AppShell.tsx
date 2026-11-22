@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { Monitor, Moon, Palette, PanelLeft, Sun } from 'lucide-react'
 import type { Theme } from '@shared/ipc'
+import { CHANGELOG } from '@shared/changelog'
 import { processImportQueue } from '@/features/library/ingest'
+import { WhatsNew } from '@/features/whats-new/WhatsNew'
 import { changed } from '@/lib/api'
 import { useAppState } from '@/lib/app-state'
 import { subscribe } from '@/lib/ipc'
 import { isModOnly, modKey } from '@/lib/keys'
+import { useSetting } from '@/lib/settings'
 import { CommandPalette } from './CommandPalette'
 import { useRegisterCommands, type Command } from './commands'
 import { NAV_ALL } from './nav'
@@ -23,10 +26,20 @@ const THEME_COMMANDS: { theme: Theme; title: string; icon: Command['icon'] }[] =
 
 /** The frame around every screen: sidebar, top bar, the routed view and the command palette. */
 export function AppShell() {
-  const { prefs, setPrefs } = useAppState()
+  const { prefs, setPrefs, info } = useAppState()
   const navigate = useNavigate()
   const location = useLocation()
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const latest = CHANGELOG[0]?.version ?? ''
+  const [seen, setSeen, seenLoaded] = useSetting<string>('whatsNew.seen', '')
+  const [whatsNew, setWhatsNew] = useState<'card' | 'list' | null>(null)
+  // Show the latest release's card once, after it lands.
+  const [checked, setChecked] = useState(false)
+  if (seenLoaded && !checked) {
+    setChecked(true)
+    // Packaged builds only: a fresh test or dev profile should not open on a pop-up.
+    if (latest && seen !== latest && info.isPackaged) setWhatsNew('card')
+  }
 
   const collapsed = prefs.sidebarCollapsed
   const toggleSidebar = useCallback(() => {
@@ -112,6 +125,7 @@ export function AppShell() {
           sidebarCollapsed={collapsed}
           onToggleSidebar={toggleSidebar}
           onOpenPalette={openPalette}
+          onOpenWhatsNew={() => setWhatsNew('list')}
         />
         <UpdateBanner />
         <main className="min-h-0 flex-1 overflow-hidden bg-surface">
@@ -121,6 +135,15 @@ export function AppShell() {
         </main>
       </div>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <WhatsNew
+        open={whatsNew !== null}
+        startWithList={whatsNew === 'list'}
+        onOpenChange={(open) => {
+          if (open) return
+          setWhatsNew(null)
+          if (seen !== latest) setSeen(latest)
+        }}
+      />
     </div>
   )
 }

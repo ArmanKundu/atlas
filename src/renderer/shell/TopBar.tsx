@@ -1,6 +1,6 @@
 import { Fragment } from 'react'
 import { Link, useMatches } from 'react-router'
-import { ChevronRight, PanelLeft, Search, Sparkles, Timer } from 'lucide-react'
+import { ChevronRight, Gift, PanelLeft, Search, Sparkles, Timer } from 'lucide-react'
 import { IconButton } from '@/design/Button'
 import { Kbd } from '@/design/Kbd'
 import { Tooltip } from '@/design/Tooltip'
@@ -45,10 +45,12 @@ export function TopBar({
   sidebarCollapsed,
   onToggleSidebar,
   onOpenPalette,
+  onOpenWhatsNew,
 }: {
   sidebarCollapsed: boolean
   onToggleSidebar: () => void
   onOpenPalette: () => void
+  onOpenWhatsNew: () => void
 }) {
   const crumbs = useCrumbs()
   const timer = useTimer()
@@ -113,6 +115,10 @@ export function TopBar({
           })}
         </ol>
       </nav>
+
+      <IconButton label="What’s new" onClick={onOpenWhatsNew} className="app-no-drag">
+        <Gift className="size-4" aria-hidden />
+      </IconButton>
 
       <Tooltip
         label={provider ? 'AI is connected. Open AI settings' : 'No AI connected. Open AI settings'}
