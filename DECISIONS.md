@@ -130,3 +130,15 @@ The owner wants a banner when a new version is published, with one button that i
 - **Checked download:** the installer's SHA-512 must match the release's `latest.yml` / `latest-mac.yml`.
 - **Mac:** builds are ad-hoc signed, which Electron's built-in Squirrel updater rejects. The new `Atlas.app` is unzipped and a small script swaps it in after Atlas quits, then reopens it; on failure the old app is put back. When Atlas runs from the disk image or a folder it cannot write to, the bar shows Download instead.
 - **Windows:** the NSIS installer runs silently over the current install and starts Atlas again.
+
+### D-022 Shared library on Supabase
+
+The owner wants a small, invite-only library where about ten friends share and remix notes and resources, with the most features and storage on a free plan.
+
+- **Host:** one free Supabase project ("Atlas Library", Sydney). It covers sign-in, Postgres with full-text search, file storage and row-level security. Google Drive offers more space but none of these features. Schema, rules and storage live in `supabase/library.sql`.
+- **Exception to local-first:** this is the only feature that goes online, and only after the person signs in on the Shared screen. Nothing from their profile leaves the laptop unless they press Share on it.
+- **Who gets in:** an email-and-password account, then a library code. The code is stored hashed, and `join_library` checks it. Without membership, row-level security returns nothing. Email confirmation is off, because Supabase's free email only reaches team members.
+- **Session:** the sign-in session is stored encrypted with the OS keychain (`safeStorage`), next to the AI keys. All calls run in the main process; the renderer's CSP allows no outside requests.
+- **Limits:** on the free plan, files can be up to 50 MB each, with 1 GB of storage in total. A file shared by several people is stored once (by SHA-256). Anything bigger is shared as a link. A meter shows space used.
+- **Remix:** a note becomes your own note, with credit at the bottom. A file goes into your Library. A deck becomes flashcards in the matching subject. "Share my version" posts a remix linked to the original.
+- **Look:** cards by default, with a list view (the owner asked for both), and a preview panel on the right. The screen sits under Library in the sidebar as "Shared".

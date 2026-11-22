@@ -15,7 +15,7 @@ export const TOPBAR_HEIGHT = 48
 /**
  * The shared library's Supabase project. The publishable key is meant to ship inside apps:
  * row level security and the invite code decide who can read or write (supabase/library.sql).
- * Empty until the project exists; `ATLAS_LIBRARY_URL` / `ATLAS_LIBRARY_KEY` override both.
+ * `ATLAS_LIBRARY_URL` / `ATLAS_LIBRARY_KEY` override both.
  */
-export const LIBRARY_URL = ''
-export const LIBRARY_KEY = ''
+export const LIBRARY_URL = 'https://bujmoqrsylrdrsrzusqf.supabase.co'
+export const LIBRARY_KEY = 'sb_publishable_PoQYI5YIFd-il_VGJtzc1g_Ij_gHLEw'

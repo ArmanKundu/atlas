@@ -37,12 +37,8 @@ create table public.items (
   downloads int not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  search tsvector generated always as (
-    setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
-    setweight(to_tsvector('english', coalesce(subject, '') || ' ' || array_to_string(tags, ' ')), 'B') ||
-    setweight(to_tsvector('english', coalesce(description, '')), 'C') ||
-    setweight(to_tsvector('english', left(coalesce(body, ''), 100000)), 'D')
-  ) stored
+  -- Filled by a trigger (array_to_string is not immutable, so it cannot be a generated column).
+  search tsvector
 );
 create index items_search on public.items using gin (search);
 create index items_created on public.items (created_at desc);
@@ -107,6 +103,20 @@ as $$ begin new.updated_at = now(); return new; end $$;
 create trigger items_touch before update on public.items
 for each row execute function public.touch_updated_at();
 
+create function public.items_search_vector() returns trigger
+language plpgsql set search_path = ''
+as $$
+begin
+  new.search :=
+    setweight(to_tsvector('english'::regconfig, coalesce(new.title, '')), 'A') ||
+    setweight(to_tsvector('english'::regconfig, coalesce(new.subject, '') || ' ' || array_to_string(new.tags, ' ')), 'B') ||
+    setweight(to_tsvector('english'::regconfig, coalesce(new.description, '')), 'C') ||
+    setweight(to_tsvector('english'::regconfig, left(coalesce(new.body, ''), 100000)), 'D');
+  return new;
+end $$;
+create trigger items_search before insert or update on public.items
+for each row execute function public.items_search_vector();
+
 revoke all on function public.join_library(text, text) from public, anon;
 grant execute on function public.join_library(text, text) to authenticated;
 revoke all on function public.count_download(uuid) from public, anon;
@@ -155,6 +165,11 @@ create policy "members upload to own folder" on storage.objects
   for insert to authenticated with check (
     bucket_id = 'library' and (select public.is_member())
     and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+-- Upserts (re-uploading the same file) need update as well as insert.
+create policy "members update own files" on storage.objects
+  for update to authenticated using (
+    bucket_id = 'library' and (storage.foldername(name))[1] = (select auth.uid())::text
   );
 create policy "members delete own files" on storage.objects
   for delete to authenticated using (

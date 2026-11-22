@@ -23,7 +23,7 @@ Phases follow `BUILD_PROMPT.md` §14; extra work the owner asked for is listed a
 - [~] **12. Assistant.** 26 helpers, answers grounded in your files with sources. _Still to do: attachments, share as image, per-chat AI choice._
 - [~] **13. Exam builder.** Practice papers in the official layout, PDF export, maths and chemistry notation. _Still to do: .tex export, CAS checks, drawing from your question bank, the owner's crash course._
 - [ ] **14. Subject specifics.** Essay workspace (English), LaTeX answers and CAS check (Maths), data book (Chemistry), ledgers and statements (Accounting).
-- [ ] **15. Packs.** Export and import subject packs; public library on GitHub.
+- [~] **15. Packs and sharing.** Shared library for your group (Supabase, invite code, share, remix). _Still to do: export and import subject packs; large files over 50 MB._
 - [~] **16. Updates and releases.** Tag-triggered Mac and Windows installers on GitHub, README. In-app update bar with a data copy first. _Still to do: signing._
 - [~] **17. Compass.** Calendar sync from the iCal link. _Still to do: full Compass connection (below), local MCP server._
 - [~] **18. Planner.** Calendar, to-dos, school events. _Still to do: notifications, exam mode in the planner, auto-plan._
