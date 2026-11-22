@@ -142,3 +142,12 @@ The owner wants a small, invite-only library where about ten friends share and r
 - **Limits:** on the free plan, files can be up to 50 MB each, with 1 GB of storage in total. A file shared by several people is stored once (by SHA-256). Anything bigger is shared as a link. A meter shows space used.
 - **Remix:** a note becomes your own note, with credit at the bottom. A file goes into your Library. A deck becomes flashcards in the matching subject. "Share my version" posts a remix linked to the original.
 - **Look:** cards by default, with a list view (the owner asked for both), and a preview panel on the right. The screen sits under Library in the sidebar as "Shared".
+
+### D-023 Built-in AI model and phone scanner
+
+The owner wants AI that works on weak laptops with no account or limits, and a way to scan paper work from a phone.
+
+- **Built-in model:** `node-llama-cpp` runs a GGUF model in the main process. Two choices: Qwen3 1.7B (Q4_K_M, about 1 GB, 4 GB RAM) and Qwen3 4B Instruct 2507 (Q4_K_M, about 2.3 GB, 8 GB RAM). Models download once from Hugging Face into the user data folder; nothing else goes online. It is a normal provider (`atlas-local`), so every AI feature can use it, and it gets the same context (notes, resources) as other providers. Thinking is discouraged so short answers stay fast.
+- **Phone scanner:** a one-time link on the home network, shown as a QR code. Atlas serves a small page from a local HTTP server that accepts only private-network addresses, needs a random token and closes after 30 minutes or when the dialog closes. No relay server and no app to install.
+- **Camera:** phones only allow a live camera on https pages, and a self-signed certificate would show a scary warning. So the page uses the phone's own camera (flash and flip work there) and adds live auto-capture only where the browser allows it.
+- **Files:** the library reads PDFs, so pages become one multi-page PDF, or in photos mode one single-page PDF each. They are filed as class notes in the chosen subject.

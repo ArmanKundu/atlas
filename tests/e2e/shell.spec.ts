@@ -1,7 +1,14 @@
 import { rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
-import { completeSetup, launchAtlas, launchReady, makeUserData, mod } from './launch'
+import {
+  completeSetup,
+  finishOnboarding,
+  launchAtlas,
+  launchReady,
+  makeUserData,
+  mod,
+} from './launch'
 
 const fixtures = resolve('tests/fixtures')
 
@@ -193,7 +200,7 @@ test('notes, flashcards and the timer work without AI', async () => {
     await nav.getByRole('link', { name: 'Flashcards' }).click()
     await page.getByRole('button', { name: 'New card' }).first().click()
     await page.getByLabel('Front').fill('What does a catalyst lower?')
-    await page.getByLabel('Back').fill('The activation energy')
+    await page.getByLabel('Back', { exact: true }).fill('The activation energy')
     await page.getByRole('button', { name: 'Add card' }).click()
     await page.getByRole('button', { name: 'Done' }).click()
     await page.getByRole('button', { name: 'Start review' }).click()
@@ -228,10 +235,7 @@ test('theme and profile survive a restart; a password gates the profile', async 
     await first.page.getByLabel('Your name').fill('Riley')
     await first.page.getByLabel('Password (optional)').fill('open sesame')
     await first.page.getByRole('button', { name: 'Create profile' }).click()
-    await first.page.getByRole('button', { name: 'Get started' }).click()
-    for (let step = 0; step < 5; step++)
-      await first.page.getByRole('button', { name: 'Next' }).click()
-    await first.page.getByRole('button', { name: 'Open Atlas' }).click()
+    await finishOnboarding(first.page)
     await first.page
       .getByRole('navigation', { name: 'Main' })
       .getByRole('link', { name: 'Settings' })

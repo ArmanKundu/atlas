@@ -1,4 +1,5 @@
 const PROVIDER_NAMES: Record<string, string> = {
+  'atlas-local': 'Atlas built-in',
   'claude-code': 'Claude',
   codex: 'ChatGPT',
   'gemini-cli': 'Gemini',

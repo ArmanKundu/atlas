@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { FileText, FolderUp, Lock, Trash2, Upload } from 'lucide-react'
+import { FileText, FolderUp, Lock, ScanLine, Trash2, Upload } from 'lucide-react'
 import { SOURCE_KINDS, SOURCE_KIND_LABELS, type Source, type SourceKind } from '@shared/models'
 import { Button, IconButton } from '@/design/Button'
 import { Badge, Select, SubjectDot } from '@/design/Form'
@@ -11,6 +11,7 @@ import { useSubjects } from '@/lib/app-state'
 import { cn } from '@/lib/cn'
 import { call } from '@/lib/ipc'
 import { processImportQueue } from './ingest'
+import { ScanDialog } from './ScanDialog'
 
 function formatSize(bytes: number | null): string {
   if (!bytes) return ''
@@ -28,6 +29,7 @@ export function LibraryView({ subjectId }: { subjectId?: string }) {
   const toast = useToast()
   const [dragging, setDragging] = useState(false)
   const [filter, setFilter] = useState<SourceKind | 'all'>('all')
+  const [scanning, setScanning] = useState(false)
   const sources = useLive(
     ['sources'],
     () => db.list('sources', { where: subjectId ? { subjectId } : undefined }) as Promise<Source[]>,
@@ -93,15 +95,24 @@ export function LibraryView({ subjectId }: { subjectId?: string }) {
             </p>
           </div>
         </div>
-        <Button
-          variant="primary"
-          disabled={pick.pending || drop.pending}
-          onClick={() => void pick.run()}
-          icon={<Upload className="size-3.5" aria-hidden />}
-        >
-          {pick.pending || drop.pending ? 'Importing…' : 'Import files'}
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          <Button
+            onClick={() => setScanning(true)}
+            icon={<ScanLine className="size-3.5" aria-hidden />}
+          >
+            Scan with phone
+          </Button>
+          <Button
+            variant="primary"
+            disabled={pick.pending || drop.pending}
+            onClick={() => void pick.run()}
+            icon={<Upload className="size-3.5" aria-hidden />}
+          >
+            {pick.pending || drop.pending ? 'Importing…' : 'Import files'}
+          </Button>
+        </div>
       </div>
+      <ScanDialog open={scanning} onOpenChange={setScanning} subjectId={subjectId} />
       {pick.error || drop.error || remove.error ? (
         <ErrorState title="That did not work">
           {pick.error ?? drop.error ?? remove.error}

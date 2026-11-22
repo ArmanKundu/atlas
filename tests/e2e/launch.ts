@@ -52,15 +52,19 @@ export async function launchAtlas(
 export async function completeSetup(page: Page, name = 'Sam'): Promise<void> {
   await page.getByLabel('Your name').fill(name)
   await page.getByRole('button', { name: 'Create profile' }).click()
+  await finishOnboarding(page)
+  // The shell (and its keyboard shortcuts) is ready once the sidebar is on screen.
+  await page.getByRole('navigation', { name: 'Main' }).waitFor()
+}
+
+/** From the welcome screen, clicks Next through every step (however many there are) to Open Atlas. */
+export async function finishOnboarding(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Get started' }).click()
-  // Click Next until the last step, however many steps onboarding has.
   const open = page.getByRole('button', { name: 'Open Atlas' })
   for (let step = 0; step < 20 && !(await open.isVisible()); step++) {
     await page.getByRole('button', { name: 'Next' }).click()
   }
   await open.click()
-  // The shell (and its keyboard shortcuts) is ready once the sidebar is on screen.
-  await page.getByRole('navigation', { name: 'Main' }).waitFor()
 }
 
 /** Launches and gets straight to the app with a fresh profile. */

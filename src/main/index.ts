@@ -24,6 +24,9 @@ import { ProfileManager } from './profiles'
 import { buildCsp, isAppUrl, resolveRendererPath } from './security'
 import { CommunityLibrary } from './community'
 import { Voice } from './voice'
+import { PhoneScanner } from './scanner'
+import { importPaths } from './library'
+import { localModels } from './ai/local-model'
 import {
   allowScreenRecording,
   captureWindow,
@@ -129,6 +132,11 @@ async function main(): Promise<void> {
   })
   updater.start()
 
+  const filesDirNow = (): string => {
+    const current = profiles.current
+    if (!current) throw new Error('no profile open')
+    return profiles.filesDir(current.id)
+  }
   const shared = new CommunityLibrary({
     secrets,
     log,
@@ -193,6 +201,33 @@ async function main(): Promise<void> {
   })
   registry.handle('files:saveBytes', (input) => saveBytes(input))
   registry.handle('files:stashBytes', (input) => stashBytes(input))
+  localModels.onProgress((p) =>
+    broadcast(windows(), 'models:progress', {
+      id: `llm:${p.id}`,
+      state: p.failed ? 'error' : p.done ? 'ready' : 'downloading',
+      loaded: p.loaded,
+      total: p.total,
+    }),
+  )
+  const scanner = new PhoneScanner({
+    importFiles: async ({ subjectId, paths }) => {
+      const rows = await importPaths(profiles.db(), filesDirNow(), {
+        subjectId,
+        paths,
+        kind: 'class_notes',
+      })
+      broadcast(windows(), 'library:changed', { sourceId: null })
+      return rows.map((r) => ({ id: String(r['id']), title: String(r['title'] ?? '') }))
+    },
+    onReceived: (item) => broadcast(windows(), 'scanner:received', item),
+  })
+  registry.handle('scanner:start', ({ subjectId }) => scanner.start({ subjectId }))
+  registry.handle('scanner:stop', () => scanner.stop())
+  app.on('will-quit', () => void scanner.stop())
+  registry.handle('localai:list', () => localModels.list())
+  registry.handle('localai:download', ({ id }) => localModels.download(id))
+  registry.handle('localai:cancel', ({ id }) => localModels.cancel(id))
+  registry.handle('localai:remove', ({ id }) => localModels.remove(id))
   registry.handle('voice:status', () => voice.state)
   registry.handle('voice:prepare', () => voice.prepare())
   registry.handle('voice:speak', (input) => voice.speak(input))

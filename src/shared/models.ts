@@ -452,6 +452,7 @@ export type SearchHit = z.infer<typeof SearchHitSchema>
 /* ---------- AI ---------- */
 
 export const PROVIDER_IDS = [
+  'atlas-local',
   'claude-code',
   'codex',
   'gemini-cli',
@@ -464,6 +465,16 @@ export const PROVIDER_IDS = [
 ] as const
 export type ProviderId = (typeof PROVIDER_IDS)[number]
 export const ProviderIdSchema = z.enum(PROVIDER_IDS)
+
+export const LocalModelInfoSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  detail: z.string(),
+  size: z.number(),
+  installed: z.boolean(),
+  downloading: z.object({ loaded: z.number(), total: z.number() }).nullable(),
+})
+export type LocalModelInfo = z.infer<typeof LocalModelInfoSchema>
 
 export const ProviderStatusSchema = z.object({
   id: ProviderIdSchema,

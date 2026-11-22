@@ -7,6 +7,7 @@ import { Skeleton } from '@/design/States'
 import { changed, useAction, useLive } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { call } from '@/lib/ipc'
+import { BuiltInModel } from './BuiltInModel'
 
 const GROUPS: { kind: ProviderStatus['kind']; title: string; hint: string }[] = [
   {
@@ -256,13 +257,14 @@ export function AiProviders() {
         AI in Atlas runs on your own plan or key. Nothing goes through a server of ours, and every
         feature that does not need AI works without it.
       </p>
+      <BuiltInModel config={config.data} />
       {GROUPS.map((group) => (
         <section key={group.kind}>
           <h3 className="font-semibold text-ink">{group.title}</h3>
           <p className="mt-0.5 mb-3 text-ink-3">{group.hint}</p>
           <div className="grid grid-cols-1 gap-3 min-[1180px]:grid-cols-2">
             {status.data
-              ?.filter((s) => s.kind === group.kind)
+              ?.filter((s) => s.kind === group.kind && s.id !== 'atlas-local')
               .map((s) => (
                 <ProviderCard
                   key={s.id}

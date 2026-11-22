@@ -50,6 +50,16 @@ Phases follow `BUILD_PROMPT.md` §14; extra work the owner asked for is listed a
 - [~] Playwright tests for the brief's "done means" list (paper, boxes, keys, practice, deep link done; sit-it test still to add)
 - [ ] Side-by-side comparison with Operon (needs the reference screenshots and code, not found on disk yet)
 
+## Added on request
+
+- [x] Account cap with an approved waitlist, admin screen
+- [x] Bug reports and ideas with a screenshot or screen recording
+- [x] Auto helper picker and grouped helpers
+- [x] Whiteboard explainer with an on-device voice (Kokoro)
+- [x] Atlas built-in AI (Qwen3 via node-llama-cpp)
+- [x] Scan with your phone (QR, PDF or photos, Check my work)
+- [ ] Scanner: mistakes found in a scan go straight into the review loop and study plan without asking in chat
+
 ## Later (owner's requests)
 
 - [ ] **Full Compass connection.** You follow in-app steps and sign in to Compass yourself; Atlas then reads your calendar, learning tasks, results, resources, lesson plans and the newsfeed. Your own AI subscription can then answer "what's due this week", sort grades and set reminders. Possibly also as an MCP server.

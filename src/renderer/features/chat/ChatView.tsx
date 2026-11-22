@@ -162,7 +162,8 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
     chatId: null,
     items: [],
   })
-  const [draft, setDraft] = useState('')
+  // Another page can start a question, e.g. “Check my work” after a scan.
+  const [draft, setDraft] = useState(() => params.get('ask') ?? '')
   const [agentId, setAgentId] = useState(AUTO_HELPER)
   const bottom = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)

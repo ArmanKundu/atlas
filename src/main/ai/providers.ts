@@ -12,6 +12,7 @@ import {
 import * as codexCli from './adapters/codex/cli'
 import * as geminiCli from './adapters/gemini-cli/cli'
 import { AiError } from './errors'
+import { localModels } from './local-model'
 
 export interface ChatTurn {
   role: 'user' | 'assistant'
@@ -50,6 +51,15 @@ interface ProviderDef {
 }
 
 export const PROVIDERS: ProviderDef[] = [
+  {
+    id: 'atlas-local',
+    name: 'Atlas built-in',
+    kind: 'local',
+    description: 'A small open model inside Atlas. Free, unlimited and offline once downloaded',
+    termsUrl: 'https://huggingface.co/Qwen',
+    installHint: null,
+    defaultModel: null,
+  },
   {
     id: 'claude-code',
     name: 'Claude',
@@ -177,6 +187,7 @@ const byNewest = (a: string, b: string): number => b.localeCompare(a, undefined,
 
 export async function listModels(id: ProviderId, ctx: AdapterContext): Promise<string[]> {
   if (CLI_BINARY[id]) return []
+  if (id === 'atlas-local') return localModels.installed()
   const cached = modelCache.get(id)
   if (cached && Date.now() - cached.at < 10 * 60_000) return cached.models
 
@@ -207,6 +218,11 @@ export async function resolveModel(
   const def = providerDef(id)
   if (def.defaultModel) return def.defaultModel
   if (CLI_BINARY[id]) return null // the CLI uses the plan's own default
+  if (id === 'atlas-local') {
+    const installed = await localModels.installed()
+    // Prefer the better model when both are on this computer.
+    return installed.includes('qwen3-4b') ? 'qwen3-4b' : (installed[0] ?? null)
+  }
   const models = await listModels(id, ctx)
   const skip =
     /mini|nano|audio|realtime|image|tts|transcribe|search|embed|moderation|lite|live|vision|instruct|codex/i
@@ -243,6 +259,19 @@ export async function providerStatus(
     termsUrl: def.termsUrl,
     installHint: def.installHint,
     model,
+  }
+
+  if (id === 'atlas-local') {
+    const installed = await localModels.installed()
+    return {
+      ...base,
+      installed: installed.length > 0,
+      ready: installed.length > 0,
+      detail:
+        installed.length > 0
+          ? 'Downloaded. Runs on this computer'
+          : 'Not downloaded yet. Choose a size below',
+    }
   }
 
   const binaryName = CLI_BINARY[id]
@@ -433,6 +462,19 @@ export async function streamFrom(
 ): Promise<StreamResult> {
   try {
     if (id === 'anthropic-api') return await streamAnthropic(request, ctx)
+    if (id === 'atlas-local') {
+      const model = request.model ?? (await resolveModel(id, null, ctx))
+      if (!model) throw new AiError('not_installed')
+      const text = await localModels.stream({
+        id: model,
+        system: request.system,
+        messages: request.messages,
+        signal: request.signal,
+        maxTokens: request.maxTokens,
+        onText: request.onText,
+      })
+      return { text, model }
+    }
     if (CLI_BINARY[id]) return await streamCli(id, request)
     return await streamOpenAiCompatible(id, request, ctx)
   } catch (error) {

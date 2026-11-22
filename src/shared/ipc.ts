@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { UpdateStatusSchema } from './update'
+import { ScanSessionSchema } from './scanner'
 import {
   AccessEntrySchema,
   CapacitySchema,
@@ -26,6 +27,7 @@ import {
 import type { IpcEvent } from './ipc-channels'
 import {
   AgentInfoSchema,
+  LocalModelInfoSchema,
   AiConfigSchema,
   BackupInfoSchema,
   ChatMessageSchema,
@@ -200,6 +202,16 @@ export const ipcContract = {
     request: z.object({ id, status: z.enum(['new', 'seen', 'done']) }),
     response: none,
   },
+
+  // Scan with a phone over the home network
+  'scanner:start': { request: z.object({ subjectId: id.nullable() }), response: ScanSessionSchema },
+  'scanner:stop': { request: none, response: none },
+
+  // Atlas built-in model
+  'localai:list': { request: none, response: z.array(LocalModelInfoSchema) },
+  'localai:download': { request: z.object({ id }), response: none },
+  'localai:cancel': { request: z.object({ id }), response: none },
+  'localai:remove': { request: z.object({ id }), response: none },
 
   // Whiteboard narration (Kokoro, runs on this computer)
   'voice:status': {
@@ -393,6 +405,7 @@ export const ipcEvents = {
   'library:changed': z.object({ sourceId: z.string().nullable() }),
   'calendar:changed': z.object({ at: z.number() }),
   'update:changed': UpdateStatusSchema,
+  'scanner:received': z.object({ id: z.string(), title: z.string(), pages: z.number() }),
   'models:progress': z.object({
     id: z.string(),
     state: z.enum(['missing', 'downloading', 'ready', 'error']),

@@ -19,6 +19,40 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '0.3.0',
+    date: '2026-11-23',
+    headline: 'A whiteboard tutor, a built-in AI and a phone scanner',
+    summary:
+      'Watch explanations drawn and read aloud, use a free AI that runs on your laptop, and scan worksheets straight from your phone.',
+    items: [
+      {
+        icon: 'presentation',
+        title: 'Whiteboard explainer',
+        body: 'Ask the Whiteboard helper and it draws the idea step by step with a pen while a natural voice reads it aloud. Save it as an image or video, keep it in your library or share it to a space.',
+      },
+      {
+        icon: 'cpu',
+        title: 'Atlas built-in AI',
+        body: 'Download a small open model once (1 or 2.3 GB) in Settings, AI. It is free, unlimited and works offline, and can make notes, flashcards and exams from your resources.',
+      },
+      {
+        icon: 'scan-line',
+        title: 'Scan with your phone',
+        body: 'In Library, press Scan with phone and point your camera at the code. Pages arrive as a PDF in the subject you chose, over your own Wi-Fi. Then press Check my work.',
+      },
+      {
+        icon: 'sparkles',
+        title: 'Auto helper',
+        body: 'The Assistant now picks the right helper for each question. You can still choose one yourself from the searchable list.',
+      },
+      {
+        icon: 'life-buoy',
+        title: 'Report a bug',
+        body: 'The help button in the top bar sends a bug report or idea with a screenshot or a short screen recording.',
+      },
+    ],
+  },
+  {
     version: '0.2.0',
     date: '2026-11-22',
     headline: 'Spaces with friends',
