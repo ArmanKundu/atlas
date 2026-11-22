@@ -15,6 +15,7 @@ export const IPC_EVENTS = [
   'library:changed',
   'calendar:changed',
   'update:changed',
+  'models:progress',
 ] as const
 
 export type IpcEvent = (typeof IPC_EVENTS)[number]

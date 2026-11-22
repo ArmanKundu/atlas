@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/inter'
 import '@fontsource-variable/newsreader'
 import '@fontsource-variable/jetbrains-mono'
+import '@fontsource/caveat/600.css'
 import './styles/index.css'
 import { App } from './shell/App'
 

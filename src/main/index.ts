@@ -23,7 +23,16 @@ import { PrefsStore } from './prefs'
 import { ProfileManager } from './profiles'
 import { buildCsp, isAppUrl, resolveRendererPath } from './security'
 import { CommunityLibrary } from './community'
-import { allowScreenRecording, captureWindow, copyImage, saveAs, saveRecording } from './feedback'
+import { Voice } from './voice'
+import {
+  allowScreenRecording,
+  captureWindow,
+  copyImage,
+  saveAs,
+  saveBytes,
+  saveRecording,
+  stashBytes,
+} from './feedback'
 import { Updater } from './updater'
 import { createMainWindow, printRouteToPdf } from './window'
 
@@ -169,6 +178,7 @@ async function main(): Promise<void> {
   registry.handle('admin:setAccess', (input) => shared.adminSetAccess(input))
   registry.handle('admin:setCapacity', ({ capacity }) => shared.adminSetCapacity(capacity))
   registry.handle('admin:feedback', () => shared.adminFeedback())
+  registry.handle('admin:attachment', ({ id }) => shared.adminAttachment(id))
   registry.handle('admin:setFeedback', (input) => shared.adminSetFeedback(input))
   registry.handle('feedback:capture', () => captureWindow())
   registry.handle('feedback:saveRecording', (input) => saveRecording(input))
@@ -176,6 +186,16 @@ async function main(): Promise<void> {
   registry.handle('feedback:saveAs', ({ path }) => saveAs(path))
   registry.handle('feedback:send', (input) => shared.sendFeedback(input))
   allowScreenRecording()
+
+  const voice = new Voice({
+    log,
+    progress: (p) => broadcast(windows(), 'models:progress', p),
+  })
+  registry.handle('files:saveBytes', (input) => saveBytes(input))
+  registry.handle('files:stashBytes', (input) => stashBytes(input))
+  registry.handle('voice:status', () => voice.state)
+  registry.handle('voice:prepare', () => voice.prepare())
+  registry.handle('voice:speak', (input) => voice.speak(input))
   app.on('will-quit', () => {
     updater.stop()
     profiles.lock()

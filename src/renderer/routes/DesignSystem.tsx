@@ -25,6 +25,10 @@ import { PillBar, PillButton, PillDivider } from '@/design/Pill'
 import { Segmented } from '@/design/Segmented'
 import { EmptyState, ErrorState, SkeletonList } from '@/design/States'
 import { useToast } from '@/design/Toast'
+import { BoardCard } from '@/features/whiteboard/BoardCard'
+import { SAMPLE_BOARD } from '@/features/whiteboard/sample'
+import { closeBoard, useOpenBoard } from '@/features/whiteboard/store'
+import { WhiteboardPanel } from '@/features/whiteboard/WhiteboardPanel'
 import { Mascot } from '@/mascot/Mascot'
 import {
   MASCOT_ACCESSORIES,
@@ -276,6 +280,31 @@ export function DesignSystem() {
           </div>
         </div>
       </Section>
+
+      <Section title="Whiteboard">
+        <BoardSample />
+      </Section>
     </Page>
+  )
+}
+
+function BoardSample() {
+  const open = useOpenBoard()
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="max-w-md">
+        <BoardCard code={SAMPLE_BOARD} />
+      </div>
+      {open ? (
+        <div className="flex h-[640px] justify-end overflow-hidden rounded-xl ring-1 ring-line">
+          <WhiteboardPanel
+            key={open.key}
+            board={open.board}
+            subjectId={null}
+            onClose={closeBoard}
+          />
+        </div>
+      ) : null}
+    </div>
   )
 }

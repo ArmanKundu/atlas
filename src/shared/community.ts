@@ -125,7 +125,6 @@ export const FeedbackSchema = z.object({
   kind: z.enum(FEEDBACK_KINDS),
   title: z.string(),
   body: z.string(),
-  attachmentUrl: z.string().nullable(),
   attachmentName: z.string().nullable(),
   appVersion: z.string(),
   platform: z.string(),

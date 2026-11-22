@@ -388,29 +388,37 @@ export class CommunityLibrary {
         `${String(p['display_name'])} @${String(p['username'])}`,
       ]),
     )
-    return Promise.all(
-      rows.map(async (r) => {
-        const path = (r['attachment'] as string | null) ?? null
-        let url: string | null = null
-        if (path) {
-          const signed = await sb.storage.from('feedback').createSignedUrl(path, 60 * 60)
-          url = signed.data?.signedUrl ?? null
-        }
-        return {
-          id: String(r['id']),
-          kind: (r['kind'] as Feedback['kind']) ?? 'other',
-          title: String(r['title']),
-          body: String(r['body'] ?? ''),
-          attachmentUrl: url,
-          attachmentName: path ? basename(path) : null,
-          appVersion: String(r['app_version'] ?? ''),
-          platform: String(r['platform'] ?? ''),
-          status: (r['status'] as Feedback['status']) ?? 'new',
-          createdAt: String(r['created_at']),
-          from: names.get(String(r['user_id'])) ?? 'Someone',
-        }
-      }),
-    )
+    return rows.map((r) => {
+      const path = (r['attachment'] as string | null) ?? null
+      return {
+        id: String(r['id']),
+        kind: (r['kind'] as Feedback['kind']) ?? 'other',
+        title: String(r['title']),
+        body: String(r['body'] ?? ''),
+        attachmentName: path ? basename(path) : null,
+        appVersion: String(r['app_version'] ?? ''),
+        platform: String(r['platform'] ?? ''),
+        status: (r['status'] as Feedback['status']) ?? 'new',
+        createdAt: String(r['created_at']),
+        from: names.get(String(r['user_id'])) ?? 'Someone',
+      }
+    })
+  }
+
+  /** A report's screenshot or recording, fetched here so the renderer's CSP stays local. */
+  async adminAttachment(id: string): Promise<Uint8Array<ArrayBuffer>> {
+    const sb = this.supabase()
+    const { data: row, error } = await sb
+      .from('feedback')
+      .select('attachment')
+      .eq('id', id)
+      .maybeSingle()
+    if (error) throw friendly(error, 'Could not load the report.')
+    const path = (row as Row | null)?.['attachment'] as string | undefined
+    if (!path) throw new AtlasError('not_found', 'That report has no attachment.')
+    const { data, error: fail } = await sb.storage.from('feedback').download(path)
+    if (fail) throw friendly(fail, 'Could not download the attachment.')
+    return new Uint8Array(await data.arrayBuffer())
   }
 
   async adminSetFeedback(input: { id: string; status: Feedback['status'] }): Promise<void> {

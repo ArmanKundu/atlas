@@ -9,14 +9,21 @@ import { Markdown } from '@/design/Markdown'
 import { ErrorState } from '@/design/States'
 import { useToast } from '@/design/Toast'
 import { changed, db, useAction, useLive } from '@/lib/api'
+import { cn } from '@/lib/cn'
 import { call, subscribe } from '@/lib/ipc'
 import { Buddy } from '@/mascot/Buddy'
 import { providerName } from '@/features/ai/names'
 import { agentIcon } from './agents'
 import { HelperPicker } from './HelperPicker'
 import { ShareActionCard } from '@/features/shared/ShareActionCard'
+import { BoardCard } from '@/features/whiteboard/BoardCard'
+import { closeBoard, useOpenBoard } from '@/features/whiteboard/store'
+import { WhiteboardPanel } from '@/features/whiteboard/WhiteboardPanel'
 
-const CHAT_BLOCKS = { 'atlas-share': (code: string) => <ShareActionCard code={code} /> }
+const CHAT_BLOCKS = {
+  'atlas-share': (code: string) => <ShareActionCard code={code} />,
+  'atlas-board': (code: string) => <BoardCard code={code} />,
+}
 
 function parseCards(text: string): { front: string; back: string }[] {
   const start = text.indexOf('[')
@@ -289,10 +296,13 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
   }, [])
 
   const noAi = config.data?.defaultProvider === null
+  const board = useOpenBoard()
 
   return (
     <div className="flex h-full min-h-0">
-      <aside className="flex w-[232px] shrink-0 flex-col border-r border-line">
+      <aside
+        className={cn('flex w-[232px] shrink-0 flex-col border-r border-line', board && 'hidden')}
+      >
         <div className="p-3">
           <Button
             className="w-full"
@@ -483,6 +493,14 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
           </form>
         </div>
       </section>
+      {board ? (
+        <WhiteboardPanel
+          key={board.key}
+          board={board.board}
+          subjectId={subjectId}
+          onClose={closeBoard}
+        />
+      ) : null}
     </div>
   )
 }

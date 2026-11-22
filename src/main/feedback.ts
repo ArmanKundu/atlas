@@ -87,3 +87,26 @@ export function allowScreenRecording(): void {
     { useSystemPicker: true },
   )
 }
+
+/** Saves bytes the student made in Atlas (a whiteboard image or video) where they choose. */
+export async function saveBytes(input: { bytes: Uint8Array; name: string }): Promise<boolean> {
+  const win = BrowserWindow.getFocusedWindow()
+  const safe = input.name.replace(/[^\w .()-]+/g, '').slice(0, 80) || 'Atlas'
+  const options = { defaultPath: join(app.getPath('downloads'), safe) }
+  const result = win
+    ? await dialog.showSaveDialog(win, options)
+    : await dialog.showSaveDialog(options)
+  if (result.canceled || !result.filePath) return false
+  await writeFile(result.filePath, input.bytes)
+  return true
+}
+
+/** Writes bytes to a temporary file so they can be imported to the library or shared. */
+export async function stashBytes(input: { bytes: Uint8Array; name: string }): Promise<string> {
+  const dir = join(folder(), `board-${Date.now()}`)
+  await mkdir(dir, { recursive: true })
+  const safe = input.name.replace(/[^\w .()-]+/g, '').slice(0, 80) || 'Atlas.png'
+  const path = join(dir, safe)
+  await writeFile(path, input.bytes)
+  return path
+}

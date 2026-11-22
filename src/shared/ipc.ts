@@ -195,9 +195,37 @@ export const ipcContract = {
     response: none,
   },
   'admin:feedback': { request: none, response: z.array(FeedbackSchema) },
+  'admin:attachment': { request: z.object({ id }), response: z.instanceof(Uint8Array) },
   'admin:setFeedback': {
     request: z.object({ id, status: z.enum(['new', 'seen', 'done']) }),
     response: none,
+  },
+
+  // Whiteboard narration (Kokoro, runs on this computer)
+  'voice:status': {
+    request: none,
+    response: z.enum(['missing', 'downloading', 'ready', 'error']),
+  },
+  'voice:prepare': {
+    request: none,
+    response: z.enum(['missing', 'downloading', 'ready', 'error']),
+  },
+  'voice:speak': {
+    request: z.object({
+      text: z.string().max(2000),
+      voice: z.string().max(40).default('af_heart'),
+      speed: z.number().min(0.5).max(2).default(1),
+    }),
+    response: z.object({ wav: z.instanceof(Uint8Array), seconds: z.number() }),
+  },
+
+  'files:saveBytes': {
+    request: z.object({ bytes: z.instanceof(Uint8Array), name: z.string().max(120) }),
+    response: z.boolean(),
+  },
+  'files:stashBytes': {
+    request: z.object({ bytes: z.instanceof(Uint8Array), name: z.string().max(120) }),
+    response: z.string(),
   },
 
   // Bug reports and feature requests
@@ -365,6 +393,12 @@ export const ipcEvents = {
   'library:changed': z.object({ sourceId: z.string().nullable() }),
   'calendar:changed': z.object({ at: z.number() }),
   'update:changed': UpdateStatusSchema,
+  'models:progress': z.object({
+    id: z.string(),
+    state: z.enum(['missing', 'downloading', 'ready', 'error']),
+    loaded: z.number(),
+    total: z.number(),
+  }),
 } as const satisfies Record<IpcEvent, z.ZodType>
 
 export type IpcRequest<C extends IpcChannel> = z.input<(typeof ipcContract)[C]['request']>

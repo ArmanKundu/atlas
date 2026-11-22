@@ -21,6 +21,9 @@ test('first run: create a profile, set up with no AI, and land on Today', async 
     await page.getByRole('button', { name: 'Next' }).click()
     await expect(page.getByText('Use your own API key')).toBeVisible()
     await page.getByRole('button', { name: 'Skip' }).click()
+    // The shared library sign-in is optional.
+    await expect(page.getByText('Shared library').first()).toBeVisible()
+    await page.getByRole('button', { name: 'Skip' }).click()
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByRole('button', { name: 'Open Atlas' }).click()

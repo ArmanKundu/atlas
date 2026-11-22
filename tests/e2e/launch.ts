@@ -53,8 +53,12 @@ export async function completeSetup(page: Page, name = 'Sam'): Promise<void> {
   await page.getByLabel('Your name').fill(name)
   await page.getByRole('button', { name: 'Create profile' }).click()
   await page.getByRole('button', { name: 'Get started' }).click()
-  for (let step = 0; step < 5; step++) await page.getByRole('button', { name: 'Next' }).click()
-  await page.getByRole('button', { name: 'Open Atlas' }).click()
+  // Click Next until the last step, however many steps onboarding has.
+  const open = page.getByRole('button', { name: 'Open Atlas' })
+  for (let step = 0; step < 20 && !(await open.isVisible()); step++) {
+    await page.getByRole('button', { name: 'Next' }).click()
+  }
+  await open.click()
   // The shell (and its keyboard shortcuts) is ready once the sidebar is on screen.
   await page.getByRole('navigation', { name: 'Main' }).waitFor()
 }

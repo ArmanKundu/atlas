@@ -261,23 +261,7 @@ function Reports() {
                 {f.body ? (
                   <p className="mt-2 text-sm whitespace-pre-wrap text-ink-2">{f.body}</p>
                 ) : null}
-                {f.attachmentUrl ? (
-                  f.attachmentName?.match(/\.(webm|mp4)$/) ? (
-                    <video
-                      src={f.attachmentUrl}
-                      controls
-                      className="mt-3 max-h-72 w-full rounded-lg bg-black"
-                    />
-                  ) : (
-                    <a href={f.attachmentUrl} target="_blank" rel="noreferrer">
-                      <img
-                        src={f.attachmentUrl}
-                        alt="Attached screenshot"
-                        className="mt-3 max-h-72 rounded-lg ring-1 ring-line"
-                      />
-                    </a>
-                  )
-                ) : null}
+                {f.attachmentName ? <Attachment id={f.id} name={f.attachmentName} /> : null}
               </div>
               {f.status === 'done' ? (
                 <Button size="sm" variant="ghost" onClick={() => void mark.run(f, 'seen')}>
@@ -298,5 +282,39 @@ function Reports() {
         )
       })}
     </div>
+  )
+}
+
+/** Loads a report's screenshot or recording only when the admin asks to see it. */
+function Attachment({ id, name }: { id: string; name: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const video = /\.(webm|mp4)$/.test(name)
+  const load = useAction(async () => {
+    const bytes = await call('admin:attachment', { id })
+    setUrl(URL.createObjectURL(new Blob([bytes], { type: video ? 'video/webm' : 'image/png' })))
+  })
+  if (!url) {
+    return (
+      <div className="mt-2">
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={load.pending}
+          onClick={() => void load.run()}
+        >
+          {load.pending ? 'Loading…' : video ? 'Show recording' : 'Show screenshot'}
+        </Button>
+        {load.error ? <p className="mt-1 text-2xs text-danger">{load.error}</p> : null}
+      </div>
+    )
+  }
+  return video ? (
+    <video src={url} controls className="mt-3 max-h-72 w-full rounded-lg bg-black" />
+  ) : (
+    <img
+      src={url}
+      alt="Attached screenshot"
+      className="mt-3 max-h-72 rounded-lg ring-1 ring-line"
+    />
   )
 }

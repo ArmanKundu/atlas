@@ -16,6 +16,11 @@ interface Rule {
 
 const RULES: Rule[] = [
   {
+    id: 'whiteboard',
+    pattern:
+      /\b(whiteboard|draw|sketch|diagram|visuali[sz]e|graph (of|y ?=)|plot|derive|derivation|show me (how|visually))\b/,
+  },
+  {
     id: 'marker',
     pattern: /\b(mark|grade|score|assess) (my|this)\b|\bhow many marks would\b|\bmark it\b/,
   },

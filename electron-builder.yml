@@ -14,9 +14,18 @@ files:
   - '!**/*.map'
 
 asar: true
+# Native runtimes for the on-device voice and AI model must live outside the asar archive.
+asarUnpack:
+  - node_modules/onnxruntime-node/**
+  - node_modules/node-llama-cpp/**
+  - node_modules/@node-llama-cpp/**
 
 mac:
   category: public.app-category.education
+  # Only this platform's native binaries ship (the voice runtime bundles every platform).
+  files:
+    - '!node_modules/onnxruntime-node/bin/napi-v3/{linux,win32}/**'
+    - '!node_modules/onnxruntime-web/**'
   # Ad-hoc signature: no certificate needed, and Apple silicon requires at least this to run.
   # Replace with a Developer ID (see README "Code signing") to remove the first-open warning.
   identity: '-'
@@ -33,6 +42,9 @@ mac:
 
 win:
   icon: build/icon.ico
+  files:
+    - '!node_modules/onnxruntime-node/bin/napi-v3/{linux,darwin}/**'
+    - '!node_modules/onnxruntime-web/**'
   target:
     - target: nsis
       arch: [x64]
