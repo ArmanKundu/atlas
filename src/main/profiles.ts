@@ -304,4 +304,32 @@ export class ProfileManager {
     if (existsSync(files)) cpSync(files, join(out, 'files'), { recursive: true })
     return out
   }
+
+  /**
+   * A full copy of every profile, made before an update installs. The open profile is copied
+   * through SQLite (safe while it is in use); the others are plain folder copies. The rolling
+   * backups inside each profile are left out, since they are copies already.
+   */
+  copyEverythingTo(targetDir: string, label: string): string {
+    const out = join(targetDir, `Atlas-before-${label}-${stamp()}`)
+    mkdirSync(out, { recursive: true })
+    if (existsSync(this.indexFile)) copyFileSync(this.indexFile, join(out, 'index.json'))
+    for (const record of this.readIndex()) {
+      const dest = join(out, record.id)
+      if (this.active?.record.id === record.id) {
+        mkdirSync(dest, { recursive: true })
+        this.snapshot(record.id, this.active.db, 'pre-update')
+        this.active.db.snapshotTo(join(dest, 'atlas.db'))
+        const files = this.filesDir(record.id)
+        if (existsSync(files)) cpSync(files, join(dest, 'files'), { recursive: true })
+      } else if (existsSync(this.dir(record.id))) {
+        const backups = this.backupsDir(record.id)
+        cpSync(this.dir(record.id), dest, {
+          recursive: true,
+          filter: (src) => !src.startsWith(backups),
+        })
+      }
+    }
+    return out
+  }
 }

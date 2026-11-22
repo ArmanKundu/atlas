@@ -8,6 +8,7 @@ import {
   net,
   protocol,
   session,
+  shell,
   type IpcMainInvokeEvent,
 } from 'electron'
 import { APP_NAME, APP_SCHEME } from '@shared/constants'
@@ -21,6 +22,7 @@ import { createFileLogger } from './log'
 import { PrefsStore } from './prefs'
 import { ProfileManager } from './profiles'
 import { buildCsp, isAppUrl, resolveRendererPath } from './security'
+import { Updater } from './updater'
 import { createMainWindow, printRouteToPdf } from './window'
 
 // Set by electron-vite while `npm run dev` is running; absent in a built app.
@@ -101,7 +103,24 @@ async function main(): Promise<void> {
     },
     printRoute: (hash) => printRouteToPdf({ devServerUrl, hash }),
   })
-  app.on('will-quit', () => profiles.lock())
+  const updater = new Updater({
+    log,
+    profiles,
+    emit: (status) => broadcast(windows(), 'update:changed', status),
+    backupRoot: () => join(app.getPath('documents'), 'Atlas Backups'),
+  })
+  registry.handle('update:status', () => updater.current)
+  registry.handle('update:check', () => updater.check())
+  registry.handle('update:install', () => updater.install())
+  registry.handle('update:revealBackup', ({ path }) => {
+    if (path.startsWith(join(app.getPath('documents'), 'Atlas Backups')))
+      shell.showItemInFolder(path)
+  })
+  updater.start()
+  app.on('will-quit', () => {
+    updater.stop()
+    profiles.lock()
+  })
   const missing = registry.missing()
   if (missing.length > 0) log.warn(`ipc channels without a handler: ${missing.join(', ')}`)
 

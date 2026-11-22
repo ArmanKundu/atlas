@@ -509,6 +509,38 @@ function AppearanceTab() {
   )
 }
 
+function UpdatesRow() {
+  const { info } = useAppState()
+  const status = useLive(['update'], () => call('update:status'))
+  const check = useAction(async () => {
+    await call('update:check')
+    changed('update')
+  })
+  const s = status.data
+  const hint = !info.isPackaged
+    ? 'Updates install in the packaged app. This is a development build.'
+    : !s || s.state === 'idle'
+      ? s?.checkedAt
+        ? `You have the latest version. Checked ${new Date(s.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`
+        : 'Atlas checks GitHub for new versions every few hours. Before installing, it saves a full copy of your data to Documents/Atlas Backups.'
+      : s.state === 'available'
+        ? `Atlas ${s.version} is available. Use the bar at the top to update.`
+        : s.state === 'error'
+          ? s.message
+          : 'Updating…'
+  return (
+    <Row label="Updates" hint={hint}>
+      <Button
+        size="sm"
+        onClick={() => void check.run()}
+        disabled={check.pending || s?.state === 'checking'}
+      >
+        {s?.state === 'checking' || check.pending ? 'Checking…' : 'Check now'}
+      </Button>
+    </Row>
+  )
+}
+
 function AboutTab() {
   const { info } = useAppState()
   return (
@@ -525,8 +557,9 @@ function AboutTab() {
         </div>
         <Row
           label="Privacy"
-          hint="No account, no server, no tracking. Your subjects, files and results stay on this laptop. AI requests go only to the provider you connected."
+          hint="No tracking. Your subjects, files and results stay on this laptop. AI requests go only to the provider you connected; update checks go to GitHub; the shared library is used only when you sign in to it."
         />
+        <UpdatesRow />
         <Row label="Licence" hint="Open source under the MIT licence." />
         <Row label="Build">
           <span className="font-mono text-2xs text-ink-3">

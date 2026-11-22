@@ -17,13 +17,16 @@ export async function makeUserData(): Promise<string> {
 }
 
 /** Launches the built app (`npm run build` first) against a throwaway data folder. */
-export async function launchAtlas(userData?: string): Promise<Launched> {
+export async function launchAtlas(
+  userData?: string,
+  extraEnv: Record<string, string> = {},
+): Promise<Launched> {
   const dir = userData ?? (await makeUserData())
   const app = await electron.launch({
     args: ['.'],
     // Do not emulate a colour scheme: the app's own theme handling is under test.
     colorScheme: null,
-    env: { ...process.env, ATLAS_USER_DATA: dir, ELECTRON_RENDERER_URL: '' },
+    env: { ...process.env, ATLAS_USER_DATA: dir, ELECTRON_RENDERER_URL: '', ...extraEnv },
   })
   const page = await app.firstWindow()
   const errors: string[] = []
@@ -57,8 +60,8 @@ export async function completeSetup(page: Page, name = 'Sam'): Promise<void> {
 }
 
 /** Launches and gets straight to the app with a fresh profile. */
-export async function launchReady(): Promise<Launched> {
-  const atlas = await launchAtlas()
+export async function launchReady(extraEnv: Record<string, string> = {}): Promise<Launched> {
+  const atlas = await launchAtlas(undefined, extraEnv)
   await completeSetup(atlas.page)
   return atlas
 }

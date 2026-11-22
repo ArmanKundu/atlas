@@ -85,6 +85,24 @@ test('the renderer is locked down', async () => {
   }
 })
 
+test('update bar appears for a newer release and Later hides it until the next one', async () => {
+  const atlas = await launchReady({ ATLAS_FAKE_UPDATE: '99.0.0' })
+  try {
+    const { page } = atlas
+    const bar = page.getByRole('status').filter({ hasText: 'Atlas 99.0.0 is ready.' })
+    await expect(bar).toBeVisible()
+    await expect(bar.getByRole('button', { name: 'Download' })).toBeVisible()
+    await bar.getByRole('button', { name: 'Later' }).click()
+    await expect(bar).toBeHidden()
+    await page.reload()
+    await page.getByRole('navigation', { name: 'Main' }).waitFor()
+    await expect(page.getByText('Atlas 99.0.0 is ready.')).toBeHidden()
+    expect(atlas.errors).toEqual([])
+  } finally {
+    await atlas.close()
+  }
+})
+
 test('command palette opens with the shortcut and runs a command', async () => {
   const atlas = await launchReady()
   try {

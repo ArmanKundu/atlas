@@ -18,6 +18,18 @@ afterEach(() => {
 })
 
 describe('ProfileManager', () => {
+  it('copies every profile before an update, without the rolling backups', () => {
+    const a = profiles.create({ name: 'A' })
+    profiles.db().insert('notes', { title: 'Keep me', bodyMd: '' })
+    const b = profiles.create({ name: 'B' })
+    const out = profiles.copyEverythingTo(join(root, 'out'), 'v9.9.9')
+    expect(existsSync(join(out, 'index.json'))).toBe(true)
+    expect(existsSync(join(out, a.id, 'atlas.db'))).toBe(true)
+    expect(existsSync(join(out, b.id, 'atlas.db'))).toBe(true)
+    expect(existsSync(join(out, a.id, 'backups'))).toBe(false)
+    expect(profiles.listBackups().some((x) => x.reason === 'pre-update')).toBe(true)
+  })
+
   it('creates a profile with its own database and a first daily backup', () => {
     const created = profiles.create({ name: 'Arman' })
     expect(created).toMatchObject({ name: 'Arman', hasPassword: false, active: true })

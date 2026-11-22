@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { UpdateStatusSchema } from './update'
 import type { IpcEvent } from './ipc-channels'
 import {
   AgentInfoSchema,
@@ -95,6 +96,12 @@ export const ipcContract = {
   'prefs:set': { request: PrefsPatchSchema, response: PrefsSchema },
   'shell:openExternal': { request: z.object({ url: z.url() }), response: none },
   'log:rendererError': { request: RendererErrorSchema, response: none },
+
+  // Updates from GitHub releases
+  'update:status': { request: none, response: UpdateStatusSchema },
+  'update:check': { request: none, response: UpdateStatusSchema },
+  'update:install': { request: none, response: UpdateStatusSchema },
+  'update:revealBackup': { request: z.object({ path: z.string().max(1000) }), response: none },
 
   // Profiles and backups
   'profile:list': { request: none, response: z.array(ProfileSummarySchema) },
@@ -246,6 +253,7 @@ export const ipcEvents = {
   'ai:finished': z.object({ chatId: z.string(), message: ChatMessageSchema }),
   'library:changed': z.object({ sourceId: z.string().nullable() }),
   'calendar:changed': z.object({ at: z.number() }),
+  'update:changed': UpdateStatusSchema,
 } as const satisfies Record<IpcEvent, z.ZodType>
 
 export type IpcRequest<C extends IpcChannel> = z.input<(typeof ipcContract)[C]['request']>

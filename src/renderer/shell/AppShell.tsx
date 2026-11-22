@@ -13,6 +13,7 @@ import { NAV_ALL } from './nav'
 import { RouteBoundary } from './RouteBoundary'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
+import { UpdateBanner } from './UpdateBanner'
 
 const THEME_COMMANDS: { theme: Theme; title: string; icon: Command['icon'] }[] = [
   { theme: 'system', title: 'Theme: match system', icon: Monitor },
@@ -112,6 +113,7 @@ export function AppShell() {
           onToggleSidebar={toggleSidebar}
           onOpenPalette={openPalette}
         />
+        <UpdateBanner />
         <main className="min-h-0 flex-1 overflow-hidden bg-surface">
           <RouteBoundary key={location.pathname} name={location.pathname}>
             <Outlet />

@@ -118,3 +118,15 @@ The owner's brief asks for an exam home, a three-pane paper workspace (questions
 - **Three ways to check an answer:** an instant check with no AI (command term, length against marks, key words from the solution), ticking the report's marking points, or marking by the connected AI ("Score: n/max").
 - **Exam mode** runs outside the app frame, with reading time that locks answers, warnings, autosave and resume.
 - Small UI state (open panes, revealed answers, drafts, notes) lives in the settings table, not in new tables.
+
+### D-021 In-app updates from GitHub releases
+
+The owner wants a banner when a new version is published, with one button that installs it, and a copy of everyone's data made first.
+
+- **Source:** the "latest" published release of `ArmanKundu/atlas`. Drafts are ignored, so a version reaches people only when the owner clicks Publish on the draft that CI makes.
+- **When:** 15 seconds after launch, then every 6 hours, in packaged builds only. The request carries no personal data.
+- **Look:** a slim bar under the top bar ("Atlas 0.2.0 is ready. What's new · Later · Update now"). Later hides it until the next version.
+- **Before installing:** every profile is copied to `Documents/Atlas Backups/Atlas-before-v<version>-<time>/` (the open database through SQLite, others as folders, without the rolling backups), and the open profile also gets a `pre-update` snapshot. Data lives in the user-data folder, which installs never touch, so this copy is a second safety net.
+- **Checked download:** the installer's SHA-512 must match the release's `latest.yml` / `latest-mac.yml`.
+- **Mac:** builds are ad-hoc signed, which Electron's built-in Squirrel updater rejects. The new `Atlas.app` is unzipped and a small script swaps it in after Atlas quits, then reopens it; on failure the old app is put back. When Atlas runs from the disk image or a folder it cannot write to, the bar shows Download instead.
+- **Windows:** the NSIS installer runs silently over the current install and starts Atlas again.

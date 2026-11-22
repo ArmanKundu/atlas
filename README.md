@@ -22,7 +22,7 @@ No subject content, textbooks, exams or personal data ever go in this repo. Each
 
 ## Install (for friends)
 
-Download the latest installer from the [Releases](../../releases) page.
+Download the latest installer from the [Releases](../../releases) page. After that, Atlas tells you when a new version is out and installs it with one click, after saving a copy of your data to `Documents/Atlas Backups`.
 
 **Mac.** Open the `.dmg` (choose `arm64` for Apple silicon, `x64` for Intel) and drag Atlas to Applications. Atlas is not code-signed yet, so the first time: right-click the app, choose **Open**, then **Open** again. If macOS says the app is damaged, run this once in Terminal:
 
@@ -60,14 +60,14 @@ npm install
 npm run dev
 ```
 
-| Command                                | What it does                                                                                                    |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `npm run check`                        | Lint, typecheck and unit tests. Run before every commit.                                                        |
-| `npm run e2e`                          | Builds the app and runs the end-to-end tests against it.                                                        |
-| `npm run dist:mac`                     | Builds the Mac installers (Apple silicon and Intel) into `release/`.                                            |
-| `npm run dist:win`                     | Builds the Windows installer into `release/` (run on Windows, or let CI do it).                                 |
-| `npm run release`                      | Bumps the version and pushes a tag. GitHub Actions then builds Mac and Windows installers and drafts a release. |
-| `node scripts/ai-smoke.mjs <provider>` | Sends one real request through a provider in the built app. Uses a little of your own plan.                     |
+| Command                                | What it does                                                                                                                                                           |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run check`                        | Lint, typecheck and unit tests. Run before every commit.                                                                                                               |
+| `npm run e2e`                          | Builds the app and runs the end-to-end tests against it.                                                                                                               |
+| `npm run dist:mac`                     | Builds the Mac installers (Apple silicon and Intel) into `release/`.                                                                                                   |
+| `npm run dist:win`                     | Builds the Windows installer into `release/` (run on Windows, or let CI do it).                                                                                        |
+| `npm run release`                      | Bumps the version and pushes a tag. GitHub Actions then builds Mac and Windows installers and drafts a release. Publishing the draft shows the update bar to everyone. |
+| `node scripts/ai-smoke.mjs <provider>` | Sends one real request through a provider in the built app. Uses a little of your own plan.                                                                            |
 
 See `CONTRIBUTING.md` for how the code is organised, `DECISIONS.md` for the choices made so far, `KNOWN_ISSUES.md` for what is not built yet, `SECURITY.md` for the security model and `PLUGINS.md` for the planned plugin format.
 
