@@ -25,6 +25,8 @@ import { Buddy } from '@/mascot/Buddy'
 import { changed, db, useLive } from '@/lib/api'
 import { useSubjects } from '@/lib/app-state'
 import { cn } from '@/lib/cn'
+import { platform } from '@/lib/ipc'
+import { isMac } from '@/lib/keys'
 import { useSetting } from '@/lib/settings'
 
 type View = 'paper' | 'report' | 'solutions' | 'mine'
@@ -387,7 +389,13 @@ export function PaperWorkspace() {
 
   return (
     <div data-workspace className="flex h-full min-h-0 flex-col bg-canvas">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-3">
+      <header
+        className={cn(
+          'app-drag flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-3',
+          isMac() && 'pl-20',
+          platform() === 'win32' && 'pr-[148px]',
+        )}
+      >
         <Tooltip label="Back to Exam">
           <IconButton
             label="Back to Exam"

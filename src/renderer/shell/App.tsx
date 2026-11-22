@@ -30,6 +30,8 @@ const router = createHashRouter([
   { path: '/print/exam/:examId', element: <PrintExam /> },
   // Sitting an exam takes the whole window: no sidebar, nothing to wander off to.
   { path: '/sit/:paperId', element: <Sit /> },
+  // A paper takes the whole window too: three panes need the width.
+  { path: '/paper/:paperId', element: <PaperWorkspace /> },
   {
     path: '/',
     element: <AppShell />,
@@ -41,7 +43,6 @@ const router = createHashRouter([
       { path: 'viewer/:sourceId', element: <Viewer />, handle: { crumb: 'Library' } },
       { path: 'notes', element: <NotesRoute />, handle: { crumb: 'Notes' } },
       { path: 'exam', element: <Exam />, handle: { crumb: 'Exam' } },
-      { path: 'paper/:paperId', element: <PaperWorkspace />, handle: { crumb: 'Exam' } },
       { path: 'questions', element: <Questions />, handle: { crumb: 'Questions' } },
       { path: 'flashcards', element: <FlashcardsRoute />, handle: { crumb: 'Flashcards' } },
       { path: 'planner', element: <Planner />, handle: { crumb: 'Planner' } },

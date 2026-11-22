@@ -168,6 +168,10 @@
 @utility app-no-drag {
   -webkit-app-region: no-drag;
 }
+/* Controls inside a draggable bar must still take clicks. */
+.app-drag :is(button, a, input, select, textarea, [role='tab'], [role='radio'], [role='timer']) {
+  -webkit-app-region: no-drag;
+}
 
 /* Editorial register helpers. */
 /* A small label above a heading. */

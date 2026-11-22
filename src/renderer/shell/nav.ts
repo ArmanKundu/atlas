@@ -31,16 +31,16 @@ export const NAV_TODAY: NavItem = {
 /** The main places, shown at full strength in the sidebar. */
 export const NAV_PRIMARY: NavItem[] = [
   {
-    to: '/assistant',
-    label: 'Assistant',
-    icon: MessageCircle,
-    keywords: ['chat', 'ai', 'ask', 'tutor', 'bot', 'helper'],
-  },
-  {
     to: '/exam',
     label: 'Exam',
     icon: GraduationCap,
     keywords: ['past papers', 'vcaa', 'examiner report', 'sit', 'practice', 'find a question'],
+  },
+  {
+    to: '/assistant',
+    label: 'Assistant',
+    icon: MessageCircle,
+    keywords: ['chat', 'ai', 'ask', 'tutor', 'bot', 'helper'],
   },
   {
     to: '/library',
@@ -53,12 +53,6 @@ export const NAV_PRIMARY: NavItem[] = [
     label: 'Planner',
     icon: CalendarDays,
     keywords: ['calendar', 'week', 'schedule', 'to-do', 'compass'],
-  },
-  {
-    to: '/exam-builder',
-    label: 'Exam builder',
-    icon: FileText,
-    keywords: ['practice exam', 'paper', 'generate'],
   },
 ]
 
@@ -85,7 +79,17 @@ export const NAV_SECONDARY: NavItem[] = [
   },
 ]
 
-export const NAV_TOOLS: NavItem[] = [...NAV_PRIMARY, ...NAV_SECONDARY]
+/** Places reached from inside another page (Exam builder lives in Exam); still in the palette. */
+export const NAV_NESTED: NavItem[] = [
+  {
+    to: '/exam-builder',
+    label: 'Exam builder',
+    icon: FileText,
+    keywords: ['practice exam', 'paper', 'generate'],
+  },
+]
+
+export const NAV_TOOLS: NavItem[] = [...NAV_PRIMARY, ...NAV_SECONDARY, ...NAV_NESTED]
 
 export const NAV_SETTINGS: NavItem = {
   to: '/settings',

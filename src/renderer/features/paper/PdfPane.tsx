@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
   Columns2,
+  Ellipsis,
   Eraser,
   Expand,
   Flag,
@@ -38,6 +39,7 @@ import {
 } from 'lucide-react'
 import { TextLayer } from 'pdfjs-dist'
 import type { PageText, Region } from '@shared/models'
+import { Menu } from '@/design/Menu'
 import { PillBar, PillButton, PillDivider } from '@/design/Pill'
 import { ErrorState, Skeleton } from '@/design/States'
 import { Tooltip } from '@/design/Tooltip'
@@ -340,6 +342,8 @@ export const PdfPane = forwardRef<PdfPaneHandle, PdfPaneProps>(function PdfPane(
   const fitPageWidth = Math.max(240, (box.h - 40) / ratio)
   const width = Math.round((fitPage ? Math.min(fitWidth, fitPageWidth) : fitWidth) * zoom)
   const numPages = doc?.numPages ?? 0
+  // Narrow pane (both side panels open): keep two rows and move the rest into a "More" menu.
+  const narrow = box.w < 760
 
   const goTo = useCallback((number: number, y = 0) => {
     const element = document.getElementById(`pdf-page-${number}`)
@@ -486,10 +490,32 @@ export const PdfPane = forwardRef<PdfPaneHandle, PdfPaneProps>(function PdfPane(
       </div>
     )
 
+  const fitToPage = (): void => {
+    setFitPage(true)
+    setZoom(1)
+  }
+  const rotate = (): void => setRotation((r) => (r + 90) % 360)
+  const clearAll = (): void => {
+    if (window.confirm('Clear all your annotations on this document? This cannot be undone.'))
+      void annotations.clearMine()
+  }
+  const toggleBookmark = (): void =>
+    void (bookmarkHere
+      ? annotations.remove(bookmarkHere)
+      : annotations.add({ targetType: 'source', targetId: sourceId, page, kind: 'bookmark' }))
+  const toggleLock = (): void => {
+    onLocked(!locked)
+    if (!locked) onTool('select')
+  }
+  const fullScreen = (): void =>
+    document.fullscreenElement
+      ? void document.exitFullscreen()
+      : void root.current?.closest('[data-workspace]')?.requestFullscreen()
+
   return (
     <div ref={root} className="flex min-w-0 flex-1 flex-col bg-canvas">
       {/* Row 1: pages, find, zoom */}
-      <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 px-3 pt-2.5">
+      <div className="flex shrink-0 items-center justify-center gap-2 overflow-x-auto px-3 pt-2.5 [scrollbar-width:none]">
         <PillBar label="Pages">
           {compact ? null : (
             <PillButton
@@ -543,7 +569,7 @@ export const PdfPane = forwardRef<PdfPaneHandle, PdfPaneProps>(function PdfPane(
             aria-label="Find in document"
             className={cn(
               'bg-transparent px-1 text-ink outline-none placeholder:text-ink-3',
-              compact ? 'w-20' : 'w-32',
+              compact || narrow ? 'w-24' : 'w-32',
             )}
           />
           <span className="min-w-8 text-center text-ink-3 tabular-nums">
@@ -553,21 +579,25 @@ export const PdfPane = forwardRef<PdfPaneHandle, PdfPaneProps>(function PdfPane(
                 ? '0/0'
                 : ''}
           </span>
-          <PillButton
-            label="Previous result"
-            icon={<ChevronUp className="size-4" />}
-            onClick={() => step(-1)}
-          />
-          <PillButton
-            label="Next result"
-            icon={<ChevronDown className="size-4" />}
-            onClick={() => step(1)}
-          />
-          <PillButton
-            label="Clear find"
-            icon={<X className="size-4" />}
-            onClick={() => setQuery('')}
-          />
+          {narrow && !query ? null : (
+            <>
+              <PillButton
+                label="Previous result"
+                icon={<ChevronUp className="size-4" />}
+                onClick={() => step(-1)}
+              />
+              <PillButton
+                label="Next result"
+                icon={<ChevronDown className="size-4" />}
+                onClick={() => step(1)}
+              />
+              <PillButton
+                label="Clear find"
+                icon={<X className="size-4" />}
+                onClick={() => setQuery('')}
+              />
+            </>
+          )}
         </PillBar>
         <PillBar label="Zoom">
           <PillButton
@@ -593,26 +623,27 @@ export const PdfPane = forwardRef<PdfPaneHandle, PdfPaneProps>(function PdfPane(
               setZoom(1)
             }}
           />
-          <PillButton
-            label="Fit page"
-            active={fitPage && zoom === 1}
-            icon={<Maximize className="size-[18px]" />}
-            onClick={() => {
-              setFitPage(true)
-              setZoom(1)
-            }}
-          />
-          <PillButton
-            label="Rotate"
-            icon={<RotateCw className="size-[18px]" />}
-            onClick={() => setRotation((r) => (r + 90) % 360)}
-          />
+          {narrow ? null : (
+            <>
+              <PillButton
+                label="Fit page"
+                active={fitPage && zoom === 1}
+                icon={<Maximize className="size-[18px]" />}
+                onClick={fitToPage}
+              />
+              <PillButton
+                label="Rotate"
+                icon={<RotateCw className="size-[18px]" />}
+                onClick={rotate}
+              />
+            </>
+          )}
         </PillBar>
       </div>
 
       {/* Row 2: tools */}
       {compact ? null : (
-        <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 px-3 pt-2 pb-1">
+        <div className="flex shrink-0 items-center justify-center gap-2 overflow-x-auto px-3 pt-2 pb-1 [scrollbar-width:none]">
           <PillBar label="Tools">
             {TOOLS.map((t) => (
               <PillButton
@@ -679,65 +710,91 @@ export const PdfPane = forwardRef<PdfPaneHandle, PdfPaneProps>(function PdfPane(
               disabled={!annotations.canRedo}
               onClick={() => void annotations.redo()}
             />
-            <PillButton
-              label="Clear my annotations"
-              icon={<X className="size-[18px]" />}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    'Clear all your annotations on this document? This cannot be undone.',
-                  )
-                )
-                  void annotations.clearMine()
-              }}
-            />
-            <PillButton
-              label={bookmarkHere ? 'Remove bookmark' : 'Bookmark this page'}
-              active={Boolean(bookmarkHere)}
-              icon={<Bookmark className="size-[18px]" />}
-              onClick={() =>
-                void (bookmarkHere
-                  ? annotations.remove(bookmarkHere)
-                  : annotations.add({
-                      targetType: 'source',
-                      targetId: sourceId,
-                      page,
-                      kind: 'bookmark',
-                    }))
-              }
-            />
-            <PillDivider />
-            <PillButton
-              label={locked ? 'Unlock annotations' : 'Lock annotations'}
-              active={locked}
-              icon={
-                locked ? <Lock className="size-[18px]" /> : <LockOpen className="size-[18px]" />
-              }
-              onClick={() => {
-                onLocked(!locked)
-                if (!locked) onTool('select')
-              }}
-            />
-            <PillButton
-              label="Full screen"
-              icon={<Maximize className="size-[18px]" />}
-              onClick={() =>
-                document.fullscreenElement
-                  ? void document.exitFullscreen()
-                  : void root.current?.closest('[data-workspace]')?.requestFullscreen()
-              }
-            />
-            {props.onSplit ? (
+            {narrow ? (
+              <Menu
+                trigger={<PillButton label="More" icon={<Ellipsis className="size-[18px]" />} />}
+                items={[
+                  {
+                    label: 'Fit page',
+                    icon: <Maximize className="size-4" />,
+                    onSelect: fitToPage,
+                    checked: fitPage && zoom === 1,
+                  },
+                  { label: 'Rotate', icon: <RotateCw className="size-4" />, onSelect: rotate },
+                  {
+                    label: bookmarkHere ? 'Remove bookmark' : 'Bookmark this page',
+                    icon: <Bookmark className="size-4" />,
+                    onSelect: toggleBookmark,
+                    checked: Boolean(bookmarkHere),
+                  },
+                  {
+                    label: 'Lock annotations',
+                    icon: <Lock className="size-4" />,
+                    onSelect: toggleLock,
+                    checked: locked,
+                  },
+                  {
+                    label: 'Clear my annotations',
+                    icon: <X className="size-4" />,
+                    onSelect: clearAll,
+                  },
+                  {
+                    label: 'Full screen',
+                    icon: <Maximize className="size-4" />,
+                    onSelect: fullScreen,
+                  },
+                  ...(props.onSplit
+                    ? [
+                        {
+                          label: 'Split view with the report',
+                          icon: <Columns2 className="size-4" />,
+                          onSelect: props.onSplit,
+                          checked: props.splitActive,
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            ) : (
               <>
+                <PillButton
+                  label="Clear my annotations"
+                  icon={<X className="size-[18px]" />}
+                  onClick={clearAll}
+                />
+                <PillButton
+                  label={bookmarkHere ? 'Remove bookmark' : 'Bookmark this page'}
+                  active={Boolean(bookmarkHere)}
+                  icon={<Bookmark className="size-[18px]" />}
+                  onClick={toggleBookmark}
+                />
                 <PillDivider />
                 <PillButton
-                  label="Split view with the report"
-                  active={props.splitActive}
-                  icon={<Columns2 className="size-[18px]" />}
-                  onClick={props.onSplit}
+                  label={locked ? 'Unlock annotations' : 'Lock annotations'}
+                  active={locked}
+                  icon={
+                    locked ? <Lock className="size-[18px]" /> : <LockOpen className="size-[18px]" />
+                  }
+                  onClick={toggleLock}
                 />
+                <PillButton
+                  label="Full screen"
+                  icon={<Maximize className="size-[18px]" />}
+                  onClick={fullScreen}
+                />
+                {props.onSplit ? (
+                  <>
+                    <PillDivider />
+                    <PillButton
+                      label="Split view with the report"
+                      active={props.splitActive}
+                      icon={<Columns2 className="size-[18px]" />}
+                      onClick={props.onSplit}
+                    />
+                  </>
+                ) : null}
               </>
-            ) : null}
+            )}
           </PillBar>
         </div>
       )}
