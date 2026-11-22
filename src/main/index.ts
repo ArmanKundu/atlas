@@ -22,6 +22,7 @@ import { createFileLogger } from './log'
 import { PrefsStore } from './prefs'
 import { ProfileManager } from './profiles'
 import { buildCsp, isAppUrl, resolveRendererPath } from './security'
+import { CommunityLibrary } from './community'
 import { Updater } from './updater'
 import { createMainWindow, printRouteToPdf } from './window'
 
@@ -117,6 +118,30 @@ async function main(): Promise<void> {
       shell.showItemInFolder(path)
   })
   updater.start()
+
+  const shared = new CommunityLibrary({
+    secrets,
+    log,
+    db: () => profiles.db(),
+    filesDir: () => {
+      const current = profiles.current
+      if (!current) throw new Error('no profile open')
+      return profiles.filesDir(current.id)
+    },
+    onLibraryChanged: () => broadcast(windows(), 'library:changed', { sourceId: null }),
+  })
+  registry.handle('shared:status', () => shared.status())
+  registry.handle('shared:signUp', (input) => shared.signUp(input))
+  registry.handle('shared:signIn', (input) => shared.signIn(input))
+  registry.handle('shared:signOut', () => shared.signOut())
+  registry.handle('shared:join', (input) => shared.join(input))
+  registry.handle('shared:list', (query) => shared.list(query))
+  registry.handle('shared:get', ({ id }) => shared.get(id))
+  registry.handle('shared:publish', (input) => shared.publish(input))
+  registry.handle('shared:update', (input) => shared.update(input))
+  registry.handle('shared:remove', ({ id }) => shared.remove(id))
+  registry.handle('shared:like', (input) => shared.like(input))
+  registry.handle('shared:remix', ({ id }) => shared.remix(id))
   app.on('will-quit', () => {
     updater.stop()
     profiles.lock()

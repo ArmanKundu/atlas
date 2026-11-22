@@ -10,6 +10,7 @@ import {
   NotebookPen,
   Settings,
   Timer,
+  Users,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -47,6 +48,12 @@ export const NAV_PRIMARY: NavItem[] = [
     label: 'Library',
     icon: Library,
     keywords: ['resources', 'import', 'files', 'pdf', 'papers'],
+  },
+  {
+    to: '/shared',
+    label: 'Shared',
+    icon: Users,
+    keywords: ['community', 'friends', 'share', 'remix', 'public library', 'group', 'studocu'],
   },
   {
     to: '/planner',

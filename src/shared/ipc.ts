@@ -1,5 +1,14 @@
 import { z } from 'zod'
 import { UpdateStatusSchema } from './update'
+import {
+  CommunityStatusSchema,
+  PublishSchema,
+  RemixResultSchema,
+  SharedCardSchema,
+  SharedItemSchema,
+  SharedListSchema,
+  SharedQuerySchema,
+} from './community'
 import type { IpcEvent } from './ipc-channels'
 import {
   AgentInfoSchema,
@@ -101,6 +110,37 @@ export const ipcContract = {
   'update:status': { request: none, response: UpdateStatusSchema },
   'update:check': { request: none, response: UpdateStatusSchema },
   'update:install': { request: none, response: UpdateStatusSchema },
+  // Shared library (Supabase)
+  'shared:status': { request: none, response: CommunityStatusSchema },
+  'shared:signUp': {
+    request: z.object({ email: z.email().max(200), password: z.string().min(6).max(200) }),
+    response: CommunityStatusSchema,
+  },
+  'shared:signIn': {
+    request: z.object({ email: z.email().max(200), password: z.string().min(1).max(200) }),
+    response: CommunityStatusSchema,
+  },
+  'shared:signOut': { request: none, response: CommunityStatusSchema },
+  'shared:join': {
+    request: z.object({ code: z.string().min(1).max(100), name: z.string().trim().min(1).max(60) }),
+    response: CommunityStatusSchema,
+  },
+  'shared:list': { request: SharedQuerySchema, response: SharedListSchema },
+  'shared:get': { request: z.object({ id }), response: SharedItemSchema },
+  'shared:publish': { request: PublishSchema, response: SharedCardSchema },
+  'shared:update': {
+    request: z.object({
+      id,
+      title: z.string().trim().min(1).max(200),
+      description: z.string().max(2000),
+      subject: z.string().max(80),
+      tags: z.array(z.string().max(40)).max(12),
+    }),
+    response: none,
+  },
+  'shared:remove': { request: z.object({ id }), response: none },
+  'shared:like': { request: z.object({ id, liked: z.boolean() }), response: none },
+  'shared:remix': { request: z.object({ id }), response: RemixResultSchema },
   'update:revealBackup': { request: z.object({ path: z.string().max(1000) }), response: none },
 
   // Profiles and backups

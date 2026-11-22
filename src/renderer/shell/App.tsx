@@ -19,6 +19,7 @@ import { Sit } from '@/routes/Sit'
 import { SubjectRoute } from '@/routes/Subject'
 import { TimerRoute } from '@/routes/Timer'
 import { Today } from '@/routes/Today'
+import { Shared } from '@/routes/Shared'
 import { AssistantRoute, FlashcardsRoute, LibraryRoute, NotesRoute, NotFound } from '@/routes/Tools'
 import { Viewer } from '@/routes/Viewer'
 import { AppShell } from './AppShell'
@@ -40,6 +41,7 @@ const router = createHashRouter([
       { path: 'subjects/:subjectId', element: <SubjectRoute />, handle: { crumb: 'Subject' } },
       { path: 'assistant', element: <AssistantRoute />, handle: { crumb: 'Assistant' } },
       { path: 'library', element: <LibraryRoute />, handle: { crumb: 'Library' } },
+      { path: 'shared', element: <Shared />, handle: { crumb: 'Shared library' } },
       { path: 'viewer/:sourceId', element: <Viewer />, handle: { crumb: 'Library' } },
       { path: 'notes', element: <NotesRoute />, handle: { crumb: 'Notes' } },
       { path: 'exam', element: <Exam />, handle: { crumb: 'Exam' } },
