@@ -62,7 +62,7 @@ export function ScanDialog({
       )
     return () => {
       live = false
-      void call('scanner:stop')
+      call('scanner:stop').catch(() => undefined)
     }
   }, [open, folder])
 
