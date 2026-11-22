@@ -86,8 +86,54 @@ export const CommunityStatusSchema = z.object({
   profile: ProfileSchema.nullable(),
   /** Unread inbox notifications. */
   unread: z.number(),
+  /** Null when signed out. Waitlisted people wait for the admin to let them in. */
+  access: z.enum(['approved', 'waitlisted']).nullable(),
+  isAdmin: z.boolean(),
+  /** How many accounts Atlas allows, and how many are taken. */
+  capacity: z.number(),
+  used: z.number(),
 })
 export type CommunityStatus = z.infer<typeof CommunityStatusSchema>
+
+export const CapacitySchema = z.object({ capacity: z.number(), used: z.number() })
+export type Capacity = z.infer<typeof CapacitySchema>
+
+export const AccessEntrySchema = z.object({
+  userId: z.string(),
+  email: z.string(),
+  status: z.enum(['approved', 'waitlisted']),
+  createdAt: z.string(),
+  displayName: z.string().nullable(),
+  username: z.string().nullable(),
+})
+export type AccessEntry = z.infer<typeof AccessEntrySchema>
+
+export const FEEDBACK_KINDS = ['bug', 'idea', 'other'] as const
+export type FeedbackKind = (typeof FEEDBACK_KINDS)[number]
+
+export const FeedbackInputSchema = z.object({
+  kind: z.enum(FEEDBACK_KINDS),
+  title: z.string().trim().min(1).max(140),
+  body: z.string().max(8000).default(''),
+  /** A local screenshot or recording to attach. */
+  attachment: z.string().nullable().default(null),
+})
+export type FeedbackInput = z.input<typeof FeedbackInputSchema>
+
+export const FeedbackSchema = z.object({
+  id: z.string(),
+  kind: z.enum(FEEDBACK_KINDS),
+  title: z.string(),
+  body: z.string(),
+  attachmentUrl: z.string().nullable(),
+  attachmentName: z.string().nullable(),
+  appVersion: z.string(),
+  platform: z.string(),
+  status: z.enum(['new', 'seen', 'done']),
+  createdAt: z.string(),
+  from: z.string(),
+})
+export type Feedback = z.infer<typeof FeedbackSchema>
 
 export const SpaceInputSchema = z.object({
   name: z.string().trim().min(1).max(60),
@@ -156,6 +202,7 @@ export const NOTIFICATION_KINDS = [
   'request_declined',
   'invite_accepted',
   'role_changed',
+  'waitlist',
 ] as const
 
 export const NotificationSchema = z.object({

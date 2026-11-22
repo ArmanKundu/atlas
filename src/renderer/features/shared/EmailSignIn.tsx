@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, AtSign, Check, Mail, X } from 'lucide-react'
+import { ArrowRight, AtSign, Check, Hourglass, Mail, RefreshCw, X } from 'lucide-react'
 import {
   SPACE_COLORS,
   USERNAME_PATTERN,
@@ -31,6 +31,7 @@ function suggestUsername(name: string): string {
  * friends can find you. Used in onboarding, on the Shared page and in Settings.
  */
 export function EmailSignIn({ status, onDone }: { status: CommunityStatus; onDone?: () => void }) {
+  if (status.signedIn && status.access === 'waitlisted') return <Waitlisted status={status} />
   if (status.signedIn && !status.profile) return <ProfileSetup status={status} onDone={onDone} />
   if (status.signedIn && status.profile) {
     return (
@@ -49,7 +50,64 @@ export function EmailSignIn({ status, onDone }: { status: CommunityStatus; onDon
   return <EmailCode />
 }
 
+/**
+ * Atlas keeps a small number of places so it stays among friends. When they are all taken,
+ * signing in puts you on the waitlist until the admin lets you in.
+ */
+function Waitlisted({ status }: { status: CommunityStatus }) {
+  const recheck = useAction(async () => {
+    await call('shared:recheckAccess')
+    changed('shared', 'shared-status')
+  })
+  const leave = useAction(async () => {
+    await call('shared:signOut')
+    changed('shared', 'shared-status')
+  })
+  const again = recheck.run
+  useEffect(() => {
+    const timer = window.setInterval(() => void again(), 30_000)
+    return () => window.clearInterval(timer)
+  }, [again])
+  return (
+    <div className="flex flex-col items-center gap-3 py-2 text-center">
+      <motion.div
+        className="grid size-12 place-items-center rounded-full bg-warn-soft text-warn"
+        animate={{ rotate: [0, 180, 180, 360] }}
+        transition={{ duration: 3, repeat: Infinity, times: [0, 0.3, 0.7, 1], ease: 'easeInOut' }}
+      >
+        <Hourglass className="size-5" aria-hidden />
+      </motion.div>
+      <div>
+        <p className="font-semibold text-ink">You are on the waitlist</p>
+        <p className="mt-1 max-w-[38ch] text-ink-2">
+          Atlas is at capacity: {status.used} of {status.capacity} places are taken. The admin will
+          let you in when a place opens, and this screen updates by itself.
+        </p>
+      </div>
+      <p className="rounded-full bg-sunken px-3 py-1 text-2xs text-ink-2">{status.email}</p>
+      <div className="flex gap-1">
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={recheck.pending}
+          icon={
+            <RefreshCw className={cn('size-3.5', recheck.pending && 'animate-spin')} aria-hidden />
+          }
+          onClick={() => void recheck.run()}
+        >
+          Check again
+        </Button>
+        <Button size="sm" variant="ghost" disabled={leave.pending} onClick={() => void leave.run()}>
+          Use another email
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 function EmailCode() {
+  const capacity = useLive(['shared-status'], () => call('shared:capacity').catch(() => null))
+  const full = !!capacity.data && capacity.data.used >= capacity.data.capacity
   const [email, setEmail] = useState('')
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [state, setState] = useState<CodeState>('idle')
@@ -90,6 +148,16 @@ function EmailCode() {
             if (valid) void send.run(email.trim().toLowerCase())
           }}
         >
+          {full ? (
+            <div className="flex items-start gap-2.5 rounded-lg bg-warn-soft px-3 py-2.5 text-2xs text-ink-2">
+              <Hourglass className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
+              <span>
+                <span className="font-medium text-ink">Atlas is at capacity.</span> All{' '}
+                {capacity.data?.capacity} places are taken. Sign in with your email to join the
+                waitlist, and you will be let in when a place opens.
+              </span>
+            </div>
+          ) : null}
           <Field
             label="Email"
             error={send.error}
@@ -114,7 +182,7 @@ function EmailCode() {
                 disabled={!valid || send.pending}
                 trailingIcon={<ArrowRight className="size-3.5" aria-hidden />}
               >
-                {send.pending ? 'Sending…' : 'Send code'}
+                {send.pending ? 'Sending…' : full ? 'Join waitlist' : 'Send code'}
               </Button>
             </div>
           </Field>

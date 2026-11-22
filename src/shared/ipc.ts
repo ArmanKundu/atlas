@@ -1,7 +1,11 @@
 import { z } from 'zod'
 import { UpdateStatusSchema } from './update'
 import {
+  AccessEntrySchema,
+  CapacitySchema,
   CommunityStatusSchema,
+  FeedbackInputSchema,
+  FeedbackSchema,
   INVITE_ROLES,
   JoinResultSchema,
   NotificationSchema,
@@ -179,6 +183,35 @@ export const ipcContract = {
     response: none,
   },
   'shared:remix': { request: z.object({ id }), response: RemixResultSchema },
+  'shared:capacity': { request: none, response: CapacitySchema },
+  'shared:recheckAccess': { request: none, response: CommunityStatusSchema },
+  'admin:access': { request: none, response: z.array(AccessEntrySchema) },
+  'admin:setAccess': {
+    request: z.object({ userId: id, status: z.enum(['approved', 'waitlisted', 'removed']) }),
+    response: none,
+  },
+  'admin:setCapacity': {
+    request: z.object({ capacity: z.number().int().min(1).max(1000) }),
+    response: none,
+  },
+  'admin:feedback': { request: none, response: z.array(FeedbackSchema) },
+  'admin:setFeedback': {
+    request: z.object({ id, status: z.enum(['new', 'seen', 'done']) }),
+    response: none,
+  },
+
+  // Bug reports and feature requests
+  'feedback:capture': {
+    request: none,
+    response: z.object({ path: z.string(), dataUrl: z.string() }),
+  },
+  'feedback:saveRecording': {
+    request: z.object({ bytes: z.instanceof(Uint8Array), mime: z.string().max(60) }),
+    response: z.object({ path: z.string() }),
+  },
+  'feedback:copyImage': { request: z.object({ path: z.string().max(1000) }), response: none },
+  'feedback:saveAs': { request: z.object({ path: z.string().max(1000) }), response: z.boolean() },
+  'feedback:send': { request: FeedbackInputSchema, response: none },
   'update:revealBackup': { request: z.object({ path: z.string().max(1000) }), response: none },
 
   // Profiles and backups

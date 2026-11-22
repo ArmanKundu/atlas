@@ -1,18 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { ArrowUp, Copy, Layers, NotebookPen, Plus, Square, Trash2 } from 'lucide-react'
+import { ArrowUp, Copy, Layers, NotebookPen, Plus, Square, Trash2, Wand2 } from 'lucide-react'
+import { AUTO_HELPER, pickHelper } from '@shared/helper-pick'
 import type { AgentInfo, Chat, ChatMessage } from '@shared/models'
 import { Button, IconButton } from '@/design/Button'
-import { Badge, Select } from '@/design/Form'
+import { Badge } from '@/design/Form'
 import { Markdown } from '@/design/Markdown'
 import { ErrorState } from '@/design/States'
 import { useToast } from '@/design/Toast'
 import { changed, db, useAction, useLive } from '@/lib/api'
-import { cn } from '@/lib/cn'
 import { call, subscribe } from '@/lib/ipc'
 import { Buddy } from '@/mascot/Buddy'
 import { providerName } from '@/features/ai/names'
 import { agentIcon } from './agents'
+import { HelperPicker } from './HelperPicker'
+import { ShareActionCard } from '@/features/shared/ShareActionCard'
+
+const CHAT_BLOCKS = { 'atlas-share': (code: string) => <ShareActionCard code={code} /> }
 
 function parseCards(text: string): { front: string; back: string }[] {
   const start = text.indexOf('[')
@@ -74,7 +78,7 @@ function MessageBubble({ message, subjectId }: { message: ChatMessage; subjectId
   return (
     <div className="group flex flex-col gap-1.5">
       {message.contentMd ? (
-        <Markdown>{message.contentMd}</Markdown>
+        <Markdown blocks={streaming ? undefined : CHAT_BLOCKS}>{message.contentMd}</Markdown>
       ) : streaming ? (
         <p className="animate-pulse-soft text-ink-3">Thinking…</p>
       ) : null}
@@ -152,7 +156,7 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
     items: [],
   })
   const [draft, setDraft] = useState('')
-  const [agentId, setAgentId] = useState('tutor')
+  const [agentId, setAgentId] = useState(AUTO_HELPER)
   const bottom = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)
 
@@ -193,6 +197,16 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
     [chats.data, activeId],
   )
   const agent: AgentInfo | undefined = agents.data?.find((a) => a.id === (active?.agent ?? agentId))
+  // A few helpers to start from: the subject's own first, then the everyday ones.
+  const suggested = useMemo(() => {
+    const everyday = ['tutor', 'solver', 'examiner', 'notes', 'cards', 'exam-maker']
+    const own = agentGroups.filter((g) => g.group.startsWith('For ')).flatMap((g) => g.items)
+    const rest = everyday
+      .map((id) => agents.data?.find((a) => a.id === id))
+      .filter((a): a is AgentInfo => !!a && !own.includes(a))
+    return [...own, ...rest].slice(0, 6)
+  }, [agentGroups, agents.data])
+  const helperCount = agentGroups.reduce((n, g) => n + g.items.length, 0)
   const messages = useMemo(
     () => (loaded.chatId === activeId ? loaded.items : []),
     [loaded, activeId],
@@ -246,7 +260,15 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
     if (!content || streaming) return
     let chatId = activeId
     if (!chatId) {
-      const chat: Chat = await db.create('chats', { subjectId, agent: agentId })
+      const helper =
+        agentId === AUTO_HELPER
+          ? pickHelper(
+              content,
+              agentGroups.flatMap((g) => g.items.map((a) => a.id)),
+              subject.data?.kind,
+            )
+          : agentId
+      const chat: Chat = await db.create('chats', { subjectId, agent: helper })
       chatId = chat.id
       setActiveId(chat.id)
     }
@@ -343,34 +365,50 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
                     </Link>
                   </div>
                 ) : null}
-                <div className="mt-6 flex w-full flex-col gap-5 text-left">
-                  {agentGroups.map(({ group, items }) => (
-                    <section key={group}>
-                      <h3 className="mb-2 text-2xs font-medium text-ink-3">{group}</h3>
-                      <div className="grid grid-cols-2 gap-2 min-[1150px]:grid-cols-3">
-                        {items.map((item) => {
-                          const Icon = agentIcon(item.icon)
-                          return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => newChat(item.id)}
-                              aria-pressed={item.id === agentId}
-                              className="flex items-start gap-2.5 rounded-lg p-3 text-left ring-1 ring-line ring-inset hover:bg-sunken aria-pressed:bg-blue-soft aria-pressed:ring-blue-line"
-                            >
-                              <Icon className="mt-0.5 size-4 shrink-0 text-ink-2" aria-hidden />
-                              <span>
-                                <span className="block font-medium text-ink">{item.name}</span>
-                                <span className="block text-2xs leading-4 text-ink-3">
-                                  {item.description}
-                                </span>
-                              </span>
-                            </button>
-                          )
+                <div className="mt-6 w-full text-left">
+                  <button
+                    type="button"
+                    onClick={() => newChat(AUTO_HELPER)}
+                    aria-pressed={agentId === AUTO_HELPER}
+                    className="flex w-full items-center gap-3 rounded-xl p-3.5 text-left ring-1 ring-line ring-inset hover:bg-sunken aria-pressed:bg-blue-soft aria-pressed:ring-blue-line"
+                  >
+                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-fg">
+                      <Wand2 className="size-4" aria-hidden />
+                    </span>
+                    <span className="flex-1">
+                      <span className="block font-semibold text-ink">Auto</span>
+                      <span className="block text-2xs text-ink-3">
+                        Just ask. Atlas picks the right helper: marking, flashcards, exams, plans
+                        and more.
+                      </span>
+                    </span>
+                  </button>
+                  <h3 className="mt-5 mb-2 text-2xs font-medium text-ink-3">Or pick one</h3>
+                  <div className="grid grid-cols-2 gap-2 min-[1150px]:grid-cols-3">
+                    {suggested.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => newChat(item.id)}
+                        aria-pressed={item.id === agentId}
+                        className="flex items-start gap-2.5 rounded-lg p-3 text-left ring-1 ring-line ring-inset hover:bg-sunken aria-pressed:bg-blue-soft aria-pressed:ring-blue-line"
+                      >
+                        {createElement(agentIcon(item.icon), {
+                          className: 'mt-0.5 size-4 shrink-0 text-ink-2',
+                          'aria-hidden': true,
                         })}
-                      </div>
-                    </section>
-                  ))}
+                        <span>
+                          <span className="block font-medium text-ink">{item.name}</span>
+                          <span className="block text-2xs leading-4 text-ink-3">
+                            {item.description}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-center text-2xs text-ink-3">
+                    All {helperCount} helpers are in the helper menu under the message box.
+                  </p>
                 </div>
               </div>
             ) : (
@@ -411,22 +449,12 @@ export function ChatView({ subjectId = null }: { subjectId?: string | null }) {
               className="block w-full resize-none bg-transparent px-2 py-1.5 text-[0.875rem] leading-6 text-ink outline-none placeholder:text-ink-3"
             />
             <div className="flex items-center gap-2 pt-1">
-              <Select
-                aria-label="Helper"
-                className={cn(
-                  'h-7 w-auto rounded-md bg-hover text-2xs ring-0',
-                  active && 'opacity-70',
-                )}
+              <HelperPicker
                 value={active?.agent ?? agentId}
+                groups={agentGroups}
                 disabled={Boolean(active)}
-                onChange={(e) => setAgentId(e.target.value)}
-              >
-                {agents.data?.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </Select>
+                onChange={setAgentId}
+              />
               <span className="min-w-0 flex-1 truncate text-2xs text-ink-3">
                 {config.data?.defaultProvider
                   ? `Using ${providerName(config.data.defaultProvider)}`

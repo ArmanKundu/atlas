@@ -1,4 +1,5 @@
 import { useDeferredValue, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import {
   Bell,
   Globe,
@@ -12,6 +13,7 @@ import {
   Search,
   Settings2,
   Share2,
+  ShieldCheck,
   ThumbsUp,
   Trash2,
   UserPlus,
@@ -34,6 +36,7 @@ import { Menu } from '@/design/Menu'
 import { Segmented } from '@/design/Segmented'
 import { EmptyState, ErrorState, SkeletonList } from '@/design/States'
 import { useToast } from '@/design/Toast'
+import { AdminDialog } from '@/features/shared/AdminDialog'
 import { EmailSignIn } from '@/features/shared/EmailSignIn'
 import { InboxDialog } from '@/features/shared/InboxDialog'
 import { JoinDialog } from '@/features/shared/JoinDialog'
@@ -87,12 +90,18 @@ export function Shared() {
           <div className="mb-6 flex flex-col items-center text-center">
             <Mascot size={64} />
             <h1 className="mt-4 text-[1.5rem] font-semibold tracking-[-0.02em] text-ink">
-              {s.signedIn ? 'Almost there' : 'Share with friends'}
+              {s.access === 'waitlisted'
+                ? 'Atlas is full'
+                : s.signedIn
+                  ? 'Almost there'
+                  : 'Share with friends'}
             </h1>
             <p className="mt-1.5 max-w-[42ch] text-ink-2">
-              {s.signedIn
-                ? 'Pick a name and @username so friends can invite you.'
-                : 'Join spaces with your friends to swap notes, files and flashcards. Sign in with your email; Atlas sends you a code.'}
+              {s.access === 'waitlisted'
+                ? 'Places are kept small so Atlas stays among friends.'
+                : s.signedIn
+                  ? 'Pick a name and @username so friends can invite you.'
+                  : 'Join spaces with your friends to swap notes, files and flashcards. Sign in with your email; Atlas sends you a code.'}
             </p>
           </div>
           <div className="rounded-xl bg-surface p-5 shadow-pill ring-1 ring-line">
@@ -112,13 +121,16 @@ function Home({ status, profile }: { status: CommunityStatus; profile: Profile }
   const [creating, setCreating] = useState(false)
   const [joining, setJoining] = useState(false)
   const [inbox, setInbox] = useState(false)
+  const [admin, setAdmin] = useState(false)
   const signOut = useAction(async () => {
     await call('shared:signOut')
     changed('shared')
   })
 
   const list = spaces.data ?? []
-  const space = list.find((s) => s.id === current) ?? null
+  const [params, setParams] = useSearchParams()
+  const item = params.get('item')
+  const space = item ? null : (list.find((s) => s.id === current) ?? null)
   return (
     <div className="flex h-full min-h-0">
       <aside
@@ -154,6 +166,15 @@ function Home({ status, profile }: { status: CommunityStatus; profile: Profile }
                 onSelect: () =>
                   toast({ title: profile.displayName, description: status.email ?? '' }),
               },
+              ...(status.isAdmin
+                ? [
+                    {
+                      label: 'Atlas admin',
+                      icon: <ShieldCheck className="size-4" aria-hidden />,
+                      onSelect: () => setAdmin(true),
+                    },
+                  ]
+                : []),
               {
                 label: 'Sign out',
                 icon: <LogOut className="size-4" aria-hidden />,
@@ -166,7 +187,10 @@ function Home({ status, profile }: { status: CommunityStatus; profile: Profile }
           <button
             type="button"
             aria-current={space === null || undefined}
-            onClick={() => setCurrent('all')}
+            onClick={() => {
+              setParams({})
+              setCurrent('all')
+            }}
             className={cn(
               'flex h-9 items-center gap-2.5 rounded-md px-2 text-left text-ink-2 hover:bg-hover',
               space === null && 'bg-active font-medium text-ink',
@@ -182,7 +206,10 @@ function Home({ status, profile }: { status: CommunityStatus; profile: Profile }
               key={s.id}
               type="button"
               aria-current={space?.id === s.id || undefined}
-              onClick={() => setCurrent(s.id)}
+              onClick={() => {
+                setParams({})
+                setCurrent(s.id)
+              }}
               className={cn(
                 'flex h-10 items-center gap-2.5 rounded-md px-2 text-left text-ink-2 hover:bg-hover',
                 space?.id === s.id && 'bg-active text-ink',
@@ -223,7 +250,8 @@ function Home({ status, profile }: { status: CommunityStatus; profile: Profile }
         <Welcome onCreate={() => setCreating(true)} onJoin={() => setJoining(true)} />
       ) : (
         <Browser
-          key={space?.id ?? 'all'}
+          key={`${space?.id ?? 'all'}:${item ?? ''}`}
+          initialItem={item}
           status={status}
           space={space}
           spaces={list}
@@ -233,7 +261,16 @@ function Home({ status, profile }: { status: CommunityStatus; profile: Profile }
 
       <SpaceDialog open={creating} onOpenChange={setCreating} onCreated={(s) => setCurrent(s.id)} />
       <JoinDialog open={joining} onOpenChange={setJoining} onJoined={(id) => setCurrent(id)} />
-      <InboxDialog open={inbox} onOpenChange={setInbox} onOpenSpace={(id) => setCurrent(id)} />
+      <InboxDialog
+        open={inbox}
+        onOpenChange={setInbox}
+        onOpenSpace={(id) => setCurrent(id)}
+        onOpenAdmin={() => {
+          setInbox(false)
+          setAdmin(true)
+        }}
+      />
+      {status.isAdmin ? <AdminDialog open={admin} onOpenChange={setAdmin} status={status} /> : null}
     </div>
   )
 }
@@ -412,11 +449,13 @@ function Browser({
   space,
   spaces,
   onLeft,
+  initialItem,
 }: {
   status: CommunityStatus
   space: Space | null
   spaces: Space[]
   onLeft: () => void
+  initialItem?: string | null
 }) {
   const [text, setText] = useState('')
   const query = useDeferredValue(text)
@@ -425,7 +464,7 @@ function Browser({
   const [sort, setSort] = useState<'new' | 'top'>('new')
   const [mine, setMine] = useState(false)
   const [view, setView] = useSetting<'grid' | 'list'>('shared.view', 'grid')
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(initialItem ?? null)
   const [sharing, setSharing] = useState(false)
 
   const list = useLive(

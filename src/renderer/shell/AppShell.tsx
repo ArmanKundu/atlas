@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
-import { Monitor, Moon, Palette, PanelLeft, Sun } from 'lucide-react'
+import { Bug, Lightbulb, Monitor, Moon, Palette, PanelLeft, Sun } from 'lucide-react'
+import type { FeedbackKind } from '@shared/community'
 import type { Theme } from '@shared/ipc'
 import { CHANGELOG } from '@shared/changelog'
+import { FeedbackDialog } from '@/features/feedback/FeedbackDialog'
 import { processImportQueue } from '@/features/library/ingest'
 import { WhatsNew } from '@/features/whats-new/WhatsNew'
 import { changed } from '@/lib/api'
@@ -33,6 +35,12 @@ export function AppShell() {
   const latest = CHANGELOG[0]?.version ?? ''
   const [seen, setSeen, seenLoaded] = useSetting<string>('whatsNew.seen', '')
   const [whatsNew, setWhatsNew] = useState<'card' | 'list' | null>(null)
+  const [feedback, setFeedback] = useState<FeedbackKind | null>(null)
+  const [feedbackKind, setFeedbackKind] = useState<FeedbackKind>('bug')
+  const openFeedback = useCallback((kind: FeedbackKind) => {
+    setFeedbackKind(kind)
+    setFeedback(kind)
+  }, [])
   // Show the latest release's card once, after it lands.
   const [checked, setChecked] = useState(false)
   if (seenLoaded && !checked) {
@@ -83,8 +91,24 @@ export function AppShell() {
         keywords: ['tokens', 'components', 'mascot', 'styleguide'],
         run: () => void navigate('/design'),
       },
+      {
+        id: 'help:bug',
+        title: 'Report a bug',
+        group: 'Help',
+        icon: Bug,
+        keywords: ['feedback', 'problem', 'screenshot', 'record', 'broken'],
+        run: () => openFeedback('bug'),
+      },
+      {
+        id: 'help:idea',
+        title: 'Suggest a feature',
+        group: 'Help',
+        icon: Lightbulb,
+        keywords: ['feedback', 'request', 'idea'],
+        run: () => openFeedback('idea'),
+      },
     ],
-    [navigate, collapsed, toggleSidebar, setPrefs],
+    [navigate, collapsed, toggleSidebar, setPrefs, openFeedback],
   )
   useRegisterCommands('shell', commands)
 
@@ -126,6 +150,7 @@ export function AppShell() {
           onToggleSidebar={toggleSidebar}
           onOpenPalette={openPalette}
           onOpenWhatsNew={() => setWhatsNew('list')}
+          onOpenFeedback={openFeedback}
         />
         <UpdateBanner />
         <main className="min-h-0 flex-1 overflow-hidden bg-surface">
@@ -135,6 +160,11 @@ export function AppShell() {
         </main>
       </div>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <FeedbackDialog
+        open={feedback !== null}
+        initialKind={feedbackKind}
+        onOpenChange={(open) => !open && setFeedback(null)}
+      />
       <WhatsNew
         open={whatsNew !== null}
         startWithList={whatsNew === 'list'}

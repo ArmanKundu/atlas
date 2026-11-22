@@ -26,6 +26,8 @@ function line(n: Notification): string {
       return `${who} accepted your invite to ${n.spaceName}.`
     case 'role_changed':
       return `${who} changed your role in ${n.spaceName}.`
+    case 'waitlist':
+      return 'Someone joined the Atlas waitlist.'
   }
 }
 
@@ -34,10 +36,12 @@ export function InboxDialog({
   open,
   onOpenChange,
   onOpenSpace,
+  onOpenAdmin,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onOpenSpace: (spaceId: string) => void
+  onOpenAdmin?: () => void
 }) {
   const toast = useToast()
   const inbox = useLive(['shared', 'inbox'], () => call('shared:inbox'), [open])
@@ -154,6 +158,10 @@ export function InboxDialog({
                         </>
                       )}
                     </div>
+                  ) : n.kind === 'waitlist' && onOpenAdmin ? (
+                    <Button size="sm" variant="ghost" className="mt-1 -ml-2" onClick={onOpenAdmin}>
+                      Review waitlist
+                    </Button>
                   ) : n.spaceId &&
                     (n.kind === 'request_approved' || n.kind === 'invite_accepted') ? (
                     <Button

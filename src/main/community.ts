@@ -6,6 +6,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { AtlasError } from '@shared/errors'
 import { LIBRARY_KEY, LIBRARY_URL } from '@shared/constants'
 import {
+  FeedbackInputSchema,
   ProfileInputSchema,
   PublishSchema,
   SHARED_FILE_LIMIT,
@@ -16,7 +17,11 @@ import {
   canWrite,
   formatBytes,
   searchTerms,
+  type AccessEntry,
+  type Capacity,
   type CommunityStatus,
+  type Feedback,
+  type FeedbackInput,
   type InviteRole,
   type JoinResult,
   type Notification,
@@ -54,6 +59,8 @@ const MIME: Record<string, string> = {
   '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
   '.webp': 'image/webp',
+  '.webm': 'video/webm',
+  '.mp4': 'video/mp4',
   '.txt': 'text/plain',
   '.md': 'text/markdown',
   '.csv': 'text/csv',
@@ -152,7 +159,7 @@ export function friendly(
   if (/No space has that code/i.test(message))
     return new AtlasError('not_found', 'No space has that code. Check it with whoever shared it.')
   if (
-    /Only owners and admins|already in this space|owner keeps|owner cannot leave|no longer open|already handled|Set up your profile/i.test(
+    /Only the Atlas admin|admin keeps access|Only owners and admins|already in this space|owner keeps|owner cannot leave|no longer open|already handled|Set up your profile/i.test(
       message,
     )
   )
@@ -181,6 +188,9 @@ async function sha256(bytes: Buffer): Promise<string> {
 export class CommunityLibrary {
   private client: SupabaseClient | null = null
   private profileCache: Profile | null | undefined
+  private accessCache:
+    | { status: 'approved' | 'waitlisted'; isAdmin: boolean; capacity: number; used: number }
+    | undefined
 
   constructor(
     private readonly deps: {
@@ -251,12 +261,38 @@ export class CommunityLibrary {
       email: null,
       profile: null,
       unread: 0,
+      access: null,
+      isAdmin: false,
+      capacity: 0,
+      used: 0,
     }
     if (!empty.configured) return empty
     const sb = this.supabase()
     const { data } = await sb.auth.getSession()
     const user = data.session?.user
     if (!user) return empty
+    // Approved stays approved for the session; a waitlisted place is checked each time.
+    if (this.accessCache?.status !== 'approved') {
+      const claim = await this.rpc<Row>('claim_access', {}, 'Could not check your place in Atlas.')
+      this.accessCache = {
+        status: claim['status'] === 'approved' ? 'approved' : 'waitlisted',
+        isAdmin: Boolean(claim['is_admin']),
+        capacity: Number(claim['capacity'] ?? 0),
+        used: Number(claim['used'] ?? 0),
+      }
+    }
+    const access = this.accessCache
+    if (access.status === 'waitlisted') {
+      return {
+        ...empty,
+        signedIn: true,
+        userId: user.id,
+        email: user.email ?? null,
+        access: 'waitlisted',
+        capacity: access.capacity,
+        used: access.used,
+      }
+    }
     if (this.profileCache === undefined) {
       const { data: row, error } = await sb
         .from('profiles')
@@ -281,7 +317,139 @@ export class CommunityLibrary {
       email: user.email ?? null,
       profile: this.profileCache,
       unread,
+      access: 'approved',
+      isAdmin: access.isAdmin,
+      capacity: access.capacity,
+      used: access.used,
     }
+  }
+
+  /** How full Atlas is. Works signed out, so the sign-in screen can warn early. */
+  async capacity(): Promise<Capacity> {
+    const data = await this.rpc<Row>('capacity_status', {}, 'Could not check how full Atlas is.')
+    return { capacity: Number(data['capacity'] ?? 0), used: Number(data['used'] ?? 0) }
+  }
+
+  async recheckAccess(): Promise<CommunityStatus> {
+    this.accessCache = undefined
+    this.profileCache = undefined
+    return this.status()
+  }
+
+  /* ---------- Admin ---------- */
+
+  async adminAccess(): Promise<AccessEntry[]> {
+    const rows = await this.rpc<Row[]>('admin_access_list', {}, 'Could not load the accounts.')
+    return (rows ?? []).map((r) => ({
+      userId: String(r['user_id']),
+      email: String(r['email'] ?? ''),
+      status: r['status'] === 'approved' ? 'approved' : 'waitlisted',
+      createdAt: String(r['created_at']),
+      displayName: (r['display_name'] as string | null) ?? null,
+      username: (r['username'] as string | null) ?? null,
+    }))
+  }
+
+  async adminSetAccess(input: {
+    userId: string
+    status: 'approved' | 'waitlisted' | 'removed'
+  }): Promise<void> {
+    await this.rpc(
+      'admin_set_access',
+      { target: input.userId, new_status: input.status },
+      'Could not change that account.',
+    )
+    this.accessCache = undefined
+  }
+
+  async adminSetCapacity(capacity: number): Promise<void> {
+    await this.rpc('admin_set_capacity', { cap: capacity }, 'Could not change the limit.')
+    this.accessCache = undefined
+  }
+
+  async adminFeedback(): Promise<Feedback[]> {
+    const sb = this.supabase()
+    const { data, error } = await sb
+      .from('feedback')
+      .select(
+        'id, kind, title, body, attachment, app_version, platform, status, created_at, user_id',
+      )
+      .order('created_at', { ascending: false })
+      .limit(200)
+    if (error) throw friendly(error, 'Could not load the reports.')
+    const rows = (data ?? []) as Row[]
+    const ids = [...new Set(rows.map((r) => String(r['user_id'])))]
+    const { data: people } = ids.length
+      ? await sb.from('profiles').select(PROFILE_COLUMNS).in('user_id', ids)
+      : { data: [] }
+    const names = new Map(
+      ((people ?? []) as Row[]).map((p) => [
+        String(p['user_id']),
+        `${String(p['display_name'])} @${String(p['username'])}`,
+      ]),
+    )
+    return Promise.all(
+      rows.map(async (r) => {
+        const path = (r['attachment'] as string | null) ?? null
+        let url: string | null = null
+        if (path) {
+          const signed = await sb.storage.from('feedback').createSignedUrl(path, 60 * 60)
+          url = signed.data?.signedUrl ?? null
+        }
+        return {
+          id: String(r['id']),
+          kind: (r['kind'] as Feedback['kind']) ?? 'other',
+          title: String(r['title']),
+          body: String(r['body'] ?? ''),
+          attachmentUrl: url,
+          attachmentName: path ? basename(path) : null,
+          appVersion: String(r['app_version'] ?? ''),
+          platform: String(r['platform'] ?? ''),
+          status: (r['status'] as Feedback['status']) ?? 'new',
+          createdAt: String(r['created_at']),
+          from: names.get(String(r['user_id'])) ?? 'Someone',
+        }
+      }),
+    )
+  }
+
+  async adminSetFeedback(input: { id: string; status: Feedback['status'] }): Promise<void> {
+    const { error } = await this.supabase()
+      .from('feedback')
+      .update({ status: input.status })
+      .eq('id', input.id)
+    if (error) throw friendly(error, 'Could not update the report.')
+  }
+
+  /* ---------- Feedback ---------- */
+
+  /** Sends a bug report or idea to the Atlas developer, with an optional screenshot or recording. */
+  async sendFeedback(raw: FeedbackInput): Promise<void> {
+    const input = FeedbackInputSchema.parse(raw)
+    const me = await this.userId()
+    const sb = this.supabase()
+    let attachment: string | null = null
+    if (input.attachment) {
+      const bytes = await readFile(input.attachment)
+      if (bytes.byteLength > 50 * 1024 * 1024)
+        throw new AtlasError('bad_request', 'The recording is over 50 MB. Record a shorter clip.')
+      const ext = extname(input.attachment).toLowerCase() || '.png'
+      attachment = `${me}/${Date.now()}${ext}`
+      const { error } = await sb.storage.from('feedback').upload(attachment, bytes, {
+        contentType: MIME[ext] ?? 'application/octet-stream',
+        upsert: false,
+      })
+      if (error) throw friendly(error, 'Could not upload the screenshot.')
+    }
+    const { error } = await sb.from('feedback').insert({
+      kind: input.kind,
+      title: input.title,
+      body: input.body,
+      attachment,
+      app_version: app.getVersion(),
+      platform: `${process.platform} ${process.arch}`,
+    })
+    if (error) throw friendly(error, 'Could not send the report.')
   }
 
   /** Emails a one-time code. Makes the account on first use. */
@@ -301,6 +469,7 @@ export class CommunityLibrary {
     })
     if (error) throw friendly(error, 'Could not check the code.')
     this.profileCache = undefined
+    this.accessCache = undefined
     return this.status()
   }
 
@@ -308,6 +477,7 @@ export class CommunityLibrary {
     await this.supabase().auth.signOut()
     this.deps.secrets.delete(SESSION_KEY)
     this.profileCache = undefined
+    this.accessCache = undefined
     return this.status()
   }
 

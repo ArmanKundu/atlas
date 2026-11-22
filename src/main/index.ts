@@ -23,6 +23,7 @@ import { PrefsStore } from './prefs'
 import { ProfileManager } from './profiles'
 import { buildCsp, isAppUrl, resolveRendererPath } from './security'
 import { CommunityLibrary } from './community'
+import { allowScreenRecording, captureWindow, copyImage, saveAs, saveRecording } from './feedback'
 import { Updater } from './updater'
 import { createMainWindow, printRouteToPdf } from './window'
 
@@ -162,6 +163,19 @@ async function main(): Promise<void> {
   registry.handle('shared:remove', ({ id }) => shared.remove(id))
   registry.handle('shared:react', (input) => shared.react(input))
   registry.handle('shared:remix', ({ id }) => shared.remix(id))
+  registry.handle('shared:capacity', () => shared.capacity())
+  registry.handle('shared:recheckAccess', () => shared.recheckAccess())
+  registry.handle('admin:access', () => shared.adminAccess())
+  registry.handle('admin:setAccess', (input) => shared.adminSetAccess(input))
+  registry.handle('admin:setCapacity', ({ capacity }) => shared.adminSetCapacity(capacity))
+  registry.handle('admin:feedback', () => shared.adminFeedback())
+  registry.handle('admin:setFeedback', (input) => shared.adminSetFeedback(input))
+  registry.handle('feedback:capture', () => captureWindow())
+  registry.handle('feedback:saveRecording', (input) => saveRecording(input))
+  registry.handle('feedback:copyImage', ({ path }) => copyImage(path))
+  registry.handle('feedback:saveAs', ({ path }) => saveAs(path))
+  registry.handle('feedback:send', (input) => shared.sendFeedback(input))
+  allowScreenRecording()
   app.on('will-quit', () => {
     updater.stop()
     profiles.lock()

@@ -1,8 +1,20 @@
 import { Fragment } from 'react'
 import { Link, useMatches } from 'react-router'
-import { ChevronRight, Gift, PanelLeft, Search, Sparkles, Timer } from 'lucide-react'
+import {
+  Bug,
+  ChevronRight,
+  Gift,
+  LifeBuoy,
+  Lightbulb,
+  PanelLeft,
+  Search,
+  Sparkles,
+  Timer,
+} from 'lucide-react'
+import type { FeedbackKind } from '@shared/community'
 import { IconButton } from '@/design/Button'
 import { Kbd } from '@/design/Kbd'
+import { Menu } from '@/design/Menu'
 import { Tooltip } from '@/design/Tooltip'
 import { providerName } from '@/features/ai/names'
 import { formatClock, useTimer } from '@/features/timer/TimerProvider'
@@ -46,11 +58,13 @@ export function TopBar({
   onToggleSidebar,
   onOpenPalette,
   onOpenWhatsNew,
+  onOpenFeedback,
 }: {
   sidebarCollapsed: boolean
   onToggleSidebar: () => void
   onOpenPalette: () => void
   onOpenWhatsNew: () => void
+  onOpenFeedback: (kind: FeedbackKind) => void
 }) {
   const crumbs = useCrumbs()
   const timer = useTimer()
@@ -116,9 +130,30 @@ export function TopBar({
         </ol>
       </nav>
 
-      <IconButton label="What’s new" onClick={onOpenWhatsNew} className="app-no-drag">
-        <Gift className="size-4" aria-hidden />
-      </IconButton>
+      <Menu
+        trigger={
+          <IconButton label="Help and feedback" className="app-no-drag">
+            <LifeBuoy className="size-4" aria-hidden />
+          </IconButton>
+        }
+        items={[
+          {
+            label: 'What’s new',
+            icon: <Gift className="size-4" aria-hidden />,
+            onSelect: onOpenWhatsNew,
+          },
+          {
+            label: 'Report a bug',
+            icon: <Bug className="size-4" aria-hidden />,
+            onSelect: () => onOpenFeedback('bug'),
+          },
+          {
+            label: 'Suggest a feature',
+            icon: <Lightbulb className="size-4" aria-hidden />,
+            onSelect: () => onOpenFeedback('idea'),
+          },
+        ]}
+      />
 
       <Tooltip
         label={provider ? 'AI is connected. Open AI settings' : 'No AI connected. Open AI settings'}
