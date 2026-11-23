@@ -12,6 +12,7 @@ import type { ProfileMeta, ProfileMetaPatch, ProfileSummary, Subject } from '@sh
 import { ErrorState } from '@/design/States'
 import { changed, db, useLive } from './api'
 import { call, errorMessage, subscribe } from './ipc'
+import { groupSubjectFor } from '@shared/group-subjects'
 
 interface AppState {
   info: AppInfo
@@ -171,9 +172,13 @@ export function useAppState(): AppState {
   return state
 }
 
-/** Active subjects, in the user's order. Shared by the sidebar and every subject picker. */
+/** Active group subjects, in the user's order. Shared by the sidebar and every subject picker. */
 // eslint-disable-next-line react-refresh/only-export-components
 export function useSubjects(): Subject[] {
   const { data } = useLive(['subjects'], () => db.list('subjects', { orderBy: 'createdAt' }))
-  return useMemo(() => (data ?? []).filter((s) => s.active), [data])
+  // Only the group's six subjects show; older ones stay in the data, hidden.
+  return useMemo(
+    () => (data ?? []).filter((s) => s.active && groupSubjectFor(s.name, s.code) !== null),
+    [data],
+  )
 }

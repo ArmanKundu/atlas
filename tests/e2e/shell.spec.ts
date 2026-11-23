@@ -23,8 +23,7 @@ test('first run: create a profile, set up with no AI, and land on Today', async 
     await page.getByLabel('Study system').selectOption('vce')
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByRole('button', { name: 'Chemistry', exact: true }).click()
-    await page.getByLabel('Subject name').fill('Robotics')
-    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    await page.getByRole('button', { name: 'Biology', exact: true }).click()
     await page.getByRole('button', { name: 'Next' }).click()
     await expect(page.getByText('Use your own API key')).toBeVisible()
     await page.getByRole('button', { name: 'Skip' }).click()
@@ -38,7 +37,7 @@ test('first run: create a profile, set up with no AI, and land on Today', async 
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/(Good|Still up).*Sam/)
     const nav = page.getByRole('navigation', { name: 'Main' })
     await expect(nav.getByRole('link', { name: 'Chemistry' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Robotics' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Biology' })).toBeVisible()
 
     // With no AI connected the assistant explains what it needs instead of failing.
     await nav.getByRole('link', { name: 'Assistant' }).click()

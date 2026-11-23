@@ -1,12 +1,13 @@
+import { GroupSubjectPicker } from '@/features/subjects/GroupSubjectPicker'
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
-import { Monitor, Moon, Plus, Sun, Trash2 } from 'lucide-react'
+import { useSearchParams } from 'react-router'
+import { Monitor, Moon, Sun } from 'lucide-react'
 import type { Theme } from '@shared/ipc'
 import { APP_TAGLINE } from '@shared/constants'
-import { SUBJECT_COLOURS, STUDY_SYSTEMS, type StudySystem } from '@shared/models'
+import { STUDY_SYSTEMS, type StudySystem } from '@shared/models'
 import { SYSTEM_PRESETS } from '@shared/presets'
-import { Button, IconButton } from '@/design/Button'
-import { Field, Input, Select, SubjectDot } from '@/design/Form'
+import { Button } from '@/design/Button'
+import { Field, Input, Select } from '@/design/Form'
 import { Kbd } from '@/design/Kbd'
 import { Card, Row, Section } from '@/design/Page'
 import { Segmented, type SegmentedOption } from '@/design/Segmented'
@@ -15,8 +16,8 @@ import { useToast } from '@/design/Toast'
 import { AiProviders } from '@/features/ai/AiProviders'
 import { EmailSignIn } from '@/features/shared/EmailSignIn'
 import { useSharedStatus } from '@/features/shared/useSharedStatus'
-import { changed, db, useAction, useLive } from '@/lib/api'
-import { useAppState, useSubjects } from '@/lib/app-state'
+import { changed, useAction, useLive } from '@/lib/api'
+import { useAppState } from '@/lib/app-state'
 import { cn } from '@/lib/cn'
 import { call } from '@/lib/ipc'
 import { globalShortcuts } from '@/lib/keys'
@@ -216,73 +217,12 @@ function SharedAccountSection() {
 }
 
 function SubjectsTab() {
-  const subjects = useSubjects()
-  const [name, setName] = useState('')
-  const add = useAction(async () => {
-    await db.create('subjects', {
-      name: name.trim(),
-      colour: SUBJECT_COLOURS[subjects.length % SUBJECT_COLOURS.length],
-    })
-    setName('')
-  })
   return (
     <Section
       title="Subjects"
-      description="Add anything you study. Open a subject from the sidebar to set its details, topics and exam dates."
+      description="Your group's six subjects, each with Units 1 to 4. Tick the ones you take. Open a subject from the sidebar to set its topics and exam dates."
     >
-      <Card>
-        {subjects.length === 0 ? <p className="px-4 py-4 text-ink-3">No subjects yet.</p> : null}
-        {subjects.map((subject) => (
-          <div
-            key={subject.id}
-            className="flex items-center gap-3 border-b border-line px-4 py-2.5"
-          >
-            <SubjectDot colour={subject.colour} />
-            <Link
-              to={`/subjects/${subject.id}`}
-              className="min-w-0 flex-1 truncate font-medium hover:underline"
-            >
-              {subject.name}
-            </Link>
-            <span className="font-mono text-2xs text-ink-3">{subject.code}</span>
-            <IconButton
-              label={`Archive ${subject.name}`}
-              size="sm"
-              onClick={() => void db.update('subjects', subject.id, { active: false })}
-            >
-              <Trash2 className="size-3.5" aria-hidden />
-            </IconButton>
-          </div>
-        ))}
-        <form
-          className="flex gap-2 p-3"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (name.trim()) void add.run()
-          }}
-        >
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Subject name"
-            aria-label="Subject name"
-            maxLength={120}
-          />
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={!name.trim() || add.pending}
-            icon={<Plus className="size-3.5" aria-hidden />}
-          >
-            Add subject
-          </Button>
-        </form>
-      </Card>
-      {add.error ? (
-        <ErrorState title="The subject was not added" className="mt-3">
-          {add.error}
-        </ErrorState>
-      ) : null}
+      <GroupSubjectPicker />
     </Section>
   )
 }

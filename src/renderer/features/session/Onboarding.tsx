@@ -1,14 +1,15 @@
+import { GroupSubjectPicker } from '@/features/subjects/GroupSubjectPicker'
 import { useState } from 'react'
-import { ArrowLeft, ArrowRight, Check, Plus, X } from 'lucide-react'
-import { SUBJECT_COLOURS, STUDY_SYSTEMS, type StudySystem } from '@shared/models'
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
+import { STUDY_SYSTEMS, type StudySystem } from '@shared/models'
 import { SYSTEM_PRESETS } from '@shared/presets'
 import { Button } from '@/design/Button'
-import { Field, Input, Select, SubjectDot } from '@/design/Form'
+import { Field, Input, Select } from '@/design/Form'
 import { AiProviders } from '@/features/ai/AiProviders'
 import { EmailSignIn } from '@/features/shared/EmailSignIn'
-import { db, useAction, useLive } from '@/lib/api'
+import { useAction, useLive } from '@/lib/api'
 import { call } from '@/lib/ipc'
-import { useAppState, useSubjects } from '@/lib/app-state'
+import { useAppState } from '@/lib/app-state'
 import { cn } from '@/lib/cn'
 import { Mascot } from '@/mascot/Mascot'
 import {
@@ -62,103 +63,14 @@ function SharedAccountStep() {
   return <EmailSignIn status={status.data} />
 }
 
-function SubjectsStep({ system }: { system: StudySystem }) {
-  const subjects = useSubjects()
-  const [custom, setCustom] = useState('')
-  const preset = SYSTEM_PRESETS[system]
-  const taken = new Set(subjects.map((s) => s.name.toLowerCase()))
-
-  const add = useAction(
-    async (
-      name: string,
-      kind: (typeof preset.subjects)[number]['kind'] = 'other',
-      code?: string,
-    ) => {
-      if (!name.trim() || taken.has(name.trim().toLowerCase())) return
-      await db.create('subjects', {
-        name: name.trim(),
-        kind,
-        code: code ?? null,
-        colour: SUBJECT_COLOURS[subjects.length % SUBJECT_COLOURS.length],
-      })
-    },
-  )
-
+function SubjectsStep() {
   return (
     <div>
-      <div className="mb-5 flex min-h-10 flex-wrap gap-2">
-        {subjects.length === 0 ? (
-          <p className="text-paper-ink-2">
-            Nothing added yet. Pick from the suggestions or type your own.
-          </p>
-        ) : null}
-        {subjects.map((subject) => (
-          <span
-            key={subject.id}
-            className="inline-flex h-8 items-center gap-2 rounded-md bg-surface pr-1 pl-3 font-medium text-ink shadow-pill"
-          >
-            <SubjectDot colour={subject.colour} />
-            {subject.name}
-            <button
-              type="button"
-              aria-label={`Remove ${subject.name}`}
-              onClick={() => void db.remove('subjects', subject.id)}
-              className="flex size-6 items-center justify-center rounded-full text-ink-3 hover:bg-hover hover:text-ink"
-            >
-              <X className="size-3.5" aria-hidden />
-            </button>
-          </span>
-        ))}
-      </div>
-
-      <form
-        className="mb-6 flex max-w-md gap-2"
-        onSubmit={(event) => {
-          event.preventDefault()
-          void add.run(custom).then(() => setCustom(''))
-        }}
-      >
-        <Input
-          value={custom}
-          onChange={(e) => setCustom(e.target.value)}
-          placeholder="Type any subject name"
-          aria-label="Subject name"
-          maxLength={120}
-        />
-        <Button
-          type="submit"
-          disabled={!custom.trim()}
-          icon={<Plus className="size-3.5" aria-hidden />}
-        >
-          Add
-        </Button>
-      </form>
-
-      {preset.subjects.length > 0 ? (
-        <>
-          <p className="eyebrow mb-2 text-paper-ink-2">Suggestions for {preset.label}</p>
-          <div className="flex flex-wrap gap-2">
-            {preset.subjects
-              .filter((s) => !taken.has(s.name.toLowerCase()))
-              .map((s) => (
-                <button
-                  key={s.name}
-                  type="button"
-                  onClick={() => void add.run(s.name, s.kind, s.code)}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-paper-ink ring-1 ring-paper-rule ring-inset hover:bg-surface"
-                >
-                  <Plus className="size-3.5 text-paper-ink-2" aria-hidden />
-                  {s.name}
-                </button>
-              ))}
-          </div>
-        </>
-      ) : null}
-      {add.error ? (
-        <p role="alert" className="mt-3 text-danger">
-          {add.error}
-        </p>
-      ) : null}
+      <p className="mb-4 text-paper-ink-2">
+        Atlas is set up for your group's six subjects, each with Units 1 to 4. Tick the ones you
+        take; you can change this later in Settings.
+      </p>
+      <GroupSubjectPicker tone="paper" />
     </div>
   )
 }
@@ -302,7 +214,7 @@ export function Onboarding() {
                   Add as many as you like. Each one gets its own workspace for resources, notes,
                   flashcards and questions.
                 </Heading>
-                <SubjectsStep system={meta.studySystem} />
+                <SubjectsStep />
               </>
             ) : null}
 
