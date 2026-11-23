@@ -1,3 +1,4 @@
+import type { z } from 'zod'
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
@@ -39,7 +40,11 @@ import {
   type SpaceInput,
   type SpacePeople,
   type SpaceRole,
+  MATERIALS,
+  type Material,
 } from '@shared/community'
+
+type PublishParsed = z.infer<typeof PublishSchema>
 import type { SecretStore } from './ai/secrets'
 import type { Database } from './db/database'
 import { importPaths } from './library'
@@ -47,7 +52,7 @@ import type { Logger } from './log'
 
 const SESSION_KEY = 'library.session'
 const CARD_COLUMNS =
-  'id, space_id, owner, kind, title, description, subject, tags, file_name, file_size, link_url, remix_of, downloads, created_at, updated_at, author, ups, downs, my_reaction, remixes, body_length'
+  'id, space_id, owner, kind, title, description, subject, tags, file_name, file_size, link_url, remix_of, downloads, created_at, updated_at, author, ups, downs, my_reaction, remixes, body_length, units, material, teacher, ai_summary, ai_by, ai_text_length'
 const PROFILE_COLUMNS = 'user_id, username, display_name, avatar_color'
 
 type Row = Record<string, unknown>
@@ -101,6 +106,7 @@ function toSpace(row: Row): Space {
     joinCode: (row['join_code'] as string | null) ?? null,
     memberCount: Number(row['member_count'] ?? 0),
     itemCount: Number(row['item_count'] ?? 0),
+    isGroup: Boolean(row['is_group']),
   }
 }
 
@@ -131,6 +137,14 @@ function toCard(row: Row, me: string, spaces: Map<string, Space>): SharedCard {
     remixes: Number(row['remixes'] ?? 0),
     bodyLength: Number(row['body_length'] ?? 0),
     canEdit: owner === me || canManage(space?.role),
+    units: Array.isArray(row['units']) ? (row['units'] as unknown[]).map(Number) : [],
+    material: (MATERIALS as readonly string[]).includes(String(row['material']))
+      ? (row['material'] as Material)
+      : 'other',
+    teacher: String(row['teacher'] ?? ''),
+    aiSummary: String(row['ai_summary'] ?? ''),
+    aiBy: String(row['ai_by'] ?? ''),
+    aiTextLength: Number(row['ai_text_length'] ?? 0),
   }
 }
 
@@ -199,6 +213,13 @@ export class CommunityLibrary {
       db: () => Database
       filesDir: () => string
       onLibraryChanged: () => void
+      /** A resource was shared with the AI summary on; its local file, if it had one. */
+      onPublished?: (item: {
+        id: string
+        input: PublishParsed
+        localPath: string | null
+        body: string | null
+      }) => void
     },
   ) {}
 
@@ -762,25 +783,31 @@ export class CommunityLibrary {
     if (query.spaceId) request = request.eq('space_id', query.spaceId)
     if (query.kind) request = request.eq('kind', query.kind)
     if (query.subject) request = request.eq('subject', query.subject)
+    if (query.unit) request = request.contains('units', [query.unit])
+    if (query.material) request = request.eq('material', query.material)
+    if (query.teacher) request = request.eq('teacher', query.teacher)
     if (query.mine) request = request.eq('owner', me)
     request =
       query.sort === 'top'
         ? request.order('ups', { ascending: false }).order('downloads', { ascending: false })
         : request.order('created_at', { ascending: false })
 
-    let files = sb.from('items').select('subject, file_sha256, file_size')
+    let files = sb.from('items').select('subject, teacher, file_sha256, file_size')
     if (query.spaceId) files = files.eq('space_id', query.spaceId)
     const [items, all, spaces] = await Promise.all([request, files, this.spaceMap()])
     if (items.error) throw friendly(items.error, 'Could not load the shared library.')
     const seen = new Map<string, number>()
     const subjects = new Set<string>()
+    const teachers = new Set<string>()
     for (const row of (all.data ?? []) as Row[]) {
       if (row['subject']) subjects.add(String(row['subject']))
+      if (row['teacher']) teachers.add(String(row['teacher']))
       if (row['file_sha256']) seen.set(String(row['file_sha256']), Number(row['file_size'] ?? 0))
     }
     return {
       items: ((items.data ?? []) as Row[]).map((r) => toCard(r, me, spaces)),
       subjects: [...subjects].sort((a, b) => a.localeCompare(b)),
+      teachers: [...teachers].sort((a, b) => a.localeCompare(b)),
       storageUsed: [...seen.values()].reduce((a, b) => a + b, 0),
     }
   }
@@ -790,7 +817,7 @@ export class CommunityLibrary {
     const sb = this.supabase()
     const [card, full, spaces] = await Promise.all([
       sb.from('item_cards').select(CARD_COLUMNS).eq('id', id).maybeSingle(),
-      sb.from('items').select('body, remix_of').eq('id', id).maybeSingle(),
+      sb.from('items').select('body, remix_of, ai_text').eq('id', id).maybeSingle(),
       this.spaceMap(),
     ])
     if (card.error || full.error) throw friendly(card.error ?? full.error, 'Could not open that.')
@@ -804,6 +831,7 @@ export class CommunityLibrary {
     return {
       ...toCard(card.data as Row, me, spaces),
       body: String((full.data as Row)['body'] ?? ''),
+      aiText: String((full.data as Row)['ai_text'] ?? ''),
       remixOfTitle,
     }
   }
@@ -879,6 +907,7 @@ export class CommunityLibrary {
     const input = PublishSchema.parse(raw)
     const me = await this.userId()
     const sb = this.supabase()
+    let localFile: string | null = null
     const row: Row = {
       owner: me,
       space_id: input.spaceId,
@@ -888,6 +917,9 @@ export class CommunityLibrary {
       subject: input.subject,
       tags: input.tags,
       remix_of: input.remixOf,
+      units: input.units,
+      material: input.material,
+      teacher: input.teacher,
     }
 
     if (input.kind === 'note') {
@@ -910,13 +942,15 @@ export class CommunityLibrary {
     } else if (input.kind === 'link') {
       row['link_url'] = input.url
     } else if (input.path) {
+      localFile = input.path
       Object.assign(row, await this.upload(input.spaceId, me, await this.readLocal(input.path)))
     } else if (input.sourceId) {
       const source = this.deps.db().get('sources', input.sourceId)
       if (!source || typeof source['filePath'] !== 'string') {
         throw new AtlasError('not_found', 'That file is no longer in your library.')
       }
-      const bytes = await readFile(join(this.deps.filesDir(), source['filePath']))
+      localFile = join(this.deps.filesDir(), source['filePath'])
+      const bytes = await readFile(localFile)
       Object.assign(
         row,
         await this.upload(input.spaceId, me, {
@@ -931,7 +965,12 @@ export class CommunityLibrary {
 
     const { data, error } = await sb.from('items').insert(row).select('id').single()
     if (error) throw friendly(error, 'Could not share that.')
-    return this.get(String((data as Row)['id']))
+    const id = String((data as Row)['id'])
+    if (input.aiSummary && input.kind !== 'deck' && input.kind !== 'link') {
+      const body = typeof row['body'] === 'string' ? row['body'] : null
+      this.deps.onPublished?.({ id, input, localPath: localFile, body })
+    }
+    return this.get(id)
   }
 
   async update(raw: SharedUpdate): Promise<void> {
@@ -950,6 +989,9 @@ export class CommunityLibrary {
       description: input.description,
       subject: input.subject,
       tags: input.tags,
+      units: input.units,
+      material: input.material,
+      teacher: input.teacher,
     }
     const kind = (current as Row)['kind']
     if (kind === 'note' && input.body !== undefined) patch['body'] = input.body
@@ -979,6 +1021,25 @@ export class CommunityLibrary {
       .select('id', { count: 'exact', head: true })
       .eq('file_path', path)
     if (!count) await sb.storage.from('library').remove([path])
+  }
+
+  /** Stores what the uploader's AI wrote about a resource. Only the author can do this. */
+  async saveDigest(input: {
+    id: string
+    summary: string
+    text: string
+    by: string
+  }): Promise<void> {
+    await this.userId()
+    const { error } = await this.supabase()
+      .from('items')
+      .update({
+        ai_summary: input.summary.slice(0, 20000),
+        ai_text: input.text.slice(0, 400000),
+        ai_by: input.by.slice(0, 80),
+      })
+      .eq('id', input.id)
+    if (error) throw friendly(error, 'Could not save the AI summary.')
   }
 
   async remove(id: string): Promise<void> {

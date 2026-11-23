@@ -1,4 +1,4 @@
-import { useDeferredValue, useState } from 'react'
+import { useDeferredValue, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import {
   Bell,
@@ -20,16 +20,20 @@ import {
   Users,
 } from 'lucide-react'
 import {
+  MATERIALS,
+  MATERIAL_LABELS,
   SHARED_STORAGE_QUOTA,
   canManage,
   canWrite,
   formatBytes,
   type CommunityStatus,
+  type Material,
   type Profile,
   type SharedCard,
   type SharedKind,
   type Space,
 } from '@shared/community'
+import { UNITS } from '@shared/group-subjects'
 import { Button, IconButton } from '@/design/Button'
 import { Select } from '@/design/Form'
 import { Menu } from '@/design/Menu'
@@ -51,7 +55,7 @@ import { banner } from '@/features/shared/spaceStyle'
 import { useSharedStatus } from '@/features/shared/useSharedStatus'
 import { changed, useAction, useLive } from '@/lib/api'
 import { cn } from '@/lib/cn'
-import { call } from '@/lib/ipc'
+import { call, subscribe } from '@/lib/ipc'
 import { useSetting } from '@/lib/settings'
 import { Mascot } from '@/mascot/Mascot'
 
@@ -463,6 +467,11 @@ function Browser({
   const [subject, setSubject] = useState<string | null>(null)
   const [sort, setSort] = useState<'new' | 'top'>('new')
   const [mine, setMine] = useState(false)
+  const [unit, setUnit] = useState<number | null>(null)
+  const [material, setMaterial] = useState<Material | null>(null)
+  const [teacher, setTeacher] = useState<string | null>(null)
+  // An AI summary written in the background: refresh the list and any open preview.
+  useEffect(() => subscribe('shared:changed', () => changed('shared')), [])
   const [view, setView] = useSetting<'grid' | 'list'>('shared.view', 'grid')
   const [selected, setSelected] = useState<string | null>(initialItem ?? null)
   const [sharing, setSharing] = useState(false)
@@ -477,8 +486,11 @@ function Browser({
         subject,
         sort,
         mine,
+        unit,
+        material,
+        teacher,
       }),
-    [space?.id, query, kind, subject, sort, mine],
+    [space?.id, query, kind, subject, sort, mine, unit, material, teacher],
   )
 
   const data = list.data
@@ -573,6 +585,47 @@ function Browser({
                 { value: 'mine', label: 'Mine' },
               ]}
             />
+            <Select
+              aria-label="Unit"
+              value={unit ?? ''}
+              onChange={(e) => setUnit(e.target.value ? Number(e.target.value) : null)}
+              className="w-28"
+            >
+              <option value="">All units</option>
+              {UNITS.map((u) => (
+                <option key={u} value={u}>
+                  Unit {u}
+                </option>
+              ))}
+            </Select>
+            <Select
+              aria-label="Type of material"
+              value={material ?? ''}
+              onChange={(e) => setMaterial((e.target.value || null) as Material | null)}
+              className="w-36"
+            >
+              <option value="">Any material</option>
+              {MATERIALS.map((m) => (
+                <option key={m} value={m}>
+                  {MATERIAL_LABELS[m]}
+                </option>
+              ))}
+            </Select>
+            {data?.teachers.length ? (
+              <Select
+                aria-label="Teacher"
+                value={teacher ?? ''}
+                onChange={(e) => setTeacher(e.target.value || null)}
+                className="w-36"
+              >
+                <option value="">Any teacher</option>
+                {data.teachers.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </Select>
+            ) : null}
             <div className="flex-1" />
             <Select
               aria-label="Sort"
@@ -685,6 +738,7 @@ function Browser({
         onOpenChange={setSharing}
         spaces={spaces}
         defaultSpaceId={space?.id ?? null}
+        teachers={data?.teachers ?? []}
       />
     </div>
   )
@@ -709,6 +763,36 @@ function Meta({ item }: { item: SharedCard }) {
       </span>
     </span>
   )
+}
+
+/** Units, material and teacher as small chips under the title. */
+function Badges({ item }: { item: SharedCard }) {
+  const chips = [
+    item.units.length ? item.units.map((u) => `U${u}`).join(' ') : null,
+    item.material !== 'other' && item.material !== 'notes' && item.material !== 'flashcards'
+      ? MATERIAL_LABELS[item.material]
+      : null,
+    item.teacher || null,
+    item.aiSummary ? 'AI summary' : null,
+  ].filter((c): c is string => Boolean(c))
+  if (chips.length === 0) return null
+  return (
+    <span className="mt-1.5 flex flex-wrap gap-1">
+      {chips.map((c) => (
+        <span key={c} className="rounded bg-sunken px-1.5 py-0.5 text-[0.6875rem] text-ink-2">
+          {c}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function plainSummary(md: string): string {
+  return md
+    .replace(/^[-*]\s+/gm, '')
+    .replace(/[*_`#]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function detail(item: SharedCard): string {
@@ -747,7 +831,10 @@ function GridCard({
         </span>
       </div>
       <p className="mt-3 line-clamp-2 font-semibold text-ink">{item.title}</p>
-      <p className="mt-1 line-clamp-2 flex-1 text-2xs text-ink-2">{item.description}</p>
+      <Badges item={item} />
+      <p className="mt-1 line-clamp-2 flex-1 text-2xs text-ink-2">
+        {item.description || plainSummary(item.aiSummary)}
+      </p>
       <Meta item={item} />
     </button>
   )

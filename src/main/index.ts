@@ -147,6 +147,25 @@ async function main(): Promise<void> {
       return profiles.filesDir(current.id)
     },
     onLibraryChanged: () => broadcast(windows(), 'library:changed', { sourceId: null }),
+    // Uploads are read by the uploader's own AI in the background; the summary and text version
+    // then go up with the item so everyone in the group can search and skim it.
+    onPublished: ({ id, input, localPath, body }) => {
+      void ai
+        .digest({
+          path: localPath,
+          title: input.title,
+          description: input.description,
+          subject: input.subject,
+          material: input.material,
+          body: body ?? undefined,
+        })
+        .then(async (digest) => {
+          if (!digest) return
+          await shared.saveDigest({ id, ...digest })
+          broadcast(windows(), 'shared:changed', { id })
+        })
+        .catch((error: unknown) => log.warn(`shared digest failed: ${String(error)}`))
+    },
   })
   ai.setSharedContext((question) => shared.assistantContext(question))
   registry.handle('shared:status', () => shared.status())

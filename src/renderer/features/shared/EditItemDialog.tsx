@@ -8,6 +8,7 @@ import { Segmented } from '@/design/Segmented'
 import { ErrorState } from '@/design/States'
 import { useToast } from '@/design/Toast'
 import { changed, useAction } from '@/lib/api'
+import { cn } from '@/lib/cn'
 import { call } from '@/lib/ipc'
 import { Dropzone } from './ShareDialog'
 
@@ -26,6 +27,8 @@ export function EditItemDialog({
   const [description, setDescription] = useState(item.description)
   const [subject, setSubject] = useState(item.subject)
   const [tags, setTags] = useState(item.tags.join(', '))
+  const [units, setUnits] = useState<number[]>(item.units)
+  const [teacher, setTeacher] = useState(item.teacher)
   const [body, setBody] = useState(item.body)
   const [url, setUrl] = useState(item.linkUrl ?? '')
   const [file, setFile] = useState<PickedFile | null>(null)
@@ -37,6 +40,8 @@ export function EditItemDialog({
     setDescription(item.description)
     setSubject(item.subject)
     setTags(item.tags.join(', '))
+    setUnits(item.units)
+    setTeacher(item.teacher)
     setBody(item.body)
     setUrl(item.linkUrl ?? '')
     setFile(null)
@@ -62,6 +67,9 @@ export function EditItemDialog({
         .map((t) => t.trim())
         .filter(Boolean)
         .slice(0, 12),
+      units,
+      material: item.material,
+      teacher: teacher.trim(),
       ...(item.kind === 'note' ? { body } : {}),
       ...(item.kind === 'link' && url.trim() ? { url: url.trim() } : {}),
       ...(item.kind === 'file' && file ? { path: file.path } : {}),
@@ -150,6 +158,34 @@ export function EditItemDialog({
           </Field>
           <Field label="Tags" hint="Comma separated">
             <Input value={tags} onChange={(e) => setTags(e.target.value)} />
+          </Field>
+          <Field label="Units">
+            <div className="flex gap-1.5" role="group" aria-label="Units">
+              {[1, 2, 3, 4].map((u) => {
+                const on = units.includes(u)
+                return (
+                  <button
+                    key={u}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() =>
+                      setUnits((list) => (on ? list.filter((x) => x !== u) : [...list, u].sort()))
+                    }
+                    className={cn(
+                      'h-8 flex-1 rounded-md border text-2xs font-semibold',
+                      on
+                        ? 'border-accent bg-accent text-accent-fg'
+                        : 'border-line bg-surface text-ink-2 hover:bg-hover',
+                    )}
+                  >
+                    Unit {u}
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
+          <Field label="Teacher">
+            <Input value={teacher} onChange={(e) => setTeacher(e.target.value)} maxLength={80} />
           </Field>
         </div>
         <Field label="Description">

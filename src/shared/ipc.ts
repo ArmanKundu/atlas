@@ -408,6 +408,8 @@ export const ipcEvents = {
   'scanner:received': z.object({ id: z.string(), title: z.string(), pages: z.number() }),
   /** Pages that reached this computer but are not saved yet. */
   'scanner:progress': z.object({ pages: z.number() }),
+  /** A shared item changed in the background (e.g. its AI summary arrived). */
+  'shared:changed': z.object({ id: z.string() }),
   'models:progress': z.object({
     id: z.string(),
     state: z.enum(['missing', 'downloading', 'ready', 'error']),

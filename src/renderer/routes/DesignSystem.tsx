@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { Space } from '@shared/community'
 import {
   Bold,
   ChevronDown,
@@ -25,6 +26,7 @@ import { PillBar, PillButton, PillDivider } from '@/design/Pill'
 import { Segmented } from '@/design/Segmented'
 import { EmptyState, ErrorState, SkeletonList } from '@/design/States'
 import { useToast } from '@/design/Toast'
+import { ShareDialog } from '@/features/shared/ShareDialog'
 import { BoardCard } from '@/features/whiteboard/BoardCard'
 import { PYTHAGORAS_BOARD, SAMPLE_BOARD } from '@/features/whiteboard/sample'
 import { closeBoard, useOpenBoard } from '@/features/whiteboard/store'
@@ -284,6 +286,10 @@ export function DesignSystem() {
       <Section title="Whiteboard">
         <BoardSample />
       </Section>
+
+      <Section title="Share form" description="Sharing into the group library (sample space).">
+        <ShareSample />
+      </Section>
     </Page>
   )
 }
@@ -307,5 +313,39 @@ function BoardSample() {
         </div>
       ) : null}
     </div>
+  )
+}
+
+const SAMPLE_SPACE: Space = {
+  id: 'sample',
+  owner: 'sample',
+  name: 'Atlas Friends',
+  description: '',
+  icon: 'users',
+  color: 'blue',
+  banner: '',
+  visibility: 'private',
+  requireApproval: false,
+  defaultRole: 'editor',
+  createdAt: new Date(0).toISOString(),
+  role: 'editor',
+  joinCode: null,
+  memberCount: 5,
+  itemCount: 0,
+  isGroup: true,
+}
+
+function ShareSample() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>Open the share form</Button>
+      <ShareDialog
+        open={open}
+        onOpenChange={setOpen}
+        spaces={[SAMPLE_SPACE]}
+        teachers={['Ms Nguyen', 'Mr Patel']}
+      />
+    </>
   )
 }

@@ -14,6 +14,56 @@ export const SHARED_STORAGE_QUOTA = 1024 * 1024 * 1024
 export const SHARED_KINDS = ['note', 'file', 'deck', 'link'] as const
 export type SharedKind = (typeof SHARED_KINDS)[number]
 
+/** What a shared resource is, for filtering and icons. */
+export const MATERIALS = [
+  'pdf',
+  'slides',
+  'document',
+  'image',
+  'video',
+  'audio',
+  'notes',
+  'link',
+  'exam',
+  'report',
+  'worksheet',
+  'timetable',
+  'flashcards',
+  'other',
+] as const
+export type Material = (typeof MATERIALS)[number]
+export const MATERIAL_LABELS: Record<Material, string> = {
+  pdf: 'PDF',
+  slides: 'Slides',
+  document: 'Document',
+  image: 'Image',
+  video: 'Video',
+  audio: 'Audio',
+  notes: 'Notes',
+  link: 'Link',
+  exam: 'Past exam',
+  report: 'Examiner report',
+  worksheet: 'Worksheet',
+  timetable: 'Timetable',
+  flashcards: 'Flashcards',
+  other: 'Other',
+}
+
+/** A good guess at the material from a file name. */
+export function guessMaterial(fileName: string): Material {
+  const ext = fileName.toLowerCase().split('.').pop() ?? ''
+  if (['ppt', 'pptx', 'key', 'odp'].includes(ext)) return 'slides'
+  if (['doc', 'docx', 'odt', 'rtf', 'pages'].includes(ext)) return 'document'
+  if (['png', 'jpg', 'jpeg', 'heic', 'webp', 'gif'].includes(ext)) return 'image'
+  if (['mp4', 'mov', 'webm', 'm4v', 'mkv'].includes(ext)) return 'video'
+  if (['mp3', 'm4a', 'wav', 'aac', 'ogg'].includes(ext)) return 'audio'
+  if (['md', 'txt'].includes(ext)) return 'notes'
+  if (/exam|paper/.test(fileName.toLowerCase())) return 'exam'
+  if (/report/.test(fileName.toLowerCase())) return 'report'
+  if (ext === 'pdf') return 'pdf'
+  return 'other'
+}
+
 export const SPACE_ROLES = ['owner', 'admin', 'editor', 'viewer'] as const
 export type SpaceRole = (typeof SPACE_ROLES)[number]
 export const INVITE_ROLES = ['admin', 'editor', 'viewer'] as const
@@ -163,6 +213,8 @@ export const SpaceSchema = z.object({
   joinCode: z.string().nullable(),
   memberCount: z.number(),
   itemCount: z.number(),
+  /** The group space everyone is in; new resources go here unless you pick another. */
+  isGroup: z.boolean().default(false),
 })
 export type Space = z.infer<typeof SpaceSchema>
 
@@ -246,11 +298,20 @@ export const SharedCardSchema = z.object({
   bodyLength: z.number(),
   /** The author, or an owner or admin of the space. */
   canEdit: z.boolean(),
+  units: z.array(z.number()),
+  material: z.enum(MATERIALS),
+  teacher: z.string(),
+  /** Written by the uploader's AI; empty when it was turned off or is still being written. */
+  aiSummary: z.string(),
+  aiBy: z.string(),
+  aiTextLength: z.number(),
 })
 export type SharedCard = z.infer<typeof SharedCardSchema>
 
 export const SharedItemSchema = SharedCardSchema.extend({
   body: z.string(),
+  /** The AI's text version of the file (handwriting and slides included). */
+  aiText: z.string(),
   remixOfTitle: z.string().nullable(),
 })
 export type SharedItem = z.infer<typeof SharedItemSchema>
@@ -261,6 +322,9 @@ export const SharedQuerySchema = z.object({
   text: z.string().max(200).default(''),
   kind: z.enum(SHARED_KINDS).nullable().default(null),
   subject: z.string().max(80).nullable().default(null),
+  unit: z.number().int().min(1).max(4).nullable().default(null),
+  material: z.enum(MATERIALS).nullable().default(null),
+  teacher: z.string().max(80).nullable().default(null),
   sort: z.enum(['new', 'top']).default('new'),
   mine: z.boolean().default(false),
   limit: z.number().int().min(1).max(300).default(300),
@@ -270,6 +334,7 @@ export type SharedQuery = z.input<typeof SharedQuerySchema>
 export const SharedListSchema = z.object({
   items: z.array(SharedCardSchema),
   subjects: z.array(z.string()),
+  teachers: z.array(z.string()),
   storageUsed: z.number(),
 })
 export type SharedList = z.infer<typeof SharedListSchema>
@@ -281,6 +346,11 @@ const meta = {
   subject: z.string().max(80).default(''),
   tags: z.array(z.string().max(40)).max(12).default([]),
   remixOf: z.string().max(64).nullable().default(null),
+  units: z.array(z.number().int().min(1).max(4)).max(4).default([]),
+  material: z.enum(MATERIALS).default('other'),
+  teacher: z.string().trim().max(80).default(''),
+  /** Let the uploader's own AI read it and write a summary and a text version for everyone. */
+  aiSummary: z.boolean().default(true),
 }
 
 /**
@@ -315,6 +385,9 @@ export const SharedUpdateSchema = z.object({
   description: z.string().max(2000),
   subject: z.string().max(80),
   tags: z.array(z.string().max(40)).max(12),
+  units: z.array(z.number().int().min(1).max(4)).max(4).default([]),
+  material: z.enum(MATERIALS).default('other'),
+  teacher: z.string().trim().max(80).default(''),
   /** Notes: the new text. */
   body: z.string().max(400000).optional(),
   /** Links: the new address. */

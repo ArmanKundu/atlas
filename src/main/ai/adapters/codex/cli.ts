@@ -6,7 +6,8 @@ export const BINARY = 'codex'
 export const INSTALL_HINT = 'npm install -g @openai/codex'
 export const LOGIN_COMMAND = 'codex login'
 
-export function buildArgs(options: { model?: string | null }): string[] {
+export function buildArgs(options: { model?: string | null; images?: string[] }): string[] {
+  const images = options.images ?? []
   return [
     'exec',
     '--json',
@@ -14,6 +15,7 @@ export function buildArgs(options: { model?: string | null }): string[] {
     'read-only',
     '--skip-git-repo-check',
     ...(options.model ? ['--model', options.model] : []),
+    ...(images.length ? ['--image', images.join(','), '--'] : []),
     '-', // read the prompt from stdin
   ]
 }

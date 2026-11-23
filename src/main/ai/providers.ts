@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+import { extname } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 import type { ProviderId, ProviderStatus } from '@shared/models'
@@ -27,6 +29,27 @@ export interface StreamRequest {
   onText: (text: string) => void
   /** Short jobs (tests, titles) ask for less. */
   maxTokens?: number
+  /** Files (images, PDFs) the model should look at. Only providers in `canSeeFiles` get them. */
+  files?: string[]
+}
+
+const IMAGE_TYPES: Record<string, 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+}
+const MAX_FILE_BYTES = 20 * 1024 * 1024
+
+export const isImageFile = (path: string): boolean => extname(path).toLowerCase() in IMAGE_TYPES
+
+/** Providers that can look at a file themselves (images; PDFs for Claude). */
+export function canSeeFiles(id: ProviderId, path: string): boolean {
+  if (id === 'anthropic-api' || id === 'claude-code')
+    return isImageFile(path) || /\.pdf$/i.test(path)
+  if (id === 'codex') return isImageFile(path)
+  return false
 }
 
 export interface StreamResult {
@@ -322,6 +345,33 @@ export async function providerStatus(
 const ANTHROPIC_EFFORT = /claude-(fable|mythos|opus-5|sonnet-5|haiku-5|opus-4-[678]|sonnet-4-6)/
 const ANTHROPIC_FALLBACK = /^claude-(fable-5-[12]|opus-5(-5)?|sonnet-5-5)$/
 
+async function anthropicMessages(
+  request: StreamRequest,
+): Promise<Anthropic.Beta.Messages.BetaMessageParam[]> {
+  const files = (request.files ?? []).filter((f) => canSeeFiles('anthropic-api', f))
+  if (files.length === 0) return request.messages
+  const blocks: Anthropic.Beta.Messages.BetaContentBlockParam[] = []
+  for (const file of files) {
+    const bytes = await readFile(file)
+    if (bytes.length > MAX_FILE_BYTES) continue
+    const data = bytes.toString('base64')
+    const image = IMAGE_TYPES[extname(file).toLowerCase()]
+    blocks.push(
+      image
+        ? { type: 'image', source: { type: 'base64', media_type: image, data } }
+        : { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } },
+    )
+  }
+  const turns: Anthropic.Beta.Messages.BetaMessageParam[] = [...request.messages]
+  const last = turns.at(-1)
+  if (last?.role === 'user' && typeof last.content === 'string')
+    turns[turns.length - 1] = {
+      role: 'user',
+      content: [...blocks, { type: 'text', text: last.content }],
+    }
+  return turns
+}
+
 async function streamAnthropic(request: StreamRequest, ctx: AdapterContext): Promise<StreamResult> {
   const client = anthropicClient(ctx)
   const model = request.model ?? 'claude-opus-5-5'
@@ -332,7 +382,7 @@ async function streamAnthropic(request: StreamRequest, ctx: AdapterContext): Pro
       model,
       max_tokens: request.maxTokens ?? 32_000,
       system: request.system,
-      messages: request.messages,
+      messages: await anthropicMessages(request),
       // Thinking is adaptive by default on current models; effort is set explicitly because the
       // default differs between models.
       ...(ANTHROPIC_EFFORT.test(model) ? { output_config: { effort: 'medium' as const } } : {}),
@@ -389,12 +439,16 @@ async function streamCli(id: ProviderId, request: StreamRequest): Promise<Stream
     request.onText(chunk)
   }
 
+  const seen = (request.files ?? []).filter((f) => canSeeFiles(id, f))
   if (id === 'claude-code') {
     let final: { ok: boolean; text: string } | undefined
     const result = await runCli({
       binary,
-      args: claudeCli.buildArgs({ system: request.system, model: request.model }),
-      stdin: flattenConversation('', request.messages).replace(/^\s*---\s*/, ''),
+      args: claudeCli.buildArgs({ system: request.system, model: request.model, files: seen }),
+      stdin:
+        (seen.length
+          ? `Read these files first:\n${seen.map((f) => `- ${f}`).join('\n')}\n\n`
+          : '') + flattenConversation('', request.messages).replace(/^\s*---\s*/, ''),
       signal: request.signal,
       onLine: (line) => {
         const parsed = claudeCli.parseLine(line)
@@ -412,7 +466,7 @@ async function streamCli(id: ProviderId, request: StreamRequest): Promise<Stream
   if (id === 'codex') {
     const result = await runCli({
       binary,
-      args: codexCli.buildArgs({ model: request.model }),
+      args: codexCli.buildArgs({ model: request.model, images: seen }),
       stdin: prompt,
       signal: request.signal,
       onLine: (line) => emit(codexCli.parseLine(line).text ?? ''),

@@ -6,7 +6,14 @@ export const BINARY = 'claude'
 export const INSTALL_HINT = 'npm install -g @anthropic-ai/claude-code'
 export const LOGIN_COMMAND = 'claude /login'
 
-export function buildArgs(options: { system: string; model?: string | null }): string[] {
+export function buildArgs(options: {
+  system: string
+  model?: string | null
+  /** Files it may read (with the Read tool only, inside their folders). */
+  files?: string[]
+}): string[] {
+  const files = options.files ?? []
+  const dirs = [...new Set(files.map((f) => f.slice(0, Math.max(1, f.lastIndexOf('/')))))]
   return [
     '--print',
     '--output-format',
@@ -15,8 +22,9 @@ export function buildArgs(options: { system: string; model?: string | null }): s
     '--include-partial-messages',
     '--no-session-persistence',
     // Plain question answering: no tools, and no settings from the folder it runs in.
-    '--tools',
-    '',
+    ...(files.length
+      ? ['--tools', 'Read', '--allowedTools', 'Read', ...dirs.flatMap((d) => ['--add-dir', d])]
+      : ['--tools', '']),
     '--setting-sources',
     'project',
     '--system-prompt',

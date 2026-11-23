@@ -6,18 +6,24 @@ import {
   Layers,
   Library,
   Link2,
+  Sparkles,
   NotebookText,
   PenLine,
   Upload,
   type LucideIcon,
 } from 'lucide-react'
 import {
+  MATERIALS,
+  MATERIAL_LABELS,
   SHARED_FILE_LIMIT,
   canWrite,
   formatBytes,
+  guessMaterial,
+  type Material,
   type PickedFile,
   type Space,
 } from '@shared/community'
+import { GROUP_SUBJECTS, UNITS, groupSubjectFor, type Unit } from '@shared/group-subjects'
 import type { Source } from '@shared/models'
 import { Button } from '@/design/Button'
 import { Dialog } from '@/design/Dialog'
@@ -131,6 +137,7 @@ export function ShareDialog({
   spaces,
   defaultSpaceId,
   remixOf,
+  teachers = [],
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -138,6 +145,8 @@ export function ShareDialog({
   defaultSpaceId?: string | null
   /** Set when sharing back an improved version of something from a space. */
   remixOf?: { id: string; title: string; spaceId: string } | null
+  /** Teachers already used in the library, offered as suggestions. */
+  teachers?: string[]
 }) {
   const toast = useToast()
   const subjects = useSubjects()
@@ -153,6 +162,10 @@ export function ShareDialog({
   const [description, setDescription] = useState('')
   const [subject, setSubject] = useState('')
   const [tags, setTags] = useState('')
+  const [units, setUnits] = useState<Unit[]>([])
+  const [material, setMaterial] = useState<Material>('other')
+  const [teacher, setTeacher] = useState('')
+  const [aiSummary, setAiSummary] = useState(true)
   const [ownWork, setOwnWork] = useState(false)
   const [pickError, setPickError] = useState<string | null>(null)
 
@@ -163,7 +176,12 @@ export function ShareDialog({
     [],
   )
   const cards = useLive(['flashcards'], () => db.list('flashcards'), [])
-  const subjectName = (id: string | null): string => subjects.find((s) => s.id === id)?.name ?? ''
+  // Shared items use the group's subject names, so everyone's filters line up.
+  const subjectName = (id: string | null): string => {
+    const own = subjects.find((s) => s.id === id)
+    if (!own) return ''
+    return groupSubjectFor(own.name, own.code)?.name ?? own.name
+  }
 
   const deckCounts = useMemo(() => {
     const counts = new Map<string, number>()
@@ -177,7 +195,9 @@ export function ShareDialog({
   const target =
     spaceId ||
     remixOf?.spaceId ||
-    (writable.some((s) => s.id === defaultSpaceId) ? defaultSpaceId : writable[0]?.id) ||
+    (writable.some((s) => s.id === defaultSpaceId)
+      ? defaultSpaceId
+      : (writable.find((s) => s.isGroup) ?? writable[0])?.id) ||
     ''
 
   const reset = (): void => {
@@ -192,6 +212,10 @@ export function ShareDialog({
     setDescription('')
     setSubject('')
     setTags('')
+    setUnits([])
+    setMaterial('other')
+    setTeacher('')
+    setAiSummary(true)
     setOwnWork(false)
     setPickError(null)
   }
@@ -216,6 +240,7 @@ export function ShareDialog({
       if (s) {
         setTitle(s.title)
         setSubject(subjectName(s.subjectId))
+        setMaterial(guessMaterial(s.fileName ?? s.title))
       }
     } else if (mode === 'deck') {
       const name = value === 'none' ? '' : subjectName(value)
@@ -227,6 +252,8 @@ export function ShareDialog({
   const chosenSource = mode === 'library' ? sources.data?.find((s) => s.id === pick) : undefined
   const size = mode === 'upload' ? (file?.size ?? 0) : (chosenSource?.size ?? 0)
   const tooBig = size > SHARED_FILE_LIMIT
+
+  const readable = mode === 'upload' || mode === 'library' || mode === 'write' || mode === 'note'
 
   const publish = useAction(async () => {
     const meta = {
@@ -240,6 +267,17 @@ export function ShareDialog({
         .filter(Boolean)
         .slice(0, 12),
       remixOf: remixOf?.id ?? null,
+      units,
+      material:
+        mode === 'write' || mode === 'note'
+          ? ('notes' as const)
+          : mode === 'deck'
+            ? ('flashcards' as const)
+            : mode === 'link' && material === 'other'
+              ? ('link' as const)
+              : material,
+      teacher: teacher.trim(),
+      aiSummary: readable && aiSummary,
     }
     if (mode === 'write') await call('shared:publish', { kind: 'note', body, ...meta })
     else if (mode === 'note') await call('shared:publish', { kind: 'note', noteId: pick, ...meta })
@@ -416,6 +454,7 @@ export function ShareDialog({
                       setFile(f)
                       setPickError(null)
                       if (!title) setTitle(f.name.replace(/\.[^.]+$/, ''))
+                      setMaterial(guessMaterial(f.name))
                     }}
                     onError={setPickError}
                   />
@@ -489,25 +528,82 @@ export function ShareDialog({
                   ) : null}
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Subject">
+                      <Select value={subject} onChange={(e) => setSubject(e.target.value)}>
+                        <option value="">Choose a subject…</option>
+                        {GROUP_SUBJECTS.map((g) => (
+                          <option key={g.key} value={g.name}>
+                            {g.name}
+                          </option>
+                        ))}
+                        {subject && !GROUP_SUBJECTS.some((g) => g.name === subject) ? (
+                          <option value={subject}>{subject}</option>
+                        ) : null}
+                      </Select>
+                    </Field>
+                    {mode === 'upload' || mode === 'library' || mode === 'link' ? (
+                      <Field label="Type of material">
+                        <Select
+                          value={material}
+                          onChange={(e) => setMaterial(e.target.value as Material)}
+                        >
+                          {MATERIALS.filter((m) => m !== 'flashcards').map((m) => (
+                            <option key={m} value={m}>
+                              {MATERIAL_LABELS[m]}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                    ) : (
+                      <Field label="Tags" hint="Comma separated">
+                        <Input
+                          value={tags}
+                          onChange={(e) => setTags(e.target.value)}
+                          placeholder="SAC, revision"
+                        />
+                      </Field>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Units">
+                      <div className="flex gap-1.5" role="group" aria-label="Units">
+                        {UNITS.map((u) => {
+                          const on = units.includes(u)
+                          return (
+                            <button
+                              key={u}
+                              type="button"
+                              aria-pressed={on}
+                              onClick={() =>
+                                setUnits((list) =>
+                                  on ? list.filter((x) => x !== u) : [...list, u].sort(),
+                                )
+                              }
+                              className={cn(
+                                'h-8 flex-1 rounded-md border text-2xs font-semibold transition-colors',
+                                on
+                                  ? 'border-accent bg-accent text-accent-fg'
+                                  : 'border-line bg-surface text-ink-2 hover:bg-hover',
+                              )}
+                            >
+                              Unit {u}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </Field>
+                    <Field label="Teacher" hint="Optional">
                       <Input
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        list="shared-subjects"
+                        value={teacher}
+                        onChange={(e) => setTeacher(e.target.value)}
+                        list="shared-teachers"
                         maxLength={80}
-                        placeholder="e.g. Biology"
+                        placeholder="Who made or gave it out"
                       />
-                      <datalist id="shared-subjects">
-                        {subjects.map((s) => (
-                          <option key={s.id} value={s.name} />
+                      <datalist id="shared-teachers">
+                        {teachers.map((t) => (
+                          <option key={t} value={t} />
                         ))}
                       </datalist>
-                    </Field>
-                    <Field label="Tags" hint="Comma separated">
-                      <Input
-                        value={tags}
-                        onChange={(e) => setTags(e.target.value)}
-                        placeholder="Unit 3, SAC"
-                      />
                     </Field>
                   </div>
                   <Field label="Description" hint="Optional">
@@ -533,6 +629,26 @@ export function ShareDialog({
                       ))}
                     </Select>
                   </Field>
+                  {readable ? (
+                    <label className="flex items-start gap-2.5 rounded-lg bg-sunken px-3 py-2.5 text-ink-2">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 size-4 accent-[var(--color-accent)]"
+                        checked={aiSummary}
+                        onChange={(e) => setAiSummary(e.target.checked)}
+                      />
+                      <span>
+                        <span className="flex items-center gap-1.5 font-medium text-ink">
+                          <Sparkles className="size-3.5" aria-hidden />
+                          Add an AI summary and text version
+                        </span>
+                        <span className="text-2xs text-ink-3">
+                          Your own AI reads it after it is shared (handwriting and scans too), so
+                          everyone can search and skim it. Uses your AI, not anyone else’s.
+                        </span>
+                      </span>
+                    </label>
+                  ) : null}
                   <label className="flex items-start gap-2.5 text-ink-2">
                     <input
                       type="checkbox"

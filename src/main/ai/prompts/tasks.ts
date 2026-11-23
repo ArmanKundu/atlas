@@ -99,3 +99,14 @@ export function extractJson(text: string): unknown {
   if (end <= start) throw new Error('no JSON found')
   return JSON.parse(body.slice(start, end + 1))
 }
+
+/** Reads a resource someone shared with the group, so others can search and skim it. */
+export const DIGEST_PROMPT = `You are describing a study resource that a VCE student shared with their study group. Write in Australian English, plainly, for other students.
+
+Answer in exactly two parts, with these headings:
+
+## Summary
+Four to eight short bullet points: what the resource is, which topics and key skills it covers, and anything notable (worked examples, answers included, exam style, the year if it is a past exam). No preamble.
+
+## Text
+The full text of the resource as clean Markdown. For a photo, scan or handwriting, transcribe every word you can read, keeping headings, lists, tables and equations (use LaTeX between $ signs for maths and chemistry). Write [unclear] for anything you cannot read. Do not add anything that is not in the resource.`

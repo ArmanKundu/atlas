@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Download, ExternalLink, Pencil, Repeat2, Trash2, X } from 'lucide-react'
-import { formatBytes, type SharedItem, type Space } from '@shared/community'
+import { Download, ExternalLink, Pencil, Repeat2, Sparkles, Trash2, X } from 'lucide-react'
+import { MATERIAL_LABELS, formatBytes, type SharedItem, type Space } from '@shared/community'
 import { Button, IconButton } from '@/design/Button'
 import { Badge } from '@/design/Form'
 import { Markdown } from '@/design/Markdown'
@@ -118,8 +118,13 @@ export function SharedPreview({
                 <Repeat2 className="size-3.5" aria-hidden /> A remix of “{it.remixOfTitle}”
               </p>
             ) : null}
-            {it.tags.length ? (
+            {it.tags.length || it.units.length || it.teacher || it.material !== 'other' ? (
               <div className="mt-3 flex flex-wrap gap-1.5">
+                {it.units.map((u) => (
+                  <Badge key={`u${u}`}>Unit {u}</Badge>
+                ))}
+                {it.material !== 'other' ? <Badge>{MATERIAL_LABELS[it.material]}</Badge> : null}
+                {it.teacher ? <Badge>{it.teacher}</Badge> : null}
                 {it.tags.map((t) => (
                   <Badge key={t}>{t}</Badge>
                 ))}
@@ -131,6 +136,17 @@ export function SharedPreview({
               <span>{it.remixes} remixes</span>
             </p>
 
+            {it.aiSummary ? (
+              <section className="mt-5 rounded-lg bg-sunken px-4 py-3">
+                <h3 className="flex items-center gap-1.5 text-2xs font-semibold text-ink-2">
+                  <Sparkles className="size-3.5" aria-hidden />
+                  AI summary{it.aiBy ? ` · by ${it.aiBy}` : ''}
+                </h3>
+                <div className="prose-atlas mt-1.5 text-ink">
+                  <Markdown>{it.aiSummary}</Markdown>
+                </div>
+              </section>
+            ) : null}
             <div className="mt-5 border-t border-line pt-5">
               {it.kind === 'note' ? (
                 <div className="prose-atlas text-ink">
@@ -145,6 +161,16 @@ export function SharedPreview({
                     {it.fileSize ? formatBytes(it.fileSize) : ''} · Save it to read, search and
                     annotate it in your library.
                   </p>
+                  {it.aiText ? (
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-2xs font-semibold text-ink-2">
+                        Text version (written by AI from the file)
+                      </summary>
+                      <div className="prose-atlas mt-2 max-h-[28rem] overflow-y-auto text-ink">
+                        <Markdown>{it.aiText}</Markdown>
+                      </div>
+                    </details>
+                  ) : null}
                 </div>
               ) : (
                 <p className="truncate rounded-lg bg-sunken px-4 py-3 text-ink-2">{it.linkUrl}</p>

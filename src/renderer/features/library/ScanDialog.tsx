@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CheckCircle2, Copy, FileText, ShieldCheck, Smartphone, Sparkles } from 'lucide-react'
+import {
+  CheckCircle2,
+  Copy,
+  FileText,
+  Share2,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
+} from 'lucide-react'
+import { canWrite } from '@shared/community'
+import { groupSubjectFor } from '@shared/group-subjects'
 import type { ScanSession } from '@shared/scanner'
 import { Button } from '@/design/Button'
 import { Dialog } from '@/design/Dialog'
@@ -40,6 +50,45 @@ export function ScanDialog({
   const [error, setError] = useState<string | null>(null)
   const [received, setReceived] = useState<Received[]>([])
   const [arriving, setArriving] = useState(0)
+  const [sharedIds, setSharedIds] = useState<Set<string>>(() => new Set())
+  const [sharing, setSharing] = useState<string | null>(null)
+
+  /** Puts a scan in the group library, with an AI summary and transcription by the user's AI. */
+  const shareWithGroup = async (item: Received): Promise<void> => {
+    setSharing(item.id)
+    try {
+      const spaces = await call('shared:spaces')
+      const space =
+        spaces.find((s) => s.isGroup && canWrite(s.role)) ?? spaces.find((s) => canWrite(s.role))
+      if (!space) throw new Error('Sign in to Shared first, then join the group.')
+      const own = subjects.find((s) => s.id === folder)
+      await call('shared:publish', {
+        kind: 'file',
+        sourceId: item.id,
+        spaceId: space.id,
+        title: item.title,
+        description: '',
+        subject: own ? (groupSubjectFor(own.name, own.code)?.name ?? own.name) : '',
+        tags: ['scan'],
+        remixOf: null,
+        units: [],
+        material: 'worksheet',
+        teacher: '',
+        aiSummary: true,
+      })
+      setSharedIds((ids) => new Set(ids).add(item.id))
+      changed('shared')
+      toast({
+        title: `Shared with ${space.name}`,
+        description: 'Your AI is writing a summary and text version for everyone.',
+        tone: 'success',
+      })
+    } catch (cause) {
+      setError(`Not shared: ${cause instanceof Error ? cause.message : String(cause)}`)
+    } finally {
+      setSharing(null)
+    }
+  }
 
   const [wasOpen, setWasOpen] = useState(false)
   if (open !== wasOpen) {
@@ -205,6 +254,16 @@ export function ScanDialog({
                 }}
               >
                 Open
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                title="Only your own work or free-to-share pages. No textbooks."
+                disabled={sharing === item.id || sharedIds.has(item.id)}
+                icon={<Share2 className="size-3.5" aria-hidden />}
+                onClick={() => void shareWithGroup(item)}
+              >
+                {sharedIds.has(item.id) ? 'Shared' : sharing === item.id ? 'Sharing…' : 'Share'}
               </Button>
               <Button
                 size="sm"

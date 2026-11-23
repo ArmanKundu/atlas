@@ -14,8 +14,12 @@ import type { Logger } from '../log'
 import type { ProfileManager } from '../profiles'
 import { AiError, shouldFallThrough } from './errors'
 import { agentSystemPrompt } from './prompts/agents'
-import { TASK_PROMPTS, type CompleteTask } from './prompts/tasks'
+import { DIGEST_PROMPT, TASK_PROMPTS, type CompleteTask } from './prompts/tasks'
+import { extname } from 'node:path'
+import { extractText } from '../extract-text'
 import {
+  canSeeFiles,
+  isImageFile,
   listModels,
   providerDef,
   providerStatus,
@@ -232,8 +236,13 @@ export class AiService {
     signal: AbortSignal
     onText: (text: string) => void
     maxTokens?: number
+    files?: string[]
+    /** Put providers that pass this test first (e.g. ones that can see the file). */
+    prefer?: (id: ProviderId) => boolean
   }): Promise<{ text: string; provider: ProviderId; model: string | null }> {
-    const order = await this.order(input.task, input.preferred)
+    let order = await this.order(input.task, input.preferred)
+    const prefer = input.prefer
+    if (prefer) order = [...order.filter(prefer), ...order.filter((id) => !prefer(id))]
     if (order.length === 0) throw new AiError('ai_unavailable')
     const models = this.config().models
     let lastError: AiError = new AiError('ai_unavailable')
@@ -253,6 +262,7 @@ export class AiService {
             model,
             signal: input.signal,
             maxTokens: input.maxTokens,
+            files: input.files,
             onText: (text) => {
               emitted = true
               input.onText(text)
@@ -452,6 +462,71 @@ export class AiService {
     }
   }
 
+  /**
+   * Reads a shared resource with the user's own AI and writes a short summary plus a full text
+   * version (a transcription for photos, scans and handwriting). Returns null for files it cannot
+   * read (video, audio) or when no AI is set up.
+   */
+  async digest(input: {
+    path: string | null
+    title: string
+    description: string
+    subject: string
+    material: string
+    body?: string
+  }): Promise<{ summary: string; text: string; by: string } | null> {
+    const path = input.path
+    const ext = path ? extname(path).toLowerCase() : ''
+    if (['.mp4', '.mov', '.m4v', '.webm', '.mp3', '.m4a', '.wav', '.aac', '.ogg'].includes(ext))
+      return null
+    let extracted = input.body ?? ''
+    let pages = 0
+    if (path && !isImageFile(path)) {
+      try {
+        const out = await extractText(path)
+        extracted = out.text
+        pages = out.pages
+      } catch (error) {
+        this.deps.log.warn(`digest: could not read ${ext} file: ${String(error)}`)
+      }
+    }
+    // Photos and scanned PDFs (little text per page) need a model that can look at the page.
+    const scanned =
+      !!path &&
+      (isImageFile(path) || (ext === '.pdf' && extracted.length < Math.max(200, pages * 80)))
+    if (!scanned && extracted.trim().length < 40) return null
+    const prompt = [
+      `Title: ${input.title}`,
+      input.description ? `Description: ${input.description}` : '',
+      `Subject: ${input.subject}`,
+      `Type: ${input.material}`,
+      scanned
+        ? 'The file is attached (a photo or scan). Transcribe all of it, handwriting included.'
+        : `Text of the file:\n\n${extracted.slice(0, 120_000)}`,
+    ]
+      .filter(Boolean)
+      .join('\n')
+    try {
+      const result = await this.run({
+        task: 'digest',
+        system: DIGEST_PROMPT,
+        messages: [{ role: 'user', content: prompt }],
+        signal: AbortSignal.timeout(300_000),
+        onText: () => undefined,
+        files: scanned && path ? [path] : undefined,
+        prefer: scanned && path ? (id) => canSeeFiles(id, path) : undefined,
+      })
+      const parsed = parseDigest(result.text)
+      const text = scanned ? parsed.text : parsed.text || extracted
+      if (!parsed.summary) return null
+      const by = providerDef(result.provider).name
+      return { summary: parsed.summary.slice(0, 20_000), text: text.slice(0, 400_000), by }
+    } catch (error) {
+      this.deps.log.warn(`digest failed: ${error instanceof AiError ? error.code : String(error)}`)
+      return null
+    }
+  }
+
   async test(provider: ProviderId): Promise<{ ok: boolean; message: string }> {
     const ctx = this.ctx(provider)
     try {
@@ -480,4 +555,11 @@ export class AiService {
       }
     }
   }
+}
+
+/** Splits a digest answer into its "## Summary" and "## Text" parts. */
+export function parseDigest(answer: string): { summary: string; text: string } {
+  const summary = /##\s*Summary\s*\n([\s\S]*?)(?=\n##\s*Text\b|$)/i.exec(answer)?.[1]?.trim() ?? ''
+  const text = /##\s*Text\s*\n([\s\S]*)$/i.exec(answer)?.[1]?.trim() ?? ''
+  return { summary: summary || (text ? '' : answer.trim()), text }
 }
