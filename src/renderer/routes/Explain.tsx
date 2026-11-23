@@ -28,6 +28,8 @@ import { SAMPLE_LESSONS } from '@/features/explainer/samples'
 import { shareLesson } from '@/features/explainer/share'
 import { MicButton } from '@/features/voice/MicButton'
 import { useLessonStream, type LessonRequest } from '@/features/explainer/useLessonStream'
+import { Locked } from '@/features/access/Locked'
+import { useFeatures } from '@/features/access/useFeatures'
 import { db, useLive } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { call, errorMessage, subscribe } from '@/lib/ipc'
@@ -66,6 +68,7 @@ function attachmentKey(a: Attachment): string {
  * written.
  */
 export function Explain() {
+  const features = useFeatures()
   const subjects = useLive(['subjects'], () => db.list('subjects', { where: { active: true } }))
   const recent = useLive(['lessons'], () =>
     db.list('lessons', { orderBy: 'createdAt', desc: true, limit: 24 }),
@@ -181,6 +184,8 @@ export function Explain() {
     sourceIds: followUp ? [] : attachments.flatMap((a) => (a.kind === 'source' ? [a.id] : [])),
     questionIds: followUp ? [] : attachments.flatMap((a) => (a.kind === 'question' ? [a.id] : [])),
     followUp,
+    models3d: features.models3d,
+    checks: features.tutor,
   })
 
   const begin = (next: LessonRequest): void => {
@@ -402,6 +407,8 @@ export function Explain() {
     </>
   )
 
+  if (!features.loading && !features.explainer) return <Locked feature="explainer" />
+
   /* ---------- Watching a lesson ---------- */
 
   if (showing || streaming || stream.state.status === 'error') {
@@ -476,6 +483,8 @@ export function Explain() {
                 onAsk={askAside}
                 busy={thinking}
                 onEnded={answering ? backToParent : undefined}
+                tutor={features.tutor}
+                models3d={features.models3d}
               />
             ) : (
               <Writing chars={stream.state.status === 'writing' ? stream.state.chars : 0} />

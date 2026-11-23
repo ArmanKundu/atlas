@@ -31,7 +31,8 @@ function suggestUsername(name: string): string {
  * friends can find you. Used in onboarding, on the Shared page and in Settings.
  */
 export function EmailSignIn({ status, onDone }: { status: CommunityStatus; onDone?: () => void }) {
-  if (status.signedIn && status.access === 'waitlisted') return <Waitlisted status={status} />
+  if (status.signedIn && status.access !== null && status.access !== 'approved')
+    return <Waitlisted status={status} />
   if (status.signedIn && !status.profile) return <ProfileSetup status={status} onDone={onDone} />
   if (status.signedIn && status.profile) {
     return (
@@ -78,10 +79,13 @@ function Waitlisted({ status }: { status: CommunityStatus }) {
         <Hourglass className="size-5" aria-hidden />
       </motion.div>
       <div>
-        <p className="font-semibold text-ink">You are on the waitlist</p>
+        <p className="font-semibold text-ink">
+          {status.access === 'removed' ? 'Your access was removed' : 'You are on the waitlist'}
+        </p>
         <p className="mt-1 max-w-[38ch] text-ink-2">
-          Atlas is at capacity: {status.used} of {status.capacity} places are taken. The admin will
-          let you in when a place opens, and this screen updates by itself.
+          {status.access === 'removed'
+            ? 'The Atlas admin took this account out of the shared library. Everything on this computer is still yours. If the admin lets you back in, this screen updates by itself.'
+            : `Atlas is at capacity: ${status.used} of ${status.capacity} places are taken. The admin will let you in when a place opens, and this screen updates by itself.`}
         </p>
       </div>
       <p className="rounded-full bg-sunken px-3 py-1 text-2xs text-ink-2">{status.email}</p>

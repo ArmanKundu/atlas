@@ -198,6 +198,10 @@ export const ipcContract = {
     request: z.object({ capacity: z.number().int().min(1).max(1000) }),
     response: none,
   },
+  'admin:setFeatures': {
+    request: z.object({ userId: id, features: z.record(z.string(), z.boolean()) }),
+    response: none,
+  },
   'admin:feedback': { request: none, response: z.array(FeedbackSchema) },
   'admin:attachment': { request: z.object({ id }), response: z.instanceof(Uint8Array) },
   'admin:setFeedback': {
@@ -381,6 +385,9 @@ export const ipcContract = {
       level: z.string().max(80).nullable().default(null),
       style: z.enum(['clear', 'fun']).default('clear'),
       exam: z.boolean().default(false),
+      /** What the admin allows this person: 3D models, and the tutor's quick checks. */
+      models3d: z.boolean().default(true),
+      checks: z.boolean().default(true),
       /** Files on disk: uploads, pasted screenshots. */
       files: z.array(z.string().max(2000)).max(8).default([]),
       /** Library files and questions to explain. */

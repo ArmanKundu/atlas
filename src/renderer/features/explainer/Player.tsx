@@ -24,8 +24,10 @@ export function Player({
   startScene = 0,
   onScene,
   onEnded,
-  onAsk,
+  onAsk: askProp,
   busy = false,
+  tutor = true,
+  models3d = true,
 }: {
   lesson: Lesson
   live?: boolean
@@ -38,7 +40,12 @@ export function Player({
   onAsk?: (question: string, scene: number) => void
   /** The tutor is working on an answer. */
   busy?: boolean
+  /** The talking tutor, interruptions and quick checks (the admin can turn these off). */
+  tutor?: boolean
+  /** Interactive 3D models (the admin can turn these off). */
+  models3d?: boolean
 }) {
+  const onAsk = tutor ? askProp : undefined
   const [voiceOn] = useSetting<boolean>('whiteboard.voice', true)
   const [voiceId] = useSetting<string>('whiteboard.voiceId', 'af_heart')
   const [captions, setCaptions] = useSetting<boolean>('explainer.captions', true)
@@ -146,7 +153,7 @@ export function Player({
       const length = seconds[scene] ?? 6
       if (local >= length) {
         setT(length)
-        if (current.check && !answered.current.has(scene)) {
+        if (tutor && current.check && !answered.current.has(scene)) {
           // The tutor asks a quick question before moving on.
           setPlaying(false)
           setChecking(scene)
@@ -293,20 +300,23 @@ export function Player({
           t={t}
           seconds={seconds}
           caption={captions ? subtitleAt(say, t, seconds[scene] ?? 6) : null}
+          models3d={models3d}
         />
         {waiting ? (
           <div className="absolute top-4 right-4 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-2xs text-white">
             <Loader2 className="size-3.5 animate-spin" aria-hidden /> Writing the next scene…
           </div>
         ) : null}
-        <div className="absolute bottom-[12%] left-4">
-          <Tutor
-            talking={(playing && !waiting) || lineTalking || busy}
-            withVoice={speak && !busy}
-            mood={busy ? 'thinking' : mood}
-            note={tutorNote}
-          />
-        </div>
+        {tutor ? (
+          <div className="absolute bottom-[12%] left-4">
+            <Tutor
+              talking={(playing && !waiting) || lineTalking || busy}
+              withVoice={speak && !busy}
+              mood={busy ? 'thinking' : mood}
+              note={tutorNote}
+            />
+          </div>
+        ) : null}
         {check && checking !== null ? (
           <div
             data-interactive

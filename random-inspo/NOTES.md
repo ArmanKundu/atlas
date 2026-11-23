@@ -129,3 +129,31 @@ comes from their home screen and their two YouTube videos (frames and transcript
   intersections are computed by Atlas, not guessed by the AI; questions can come from your own
   exams, scans and library; lessons are shared with the group and voted on; it runs on your own AI
   with a free offline voice; and it exports an MP4.
+
+## MathFlo (math-flo.com), studied 2026-11-23
+
+Tried live with two questions ("middle term of (x + 1/x)^10" and a visual one, the area under
+y = x² from 0 to 2 with thinner and thinner rectangles).
+
+- **Home:** dark page, one prompt box, level chips (K–8, High School, SAT/AP, Undergrad), language
+  chips, example questions. Credit balance pill top right (about $0.50 per lesson).
+- **Start:** "The lesson has already begun." A glowing voice waveform and a progress line
+  ("Reading your doubt… Planning your lesson… Drawing your first diagrams…"). The tutor talks
+  straight away, so the wait never feels dead.
+- **Lesson screen:** warm paper-textured board on the left; a dark right rail with **The Ledger**
+  (numbered cards with a coloured left edge, one formula each in serif KaTeX, a small caption) and
+  **The Dialogue** (a live transcript where maths words are coloured to match the board). LIVE and
+  END pills top left; END asks "End the lesson?" with Keep going / End it.
+- **Board:** Manim-like, drawn step by step: a title card, then axes, the curve with its label, the
+  interval edges, the shaded area marked A, Δx = ½. Finished boards shrink into thumbnails at the
+  bottom left like a filmstrip.
+- **Voice only:** it talks and listens through the microphone and waits for spoken answers (no
+  text box). Socratic: it keeps asking the student questions.
+- **Weak spots seen:** about 6 minutes before the first real diagram, filled with questions; it
+  re-asked things already answered; it said "Exactly" to a garbled "It's"; a ledger formula ran off
+  its card; it took around 10 minutes and still had not drawn the rectangles. When told "just show
+  me", it switched to narrating and went faster.
+- **For Atlas:** keep our instant start and continuous board, and add the best parts: a tutor that
+  speaks while the board is being prepared; a key-formulas rail beside the board; a coloured live
+  transcript; a "just explain" vs "quiz me" switch; spoken back-and-forth as an option. Never let
+  questions hold up the visuals.

@@ -463,12 +463,15 @@ export function Stage({
   t,
   seconds,
   caption,
+  models3d = true,
 }: {
   lesson: Lesson
   scene: number
   t: number
   seconds: number[]
   caption?: string | null
+  /** Show 3D models; when off, a small note stands in their place. */
+  models3d?: boolean
 }) {
   const box = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.5)
@@ -1359,7 +1362,24 @@ export function Stage({
           </div>
         ) : null}
         <div className="absolute inset-0">{html}</div>
-        {board.model ? (
+        {board.model && !models3d ? (
+          <div
+            className="absolute grid place-items-center"
+            style={{ left: frame.x, top: frame.y, width: frame.w, height: frame.h }}
+          >
+            <p
+              className="rounded-2xl px-6 py-4 text-center"
+              style={{ background: 'rgba(0,0,0,0.06)', color: theme.colors.ink, fontSize: 28 }}
+            >
+              A 3D model goes here.
+              <br />
+              <span style={{ fontSize: 22, opacity: 0.7 }}>
+                3D models are not turned on for your account.
+              </span>
+            </p>
+          </div>
+        ) : null}
+        {board.model && models3d ? (
           <div
             className="absolute"
             style={{ left: frame.x, top: frame.y - 20, width: frame.w, height: frame.h + 20 }}

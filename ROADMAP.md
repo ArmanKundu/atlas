@@ -81,3 +81,6 @@ Phases follow `BUILD_PROMPT.md` §14; extra work the owner asked for is listed a
 - [ ] **Study design answers.** Ask "is this in the Methods study design?" and get an answer from the official study design you imported, with the dot point quoted.
 - [ ] **Exam formatting from the owner's crash course.**
 - [ ] **Business readiness.** Signed installers, licence key or one-off purchase, privacy policy, website.
+- [ ] **Official VCAA past papers.** Using the Internet Archive's copies of the VCAA site (around July 2026, if the live site is down), gather every exam, NHT exam, examiner report and study design, plus other resources, for Accounting, Mathematical Methods, Specialist Mathematics, General Mathematics, Chemistry and Biology. Store them in the shared library database so they show up in the Exam section. Check VCAA's terms on copying first. Exam files are never committed to this repo.
+- [ ] **Cloud rendering for 3D.** Render richer 3D models and mock-ups (Blender) on a rented cloud machine, such as Google Cloud, instead of the laptop. Needs a plan for cost, sign-in and keeping it optional.
+- [ ] **Chemistry explorer** inspired by zperiod.app: an interactive periodic table with element details, trends and 3D atoms and molecules.

@@ -13,6 +13,9 @@ export interface LessonRequest {
   sourceIds: string[]
   questionIds: string[]
   followUp: { lesson: string; scene: number } | null
+  /** Let the AI use 3D models and quick checks (off when the admin turned them off). */
+  models3d?: boolean
+  checks?: boolean
 }
 
 export type StreamState =

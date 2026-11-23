@@ -192,3 +192,19 @@ The owner wants AI that works on weak laptops with no account or limits, and a w
 - **Interrupt:** "Ask" pauses the lesson; the student types or speaks (on-device Whisper, sent as soon as it is heard). The answer is a short follow-up lesson played on the same board; when it ends the original lesson resumes at the scene where it stopped.
 - **Quick checks:** a scene may carry `check` (question, 2 to 4 options, answer, why). The lesson waits for an answer and the tutor reads the explanation.
 - **3D:** a scene may carry `model`, a list of primitives (spheres, boxes, arrows, planes, surfaces z = f(x, y), parametric curves, molecules coloured by element, axes). three.js renders it on the diagram side; drag to orbit, scroll to zoom, grab a part to move it. Labels are placed each frame with `LabelPlacer`, so they never overlap. Coordinates are z-up to match maths.
+
+## D-030 Per-person features and removed accounts (2026-11-23)
+
+- The admin can switch features on or off for each person (`access.features` in Supabase):
+  Explainer, Live tutor, 3D models, Assistant. Defaults live in `src/shared/features.ts`; the
+  admin always has everything, and people who are not signed in (or not let in) get only the
+  features marked `open`, so signing out is not a way round a switch.
+- The app re-checks access every 5 minutes, so a change reaches copies that are already
+  installed and open. The check also records last seen and the app version, which is all the
+  admin sees about activity; nothing about what people study is sent (no telemetry, per
+  CLAUDE.md).
+- Removing someone keeps their row as `removed` instead of deleting it, so they cannot sign in
+  again and take a free place. "Allow back" puts them on the waitlist.
+- Switches are enforced in the app (the UI hides the feature and the prompt stops asking the AI
+  for it). Someone who rebuilds the app from source could get round that; the shared library and
+  reports stay protected server-side by row-level security.

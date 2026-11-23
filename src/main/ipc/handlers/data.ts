@@ -291,6 +291,8 @@ export function registerDataHandlers(deps: DataHandlerDeps): void {
         level: input.level ?? null,
         style: input.style ?? 'clear',
         exam: input.exam ?? false,
+        models3d: input.models3d ?? true,
+        checks: input.checks ?? true,
       },
       files: [...(input.files ?? []), ...library],
       questionIds: input.questionIds ?? [],

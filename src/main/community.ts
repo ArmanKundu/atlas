@@ -46,6 +46,7 @@ import {
   MATERIALS,
   type Material,
 } from '@shared/community'
+import { resolveFeatures } from '@shared/features'
 
 type PublishParsed = z.infer<typeof PublishSchema>
 import type { SecretStore } from './ai/secrets'
@@ -209,11 +210,21 @@ async function sha256(bytes: Buffer): Promise<string> {
  * Sign-in is a one-time code sent by email; the session is kept encrypted with the OS keychain,
  * beside the AI settings. People belong to spaces and share into them.
  */
+/** How often an open app checks its access and features again. */
+const ACCESS_RECHECK_MS = 5 * 60_000
+
 export class CommunityLibrary {
   private client: SupabaseClient | null = null
   private profileCache: Profile | null | undefined
   private accessCache:
-    | { status: 'approved' | 'waitlisted'; isAdmin: boolean; capacity: number; used: number }
+    | {
+        status: 'approved' | 'waitlisted' | 'removed'
+        isAdmin: boolean
+        capacity: number
+        used: number
+        features: Record<string, unknown>
+        at: number
+      }
     | undefined
 
   constructor(
@@ -294,6 +305,12 @@ export class CommunityLibrary {
       unread: 0,
       access: null,
       isAdmin: false,
+      features: resolveFeatures({
+        signedIn: false,
+        approved: false,
+        isAdmin: false,
+        overrides: {},
+      }),
       capacity: 0,
       used: 0,
     }
@@ -302,24 +319,39 @@ export class CommunityLibrary {
     const { data } = await sb.auth.getSession()
     const user = data.session?.user
     if (!user) return empty
-    // Approved stays approved for the session; a waitlisted place is checked each time.
-    if (this.accessCache?.status !== 'approved') {
-      const claim = await this.rpc<Row>('claim_access', {}, 'Could not check your place in Atlas.')
+    // Checked again every few minutes, so the admin's changes reach apps that are already open.
+    if (
+      this.accessCache?.status !== 'approved' ||
+      Date.now() - this.accessCache.at > ACCESS_RECHECK_MS
+    ) {
+      const claim = await this.rpc<Row>(
+        'claim_access',
+        { version: app.getVersion() },
+        'Could not check your place in Atlas.',
+      )
+      const raw = claim['features']
       this.accessCache = {
-        status: claim['status'] === 'approved' ? 'approved' : 'waitlisted',
+        status:
+          claim['status'] === 'approved'
+            ? 'approved'
+            : claim['status'] === 'removed'
+              ? 'removed'
+              : 'waitlisted',
         isAdmin: Boolean(claim['is_admin']),
         capacity: Number(claim['capacity'] ?? 0),
         used: Number(claim['used'] ?? 0),
+        features: raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {},
+        at: Date.now(),
       }
     }
     const access = this.accessCache
-    if (access.status === 'waitlisted') {
+    if (access.status !== 'approved') {
       return {
         ...empty,
         signedIn: true,
         userId: user.id,
         email: user.email ?? null,
-        access: 'waitlisted',
+        access: access.status,
         capacity: access.capacity,
         used: access.used,
       }
@@ -350,6 +382,12 @@ export class CommunityLibrary {
       unread,
       access: 'approved',
       isAdmin: access.isAdmin,
+      features: resolveFeatures({
+        signedIn: true,
+        approved: true,
+        isAdmin: access.isAdmin,
+        overrides: access.features,
+      }),
       capacity: access.capacity,
       used: access.used,
     }
@@ -374,11 +412,34 @@ export class CommunityLibrary {
     return (rows ?? []).map((r) => ({
       userId: String(r['user_id']),
       email: String(r['email'] ?? ''),
-      status: r['status'] === 'approved' ? 'approved' : 'waitlisted',
+      status:
+        r['status'] === 'approved'
+          ? 'approved'
+          : r['status'] === 'removed'
+            ? 'removed'
+            : 'waitlisted',
       createdAt: String(r['created_at']),
       displayName: (r['display_name'] as string | null) ?? null,
       username: (r['username'] as string | null) ?? null,
+      features: Object.fromEntries(
+        Object.entries((r['features'] as Record<string, unknown> | null) ?? {}).filter(
+          (e): e is [string, boolean] => typeof e[1] === 'boolean',
+        ),
+      ),
+      lastSeen: (r['last_seen'] as string | null) ?? null,
+      appVersion: String(r['app_version'] ?? ''),
     }))
+  }
+
+  async adminSetFeatures(input: {
+    userId: string
+    features: Record<string, boolean>
+  }): Promise<void> {
+    await this.rpc(
+      'admin_set_features',
+      { target: input.userId, new_features: input.features },
+      'Could not change their features.',
+    )
   }
 
   async adminSetAccess(input: {

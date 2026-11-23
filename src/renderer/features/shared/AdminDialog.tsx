@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   Bug,
   Check,
+  ChevronDown,
   Lightbulb,
   MessageSquare,
   Minus,
@@ -11,6 +12,7 @@ import {
   Undo2,
 } from 'lucide-react'
 import type { AccessEntry, CommunityStatus, Feedback } from '@shared/community'
+import { FEATURES } from '@shared/features'
 import { Button, IconButton } from '@/design/Button'
 import { Dialog } from '@/design/Dialog'
 import { Segmented } from '@/design/Segmented'
@@ -78,6 +80,7 @@ function People({ status }: { status: CommunityStatus }) {
   if (!list.data) return <SkeletonList rows={4} />
   const approved = list.data.filter((e) => e.status === 'approved')
   const waiting = list.data.filter((e) => e.status === 'waitlisted')
+  const removed = list.data.filter((e) => e.status === 'removed')
 
   return (
     <div className="flex flex-col gap-5">
@@ -156,7 +159,12 @@ function People({ status }: { status: CommunityStatus }) {
         </h3>
         <ul className="flex flex-col gap-1">
           {approved.map((e) => (
-            <Person key={e.userId} entry={e} me={e.userId === status.userId}>
+            <Person
+              key={e.userId}
+              entry={e}
+              me={e.userId === status.userId}
+              features={e.userId === status.userId ? undefined : e}
+            >
               {e.userId === status.userId ? null : (
                 <>
                   <IconButton
@@ -181,6 +189,93 @@ function People({ status }: { status: CommunityStatus }) {
           ))}
         </ul>
       </section>
+
+      {removed.length > 0 ? (
+        <section>
+          <h3 className="mb-2 text-2xs font-medium tracking-wide text-ink-3 uppercase">
+            Removed · {removed.length}
+          </h3>
+          <ul className="flex flex-col gap-1">
+            {removed.map((e) => (
+              <Person key={e.userId} entry={e}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={setAccess.pending}
+                  onClick={() => void setAccess.run(e, 'waitlisted')}
+                >
+                  Allow back
+                </Button>
+              </Person>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-2xs text-ink-3">
+            Removed accounts cannot take a place by signing in again. Allow one back to put it on
+            the waitlist.
+          </p>
+        </section>
+      ) : null}
+    </div>
+  )
+}
+
+/** When someone last opened Atlas, in words. */
+function seen(at: string | null): string {
+  if (!at) return 'not seen yet'
+  const mins = Math.round((Date.now() - new Date(at).getTime()) / 60_000)
+  if (mins < 10) return 'active now'
+  if (mins < 60) return `seen ${mins} min ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `seen ${hours} h ago`
+  const days = Math.round(hours / 24)
+  return days < 30 ? `seen ${days} d ago` : `seen ${new Date(at).toLocaleDateString()}`
+}
+
+/** Switches for what one person can use. Changes reach their app within a few minutes. */
+function FeatureSwitches({ entry }: { entry: AccessEntry }) {
+  const save = useAction(async (id: string, on: boolean) => {
+    await call('admin:setFeatures', {
+      userId: entry.userId,
+      features: { ...entry.features, [id]: on },
+    })
+    changed('admin')
+  })
+  return (
+    <div className="mt-2 mb-1 grid gap-1.5 rounded-lg bg-sunken p-3 sm:grid-cols-2">
+      {FEATURES.map((f) => {
+        const set = entry.features[f.id]
+        const on = typeof set === 'boolean' ? set : f.default
+        return (
+          <button
+            key={f.id}
+            type="button"
+            role="switch"
+            aria-checked={on}
+            disabled={save.pending}
+            onClick={() => void save.run(f.id, !on)}
+            className="flex items-center gap-3 rounded-md px-2 py-1.5 text-left hover:bg-hover disabled:opacity-60"
+          >
+            <span
+              className={cn(
+                'relative h-5 w-9 shrink-0 rounded-full transition-colors',
+                on ? 'bg-accent' : 'bg-line-strong',
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-0.5 size-4 rounded-full bg-white shadow transition-[left]',
+                  on ? 'left-[18px]' : 'left-0.5',
+                )}
+              />
+            </span>
+            <span className="min-w-0">
+              <span className="block font-medium text-ink">{f.label}</span>
+              <span className="block truncate text-2xs text-ink-3">{f.detail}</span>
+            </span>
+          </button>
+        )
+      })}
+      {save.error ? <p className="text-2xs text-danger sm:col-span-2">{save.error}</p> : null}
     </div>
   )
 }
@@ -188,25 +283,51 @@ function People({ status }: { status: CommunityStatus }) {
 function Person({
   entry,
   me,
+  features,
   children,
 }: {
   entry: AccessEntry
   me?: boolean
+  /** Show this person's feature switches. */
+  features?: AccessEntry
   children?: React.ReactNode
 }) {
+  const [open, setOpen] = useState(false)
   return (
-    <li className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-sunken">
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-ink">
-          {entry.displayName ?? entry.email}
-          {me ? <span className="ml-1.5 text-2xs font-normal text-ink-3">(you, admin)</span> : null}
-        </p>
-        <p className="truncate text-2xs text-ink-3">
-          {entry.username ? `@${entry.username} · ` : ''}
-          {entry.email} · {new Date(entry.createdAt).toLocaleDateString()}
-        </p>
+    <li className="rounded-lg px-2 py-1.5 hover:bg-sunken/60">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-ink">
+            {entry.displayName ?? entry.email}
+            {me ? (
+              <span className="ml-1.5 text-2xs font-normal text-ink-3">(you, admin)</span>
+            ) : null}
+          </p>
+          <p className="truncate text-2xs text-ink-3">
+            {entry.username ? `@${entry.username} · ` : ''}
+            {entry.email} · {seen(entry.lastSeen)}
+            {entry.appVersion ? ` · v${entry.appVersion}` : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-1">
+          {features ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-expanded={open}
+              onClick={() => setOpen((o) => !o)}
+            >
+              Features
+              <ChevronDown
+                className={cn('size-3.5 transition-transform', open && 'rotate-180')}
+                aria-hidden
+              />
+            </Button>
+          ) : null}
+          {children}
+        </div>
       </div>
-      <div className="flex items-center gap-1">{children}</div>
+      {features && open ? <FeatureSwitches entry={features} /> : null}
     </li>
   )
 }

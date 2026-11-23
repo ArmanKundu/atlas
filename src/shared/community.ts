@@ -139,8 +139,10 @@ export const CommunityStatusSchema = z.object({
   /** Unread inbox notifications. */
   unread: z.number(),
   /** Null when signed out. Waitlisted people wait for the admin to let them in. */
-  access: z.enum(['approved', 'waitlisted']).nullable(),
+  access: z.enum(['approved', 'waitlisted', 'removed']).nullable(),
   isAdmin: z.boolean(),
+  /** What this person may use, as the admin set it (see shared/features). */
+  features: z.record(z.string(), z.boolean()),
   /** How many accounts Atlas allows, and how many are taken. */
   capacity: z.number(),
   used: z.number(),
@@ -153,10 +155,14 @@ export type Capacity = z.infer<typeof CapacitySchema>
 export const AccessEntrySchema = z.object({
   userId: z.string(),
   email: z.string(),
-  status: z.enum(['approved', 'waitlisted']),
+  status: z.enum(['approved', 'waitlisted', 'removed']),
   createdAt: z.string(),
   displayName: z.string().nullable(),
   username: z.string().nullable(),
+  /** The admin's switches for this person; missing ones use each feature's default. */
+  features: z.record(z.string(), z.boolean()),
+  lastSeen: z.string().nullable(),
+  appVersion: z.string(),
 })
 export type AccessEntry = z.infer<typeof AccessEntrySchema>
 

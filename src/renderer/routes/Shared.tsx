@@ -81,18 +81,22 @@ export function Shared() {
           <div className="mb-6 flex flex-col items-center text-center">
             <Mascot size={64} />
             <h1 className="mt-4 text-[1.5rem] font-semibold tracking-[-0.02em] text-ink">
-              {s.access === 'waitlisted'
-                ? 'Atlas is full'
-                : s.signedIn
-                  ? 'Almost there'
-                  : 'Share with friends'}
+              {s.access === 'removed'
+                ? 'Access removed'
+                : s.access === 'waitlisted'
+                  ? 'Atlas is full'
+                  : s.signedIn
+                    ? 'Almost there'
+                    : 'Share with friends'}
             </h1>
             <p className="mt-1.5 max-w-[42ch] text-ink-2">
-              {s.access === 'waitlisted'
-                ? 'Places are kept small so Atlas stays among friends.'
-                : s.signedIn
-                  ? 'Pick a name and @username so friends can invite you.'
-                  : 'Join spaces with your friends to swap notes, files and flashcards. Sign in with your email; Atlas sends you a code.'}
+              {s.access === 'removed'
+                ? 'Ask the Atlas admin if you think this is a mistake.'
+                : s.access === 'waitlisted'
+                  ? 'Places are kept small so Atlas stays among friends.'
+                  : s.signedIn
+                    ? 'Pick a name and @username so friends can invite you.'
+                    : 'Join spaces with your friends to swap notes, files and flashcards. Sign in with your email; Atlas sends you a code.'}
             </p>
           </div>
           <div className="rounded-xl bg-surface p-5 shadow-pill ring-1 ring-line">

@@ -259,6 +259,7 @@ async function main(): Promise<void> {
   registry.handle('admin:access', () => shared.adminAccess())
   registry.handle('admin:setAccess', (input) => shared.adminSetAccess(input))
   registry.handle('admin:setCapacity', ({ capacity }) => shared.adminSetCapacity(capacity))
+  registry.handle('admin:setFeatures', (input) => shared.adminSetFeatures(input))
   registry.handle('admin:feedback', () => shared.adminFeedback())
   registry.handle('admin:attachment', ({ id }) => shared.adminAttachment(id))
   registry.handle('admin:setFeedback', (input) => shared.adminSetFeedback(input))

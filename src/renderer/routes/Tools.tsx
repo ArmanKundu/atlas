@@ -1,11 +1,15 @@
 import { Page, PageHeader } from '@/design/Page'
 import { EmptyState } from '@/design/States'
+import { Locked } from '@/features/access/Locked'
+import { useFeatures } from '@/features/access/useFeatures'
 import { ChatView } from '@/features/chat/ChatView'
 import { FlashcardsView } from '@/features/flashcards/FlashcardsView'
 import { LibraryView } from '@/features/library/LibraryView'
 import { NotesView } from '@/features/notes/NotesView'
 
 export function AssistantRoute() {
+  const features = useFeatures()
+  if (!features.loading && !features.assistant) return <Locked feature="assistant" />
   return <ChatView />
 }
 
