@@ -14,6 +14,7 @@ import {
   Sparkles,
   Square,
   X,
+  Share2,
 } from 'lucide-react'
 import { parseLesson, type Lesson } from '@shared/lesson'
 import type { LessonRow, Question, Source, Subject } from '@shared/models'
@@ -115,7 +116,7 @@ export function Explain() {
         .then((row) => {
           setOpened((o) => (o ? o : { key: streamKey, lesson, rowId: row.id }))
           if (!autoShare || request.followUp) return
-          setShareNote('Sharing with the group…')
+          setShareNote('Sharing to the library…')
           void shareLesson({
             lessonId: row.id,
             lesson,
@@ -123,8 +124,8 @@ export function Explain() {
             subject: request.subject,
             level: request.level,
           })
-            .then((id) => setShareNote(id ? 'Shared with the group' : null))
-            .catch(() => setShareNote("Couldn't share it with the group"))
+            .then((id) => setShareNote(id ? 'Shared to the library' : null))
+            .catch(() => setShareNote("Couldn't share it to the library"))
         })
         .catch(() => undefined)
     },
@@ -402,7 +403,38 @@ export function Explain() {
                 {lesson?.title ?? 'Writing your lesson…'}
               </h1>
               {opened?.rowId && lesson ? (
-                <DownloadVideo lessonId={opened.rowId} title={lesson.title} />
+                <>
+                  <button
+                    type="button"
+                    disabled={
+                      shareNote === 'Sharing to the library…' ||
+                      shareNote === 'Shared to the library'
+                    }
+                    onClick={() => {
+                      const rowId = opened.rowId
+                      if (!rowId) return
+                      setShareNote('Sharing to the library…')
+                      void shareLesson({
+                        lessonId: rowId,
+                        lesson,
+                        prompt: lastRequest.current?.prompt || lesson.title,
+                        subject: lastRequest.current?.subject ?? null,
+                        level: lastRequest.current?.level ?? null,
+                      })
+                        .then((id) =>
+                          setShareNote(
+                            id ? 'Shared to the library' : 'Sign in to the library to share',
+                          ),
+                        )
+                        .catch(() => setShareNote("Couldn't share it to the library"))
+                    }}
+                    className="flex h-8 items-center gap-1.5 rounded-md px-2 text-ink-2 hover:bg-hover hover:text-ink disabled:opacity-50"
+                  >
+                    <Share2 className="size-4" aria-hidden />
+                    {shareNote === 'Shared to the library' ? 'Shared' : 'Share'}
+                  </button>
+                  <DownloadVideo lessonId={opened.rowId} title={lesson.title} />
+                </>
               ) : null}
             </div>
             {lesson ? (
@@ -432,8 +464,8 @@ export function Explain() {
                 <input
                   value={ask}
                   onChange={(e) => setAsk(e.target.value)}
-                  placeholder={`Ask about scene ${scene + 1}: “why does this step work?”`}
-                  aria-label="Ask about this step"
+                  placeholder="Ask a follow-up: “how do I tell the cathode from the anode?”"
+                  aria-label="Ask a follow-up"
                   disabled={streaming}
                   className="h-8 min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-3"
                 />
@@ -449,7 +481,9 @@ export function Explain() {
             ) : null}
           </div>
           <aside className="w-full shrink-0 xl:w-[340px]">
-            <h2 className="mb-2 text-2xs font-medium tracking-wide text-ink-3 uppercase">Scenes</h2>
+            <h2 className="mb-2 text-2xs font-medium tracking-wide text-ink-3 uppercase">
+              Transcript
+            </h2>
             <ol className="flex flex-col gap-1">
               {(lesson?.scenes ?? []).map((s, i) => (
                 <li
@@ -459,10 +493,6 @@ export function Explain() {
                     i === scene ? 'bg-surface shadow-pop ring-1 ring-line' : 'text-ink-2',
                   )}
                 >
-                  <p className="text-2xs font-medium text-ink-3">
-                    {i + 1}
-                    {s.title ? ` · ${s.title}` : ''}
-                  </p>
                   <p className={cn('leading-5', i === scene ? 'text-ink' : 'text-ink-2')}>
                     {s.say}
                   </p>

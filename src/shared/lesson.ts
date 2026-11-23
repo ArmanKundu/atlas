@@ -413,6 +413,32 @@ export function nice(v: number): string {
 
 export { compileFormula }
 
+/** The short stretch of narration being spoken at `t` of `seconds`, like video subtitles. */
+export function subtitleAt(say: string, t: number, seconds: number): string {
+  const words = say.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return ''
+  // Break at sentence and clause ends, keeping each line short enough to read at a glance.
+  const lines: string[][] = [[]]
+  for (const w of words) {
+    const line = lines[lines.length - 1] ?? []
+    line.push(w)
+    if (
+      (/[.!?;:]$/.test(w) && line.length >= 4) ||
+      (/,$/.test(w) && line.length >= 8) ||
+      line.length >= 13
+    )
+      lines.push([])
+  }
+  const full = lines.filter((l) => l.length > 0)
+  const share = Math.max(0, Math.min(0.999, t / Math.max(0.1, seconds - 0.6)))
+  let at = share * words.length
+  for (const line of full) {
+    if (at < line.length) return line.join(' ')
+    at -= line.length
+  }
+  return full[full.length - 1]?.join(' ') ?? ''
+}
+
 /** Roughly how long a scene's narration takes to say, for timing without a voice. */
 export function speakingSeconds(say: string): number {
   const count = say.trim().split(/\s+/).filter(Boolean).length

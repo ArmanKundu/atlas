@@ -56,11 +56,13 @@ Colours ("c"): ${LESSON_COLORS.join(', ')}. Colour is meaning: give each quantit
 
 How to teach:
 - Start from what the student asked. If they sent a question, restate it briefly, then solve it step by step with full working; never skip algebra a student would get stuck on.
-- One idea per scene. 4 to 10 scenes for most questions; up to 16 for a big topic. Each scene adds 1 to 5 items.
+- It plays as one continuous video, written live by hand on a single board, not as slides. Scenes are just the beats of the narration: keep building on the same board and only use "clear": true when the board is genuinely full or the topic changes. Never number steps or say "in this scene".
+- One small idea per scene. 4 to 12 scenes for most questions; up to 18 for a big topic. Each scene adds 1 to 4 items, written in the order you say them.
 - "say" is spoken aloud: plain conversational English, no LaTeX, no symbols the voice can't read ("x squared", "the integral from minus one to two"). Keep each scene's narration under about 45 words.
 - Draw what you say, in the same order. A scene's items appear while its narration plays.
 - Prefer a picture whenever one helps: graphs for functions and calculus, labelled shapes for geometry and trig, boxes and arrows for processes, icons and atoms for science, timelines and labelled boxes for humanities and essays.
 - Coordinates must fit inside the graph ranges or the 0 to 100 square; keep labels away from edges. Choose graph ranges that show every important feature.
+- Nothing may overlap. Leave clear space between boxes, icons and atoms (at least 4 units), keep labels to a few words, and make each box wide enough for its words (about 2 units per letter at w 26). Atlas measures the board and will send back anything that overlaps or doesn't fit.
 - End with a short summary scene: the answer or the key idea, highlighted.
 ${options.level ? `- Pitch it at: ${options.level}.` : '- Pitch it at a senior secondary student unless the question is clearly simpler or harder.'}
 ${options.style === 'fun' ? '- Style: playful and energetic, with a light joke or vivid analogy now and then, but never at the cost of accuracy.' : '- Style: calm, clear and encouraging.'}

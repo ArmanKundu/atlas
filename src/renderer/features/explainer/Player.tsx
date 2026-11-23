@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Captions, ChevronLeft, ChevronRight, Loader2, Pause, Play, RotateCcw } from 'lucide-react'
-import { speakingSeconds, type Lesson } from '@shared/lesson'
+import { Captions, Loader2, Pause, Play, RotateCcw } from 'lucide-react'
+import { speakingSeconds, subtitleAt, type Lesson } from '@shared/lesson'
 import { useLive } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { call } from '@/lib/ipc'
 import { useSetting } from '@/lib/settings'
 import { clip, lessonAudio } from './audio'
 import { Stage } from './Stage'
+
+const clock = (s: number): string =>
+  `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
 /**
  * Plays a lesson: each scene is drawn in time with its narration. While the lesson is still being
@@ -36,6 +39,7 @@ export function Player({
   const [playing, setPlaying] = useState(autoPlay)
   const [waiting, setWaiting] = useState(false)
   const [durations, setDurations] = useState<Record<number, number>>({})
+  const [seek, setSeek] = useState(0)
   const source = useRef<AudioBufferSourceNode | null>(null)
 
   const seconds = useMemo(
@@ -126,7 +130,7 @@ export function Player({
     }
     // `t` is read once as the starting offset; re-running on every frame would restart the clip.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, scene, speak, voiceId, lesson.scenes.length, seconds[scene]])
+  }, [playing, scene, seek, speak, voiceId, lesson.scenes.length, seconds[scene]])
 
   // A new scene arrived while we were waiting for it (adjusted during render, not in an effect).
   if (waiting && scene + 1 < lesson.scenes.length) {
@@ -135,11 +139,21 @@ export function Player({
     setT(0)
   }
 
-  const go = (next: number): void => {
+  const go = (next: number, offset = 0): void => {
     stopAudio()
     setWaiting(false)
     setScene(Math.max(0, Math.min(lesson.scenes.length - 1, next)))
-    setT(0)
+    setT(offset)
+    setSeek((n) => n + 1)
+  }
+  // One timeline for the whole lesson, like a video.
+  const starts = seconds.map((_, i) => seconds.slice(0, i).reduce((a, b) => a + b, 0))
+  const total = seconds.reduce((a, b) => a + b, 0)
+  const now = (starts[scene] ?? 0) + t
+  const seekTo = (time: number): void => {
+    let i = seconds.length - 1
+    while (i > 0 && (starts[i] ?? 0) > time) i--
+    go(i, Math.max(0, time - (starts[i] ?? 0)))
   }
   const ended = !playing && scene === lesson.scenes.length - 1 && t >= (seconds[scene] ?? 0) - 0.01
   const say = lesson.scenes[scene]?.say ?? ''
@@ -152,7 +166,7 @@ export function Player({
           scene={scene}
           t={t}
           seconds={seconds}
-          caption={captions ? say : null}
+          caption={captions ? subtitleAt(say, t, seconds[scene] ?? 6) : null}
         />
         {waiting ? (
           <div className="absolute top-4 right-4 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-2xs text-white">
@@ -174,14 +188,6 @@ export function Player({
       <div className="flex items-center gap-1 bg-[#101114] px-3 py-2 text-white">
         <button
           type="button"
-          aria-label="Previous scene"
-          onClick={() => go(scene - 1)}
-          className="grid size-8 place-items-center rounded-md hover:bg-white/10"
-        >
-          <ChevronLeft className="size-4" aria-hidden />
-        </button>
-        <button
-          type="button"
           aria-label={ended ? 'Replay' : playing ? 'Pause' : 'Play'}
           onClick={() => {
             if (ended) {
@@ -199,43 +205,33 @@ export function Player({
             <Play className="size-4 translate-x-px fill-current" aria-hidden />
           )}
         </button>
-        <button
-          type="button"
-          aria-label="Next scene"
-          onClick={() => go(scene + 1)}
-          className="grid size-8 place-items-center rounded-md hover:bg-white/10"
-        >
-          <ChevronRight className="size-4" aria-hidden />
-        </button>
-        <div className="mx-3 flex flex-1 gap-1" role="group" aria-label="Scenes">
-          {lesson.scenes.map((s, i) => (
-            <button
-              key={i}
-              type="button"
-              aria-label={`Scene ${i + 1}${s.title ? `: ${s.title}` : ''}`}
-              aria-current={i === scene || undefined}
-              onClick={() => go(i)}
-              className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-white/20 hover:bg-white/30"
-            >
-              <span
-                className="absolute inset-y-0 left-0 rounded-full bg-white"
-                style={{
-                  width:
-                    i < scene
-                      ? '100%'
-                      : i === scene
-                        ? `${Math.min(100, (t / (seconds[i] ?? 1)) * 100)}%`
-                        : '0%',
-                }}
-              />
-            </button>
-          ))}
+        <span className="ml-2 w-11 text-right font-mono text-2xs text-white/70">{clock(now)}</span>
+        <div className="relative mx-3 flex h-6 flex-1 items-center">
+          <div className="absolute inset-x-0 h-1.5 overflow-hidden rounded-full bg-white/20">
+            <div
+              className="h-full rounded-full bg-white"
+              style={{ width: `${total ? Math.min(100, (now / total) * 100) : 0}%` }}
+            />
+          </div>
           {live ? (
-            <span className="h-1.5 w-8 animate-pulse rounded-full bg-white/15" aria-hidden />
+            <span
+              className="absolute right-0 h-1.5 w-10 animate-pulse rounded-full bg-white/25"
+              aria-hidden
+            />
           ) : null}
+          <input
+            type="range"
+            aria-label="Seek"
+            min={0}
+            max={Math.max(0.1, total)}
+            step={0.1}
+            value={Math.min(now, total)}
+            onChange={(e) => seekTo(Number(e.target.value))}
+            className="absolute inset-0 w-full cursor-pointer opacity-0"
+          />
         </div>
-        <span className="mr-2 font-mono text-2xs text-white/60">
-          {scene + 1}/{lesson.scenes.length}
+        <span className="mr-2 font-mono text-2xs text-white/50">
+          {live ? 'writing…' : clock(total)}
         </span>
         <button
           type="button"

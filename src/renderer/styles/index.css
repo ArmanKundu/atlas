@@ -652,3 +652,33 @@
   cursor: default;
   user-select: none;
 }
+/*
+ * Explainer board: maths in handwriting. Letters, numbers and operators use Kalam; KaTeX keeps
+ * its own fonts for big operators, roots and stretchy brackets so the layout stays exact.
+ */
+.lesson-hand .katex {
+  font-size: 1em;
+}
+.lesson-hand
+  .katex
+  :is(
+    .mord,
+    .mbin,
+    .mrel,
+    .mpunct,
+    .mopen,
+    .mclose,
+    .minner,
+    .mathnormal,
+    .mathit,
+    .mathrm,
+    .textrm
+  ) {
+  font-family: 'Kalam', 'Caveat', cursive;
+  font-style: normal;
+}
+.lesson-hand
+  .katex
+  :is(.mop.op-symbol, .delimsizing, .delimsizing *, .op-symbol *, .sqrt > .root, .accent-body) {
+  font-family: revert;
+}

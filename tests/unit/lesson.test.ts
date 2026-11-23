@@ -91,3 +91,92 @@ describe('explainer helpers', () => {
     expect(prompt).toContain('playful')
   })
 })
+
+describe('subtitleAt', () => {
+  it('shows a short line that moves through the narration', async () => {
+    const { subtitleAt } = await import('../../src/shared/lesson')
+    const say =
+      'First we differentiate the function. Setting the derivative to zero gives the stationary points, which we then substitute back in.'
+    expect(subtitleAt(say, 0, 10)).toBe('First we differentiate the function.')
+    expect(subtitleAt(say, 9.3, 10)).toMatch(/substitute back in\.$/)
+    expect(subtitleAt('', 1, 5)).toBe('')
+  })
+})
+
+describe('LabelPlacer', () => {
+  it('moves a label that would sit on another one', async () => {
+    const { LabelPlacer, overlap } = await import('../../src/shared/label-layout')
+    const placer = new LabelPlacer({ x: 0, y: 0, w: 1600, h: 900 })
+    const a = placer.place(400, 400, '(1, -1)', 26)
+    const b = placer.place(400, 400, '(1, 2)', 26)
+    expect(overlap(a.box, b.box)).toBe(0)
+    expect(a.x).toBe(400)
+  })
+
+  it('keeps labels off reserved space and away from curve points', async () => {
+    const { LabelPlacer, overlap } = await import('../../src/shared/label-layout')
+    const placer = new LabelPlacer({ x: 0, y: 0, w: 1600, h: 900 })
+    const column = { x: 0, y: 0, w: 800, h: 900 }
+    placer.reserve(column)
+    const pts: [number, number][] = Array.from({ length: 50 }, (_, i) => [820 + i * 4, 400])
+    placer.avoidPoints(pts)
+    const spot = placer.place(780, 410, 'y = x^2', 26)
+    expect(overlap(spot.box, column)).toBe(0)
+    expect(
+      pts.some(
+        ([x, y]) =>
+          x > spot.box.x &&
+          x < spot.box.x + spot.box.w &&
+          y > spot.box.y &&
+          y < spot.box.y + spot.box.h,
+      ),
+    ).toBe(false)
+  })
+})
+
+describe('auditLesson', () => {
+  const wrap = (lesson: unknown) => '```atlas-lesson\n' + JSON.stringify(lesson) + '\n```'
+
+  it('finds boxes on top of each other and words too long for their box', async () => {
+    const { auditLesson } = await import('../../src/shared/lesson-audit')
+    const lesson = parseLesson(
+      wrap({
+        title: 'Galvanic cell',
+        scenes: [
+          {
+            say: 'Two half cells.',
+            items: [
+              { t: 'box', at: [30, 50], w: 26, h: 12, text: 'Anode' },
+              { t: 'box', at: [34, 52], w: 26, h: 12, text: 'Cathode' },
+              { t: 'box', at: [80, 20], w: 8, h: 6, text: 'Oxidation happens at the anode' },
+            ],
+          },
+        ],
+      }),
+    )
+    expect(lesson).not.toBeNull()
+    const issues = auditLesson(lesson as NonNullable<typeof lesson>)
+    expect(issues.some((i) => i.includes('overlaps'))).toBe(true)
+    expect(issues.some((i) => i.includes('do not fit'))).toBe(true)
+  })
+
+  it('passes a clean board', async () => {
+    const { auditLesson } = await import('../../src/shared/lesson-audit')
+    const lesson = parseLesson(
+      wrap({
+        title: 'Flow',
+        scenes: [
+          {
+            say: 'Light goes in.',
+            items: [
+              { t: 'box', at: [25, 50], w: 26, h: 12, text: 'Light' },
+              { t: 'box', at: [75, 50], w: 26, h: 12, text: 'Glucose' },
+              { t: 'arrow', from: [38, 50], to: [62, 50] },
+            ],
+          },
+        ],
+      }),
+    )
+    expect(auditLesson(lesson as NonNullable<typeof lesson>)).toEqual([])
+  })
+})

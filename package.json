@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
+    "@fontsource/kalam": "^5.3.0",
     "@huggingface/transformers": "^3.8.1",
     "@supabase/supabase-js": "2.119.0",
     "kokoro-js": "^1.2.1",

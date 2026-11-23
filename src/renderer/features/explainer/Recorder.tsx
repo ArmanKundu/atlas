@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useParams } from 'react-router'
 import { ArrayBufferTarget, Muxer } from 'mp4-muxer'
-import { parseLesson, speakingSeconds, type Lesson } from '@shared/lesson'
+import { parseLesson, speakingSeconds, subtitleAt, type Lesson } from '@shared/lesson'
 import { db } from '@/lib/api'
 import { call, errorMessage } from '@/lib/ipc'
 import { clip } from './audio'
@@ -193,7 +193,7 @@ export function Recorder() {
           scene={at.scene}
           t={at.t}
           seconds={seconds}
-          caption={lesson.scenes[at.scene]?.say ?? null}
+          caption={subtitleAt(lesson.scenes[at.scene]?.say ?? '', at.t, seconds[at.scene] ?? 6)}
         />
       ) : null}
     </div>

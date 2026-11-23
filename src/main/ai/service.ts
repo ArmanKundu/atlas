@@ -16,6 +16,8 @@ import { AiError, shouldFallThrough } from './errors'
 import { agentSystemPrompt } from './prompts/agents'
 import { lessonFollowUpPrompt, lessonSystemPrompt, type LessonOptions } from './prompts/lesson'
 import type { AiDetails } from '@shared/community'
+import { parseLesson } from '@shared/lesson'
+import { auditLesson } from '@shared/lesson-audit'
 import { DETAILS_PROMPT, DIGEST_PROMPT, TASK_PROMPTS, type CompleteTask } from './prompts/tasks'
 import { extname } from 'node:path'
 import { extractText } from '../extract-text'
@@ -679,10 +681,54 @@ export class AiService {
           error: failure.code === 'cancelled' ? null : failure.message,
         }
       })
-      .then((done) => {
+      .then(async (done) => {
+        // Check the layout like a teacher would before showing it, and let the AI fix problems.
+        const fixed =
+          done.error || controller.signal.aborted
+            ? null
+            : await this.repairLesson(done.text, system, messages, controller.signal)
         this.running.delete(input.requestId)
-        emit({ kind: 'done', requestId: input.requestId, ...done })
+        emit({ kind: 'done', requestId: input.requestId, ...done, text: fixed ?? done.text })
       })
+  }
+
+  /**
+   * Measures a finished lesson (overlapping boxes, words too long for their box, things off the
+   * board) and, if anything is wrong, asks the AI once to send it back corrected. Returns the
+   * corrected answer only when it really has fewer problems.
+   */
+  private async repairLesson(
+    text: string,
+    system: string,
+    messages: ChatTurn[],
+    signal: AbortSignal,
+  ): Promise<string | null> {
+    const lesson = parseLesson(text)
+    if (!lesson) return null
+    const issues = auditLesson(lesson)
+    if (issues.length === 0) return null
+    try {
+      const result = await this.run({
+        task: 'explainer',
+        system,
+        messages: [
+          ...messages,
+          { role: 'assistant', content: text },
+          {
+            role: 'user',
+            content: `Atlas measured the board and found layout problems:\n${issues.map((i) => `- ${i}`).join('\n')}\n\nSend the whole lesson again in one atlas-lesson block with only these fixed. Keep the narration and everything else the same.`,
+          },
+        ],
+        signal,
+        onText: () => undefined,
+      })
+      const again = parseLesson(result.text)
+      if (!again || again.scenes.length < lesson.scenes.length * 0.6) return null
+      return auditLesson(again).length < issues.length ? result.text : null
+    } catch (error) {
+      this.deps.log.warn(`lesson repair skipped: ${String(error)}`)
+      return null
+    }
   }
 
   async test(provider: ProviderId): Promise<{ ok: boolean; message: string }> {

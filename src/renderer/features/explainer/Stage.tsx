@@ -2,6 +2,8 @@ import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'reac
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import 'katex/dist/contrib/mhchem.mjs'
+import '@fontsource/kalam/400.css'
+import '@fontsource/kalam/700.css'
 import {
   Activity,
   Apple,
@@ -75,6 +77,7 @@ import {
   type LessonItem,
   type LessonTheme,
 } from '@shared/lesson'
+import { LabelPlacer, textWidth, type Anchor, type Box } from '@shared/label-layout'
 
 export const STAGE_W = 1600
 export const STAGE_H = 900
@@ -101,13 +104,16 @@ const BRIGHT: Record<LessonColor, string> = {
   grey: '#8b8f98',
 }
 
+/** Everything on the board is handwritten, like a teacher writing live. */
+const HAND = '"Kalam", "Caveat", "Comic Sans MS", cursive'
+
 const THEMES: Record<LessonTheme, Theme> = {
   board: {
     bg: '#15171c',
     ink: '#ececec',
     soft: '#9aa0aa',
     grid: 'rgba(255,255,255,0.07)',
-    font: '"Newsreader Variable", "Iowan Old Style", Georgia, serif',
+    font: HAND,
     colors: BRIGHT,
   },
   night: {
@@ -115,7 +121,7 @@ const THEMES: Record<LessonTheme, Theme> = {
     ink: '#f1f4f8',
     soft: '#a9bbd3',
     grid: 'rgba(255,255,255,0.08)',
-    font: '"Newsreader Variable", "Iowan Old Style", Georgia, serif',
+    font: HAND,
     colors: BRIGHT,
   },
   paper: {
@@ -123,7 +129,7 @@ const THEMES: Record<LessonTheme, Theme> = {
     ink: '#1d1d1f',
     soft: '#6b6b70',
     grid: 'rgba(0,0,0,0.06)',
-    font: 'var(--font-sans)',
+    font: HAND,
     colors: {
       ink: '#1d1d1f',
       blue: '#2a7ab8',
@@ -374,6 +380,7 @@ function Tex({ tex, color, size }: { tex: string; color: string; size: number })
   }, [tex])
   return (
     <span
+      className="lesson-hand"
       style={{ color, fontSize: size }}
       // KaTeX output from text the AI wrote; KaTeX escapes it and `trust` is off.
       dangerouslySetInnerHTML={{ __html: html }}
@@ -382,6 +389,54 @@ function Tex({ tex, color, size }: { tex: string; color: string; size: number })
 }
 
 const ease = (p: number): number => 1 - (1 - p) ** 3
+
+/** A marker pen, tip at (0, 0), shown wherever writing is happening right now. */
+function PenTip({ x, y, color }: { x: number; y: number; color: string }) {
+  return (
+    <g transform={`translate(${x} ${y}) rotate(-35)`} style={{ pointerEvents: 'none' }}>
+      <circle r={9} fill={color} opacity={0.35} />
+      <path d="M0,0 L7,-14 L-7,-14 Z" fill={color} />
+      <rect
+        x={-8}
+        y={-62}
+        width={16}
+        height={48}
+        rx={4}
+        fill="#f4f4f2"
+        stroke="#2b2b2b"
+        strokeWidth={2}
+      />
+      <rect x={-8} y={-62} width={16} height={12} rx={4} fill={color} />
+    </g>
+  )
+}
+
+/** The point on a box's edge closest to (x, y), for a leader line to a label that moved. */
+function nearestEdge(box: Box, x: number, y: number): [number, number] {
+  return [Math.max(box.x, Math.min(box.x + box.w, x)), Math.max(box.y, Math.min(box.y + box.h, y))]
+}
+
+/** How wide a line of LaTeX roughly is once drawn, at `size` px. */
+function texWidth(tex: string, size: number): number {
+  const bare = tex
+    .replace(/\\(frac|dfrac)\{([^{}]*)\}\{([^{}]*)\}/g, (_, _f, a: string, b: string) =>
+      a.length > b.length ? a : b,
+    )
+    .replace(/\\(left|right|displaystyle|,|;|quad|qquad|text|mathrm|ce)/g, '')
+    .replace(/\\[a-zA-Z]+/g, 'x')
+    .replace(/[{}^_]/g, '')
+  return Math.max(size, bare.length * size * 0.55)
+}
+
+/** Height a working-column line takes, so the column can scroll before it runs off the board. */
+function lineHeight(item: LessonItem, width: number): number {
+  if (item.t === 'math') {
+    const tall = /\\(frac|dfrac|int|sum|lim|sqrt|begin|binom|prod)/.test(item.tex)
+    return (tall ? 2.3 : 1.5) * 42
+  }
+  if (item.t === 'text') return Math.max(1, Math.ceil(textWidth(item.text, 32) / width)) * 32 * 1.35
+  return 0
+}
 
 /**
  * The lesson board: a 1600 × 900 stage scaled to fit its box. Draws `scene` as it looks `t`
@@ -421,6 +476,17 @@ export function Stage({
   const m = mapper(frame, board.graph)
   const col = (c: LessonColor): string => theme.colors[c]
 
+  // Words never land on each other: keep the working column, title and subtitles clear, and go
+  // around every line and curve on the board.
+  const leftX = board.split ? 80 : 200
+  const leftW = board.split ? 700 : STAGE_W - 400
+  const bottomRoom = caption ? 130 : 50
+  const placer = new LabelPlacer({ x: 24, y: 24, w: STAGE_W - 48, h: STAGE_H - 48 - bottomRoom })
+  if (board.title) placer.reserve({ x: 200, y: 20, w: STAGE_W - 400, h: top - 40 })
+  if (board.left.length && board.split)
+    placer.reserve({ x: leftX - 20, y: top, w: leftW + 30, h: STAGE_H - top })
+  if (caption) placer.reserve({ x: 0, y: STAGE_H - bottomRoom, w: STAGE_W, h: bottomRoom })
+
   const curves = new Map<string, (x: number) => number>()
   for (const { item } of board.diagram) {
     if (item.t === 'curve' && item.id) {
@@ -429,8 +495,66 @@ export function Stage({
     }
   }
 
+  for (const { item } of board.diagram) {
+    if (item.t === 'curve') {
+      const f = compileFormula(item.fn)
+      if (!f) continue
+      const a = Math.max(item.from ?? m.xmin, m.xmin)
+      const b = Math.min(item.to ?? m.xmax, m.xmax)
+      const pts: [number, number][] = []
+      for (let i = 0; i <= 90; i++) {
+        const x = a + ((b - a) * i) / 90
+        const y = f(x)
+        if (Number.isFinite(y) && y <= m.ymax && y >= m.ymin) pts.push([m.px(x), m.py(y)])
+      }
+      placer.avoidPoints(pts)
+    } else if (item.t === 'line' || item.t === 'arrow') {
+      const pts: [number, number][] = []
+      for (let i = 0; i <= 16; i++) {
+        const k = i / 16
+        pts.push([
+          m.px(item.from[0] + (item.to[0] - item.from[0]) * k),
+          m.py(item.from[1] + (item.to[1] - item.from[1]) * k),
+        ])
+      }
+      placer.avoidPoints(pts)
+    } else if (item.t === 'box') {
+      const w = item.w * m.unit
+      const h = item.h * m.unit
+      placer.occupy({ x: m.px(item.at[0]) - w / 2, y: m.py(item.at[1]) - h / 2, w, h })
+    } else if (item.t === 'icon' || item.t === 'atom') {
+      const size = item.size * m.unit
+      placer.occupy({
+        x: m.px(item.at[0]) - size / 2,
+        y: m.py(item.at[1]) - size / 2,
+        w: size,
+        h: size + (item.t === 'icon' && item.label ? 44 : 0),
+      })
+    } else if (item.t === 'circle') {
+      const r = item.r * m.unit
+      const cx = m.px(item.at[0])
+      const cy = m.py(item.at[1])
+      const pts: [number, number][] = []
+      for (let i = 0; i < 36; i++)
+        pts.push([
+          cx + r * Math.cos((i / 36) * Math.PI * 2),
+          cy + r * Math.sin((i / 36) * Math.PI * 2),
+        ])
+      placer.avoidPoints(pts)
+    }
+  }
+  if (board.graph) {
+    const g = board.graph
+    const ax = Math.min(Math.max(0, g.y[0]), g.y[1])
+    const ay = Math.min(Math.max(0, g.x[0]), g.x[1])
+    // Axes and their numbers.
+    placer.occupy({ x: m.px(g.x[0]), y: m.py(ax) - 4, w: m.px(g.x[1]) - m.px(g.x[0]), h: 40 })
+    placer.occupy({ x: m.px(ay) - 50, y: m.py(g.y[1]), w: 54, h: m.py(g.y[0]) - m.py(g.y[1]) })
+  }
+
   const svg: ReactNode[] = []
   const html: ReactNode[] = []
+  let pen: { x: number; y: number; color: string } | null = null
 
   if (board.graph) {
     const g = board.graph
@@ -553,27 +677,44 @@ export function Stage({
     text: string,
     color: string,
     p: number,
-    anchor: 'start' | 'middle' | 'end' = 'start',
+    anchor: Anchor = 'start',
     size = 26,
-  ): ReactNode =>
-    text ? (
-      <text
-        key={key}
-        x={x}
-        y={y}
-        fill={color}
-        fontSize={size}
-        textAnchor={anchor}
-        fontFamily={theme.font}
-        opacity={ease(p)}
-        paintOrder="stroke"
-        stroke={theme.bg}
-        strokeWidth={6}
-        strokeLinejoin="round"
-      >
-        {text}
-      </text>
-    ) : null
+  ): ReactNode => {
+    if (!text) return null
+    const spot = placer.place(x, y, text, size, anchor)
+    const moved = Math.hypot(spot.x - x, spot.y - y) > size * 1.6
+    const near = nearestEdge(spot.box, x, y - size * 0.35)
+    return (
+      <g key={key} opacity={ease(p)}>
+        {moved ? (
+          <line
+            x1={x}
+            y1={y - size * 0.35}
+            x2={near[0]}
+            y2={near[1]}
+            stroke={color}
+            strokeWidth={1.5}
+            strokeDasharray="4 5"
+            opacity={0.6}
+          />
+        ) : null}
+        <text
+          x={spot.x}
+          y={spot.y}
+          fill={color}
+          fontSize={size}
+          textAnchor={anchor}
+          fontFamily={theme.font}
+          paintOrder="stroke"
+          stroke={theme.bg}
+          strokeWidth={6}
+          strokeLinejoin="round"
+        >
+          {text}
+        </text>
+      </g>
+    )
+  }
 
   // Areas go underneath everything else.
   const order = [...board.diagram].sort(
@@ -589,6 +730,14 @@ export function Stage({
         const d = curvePath(f, m, item.from ?? m.xmin, item.to ?? m.xmax)
         const lx = Math.min(item.to ?? m.xmax, m.xmax) - (m.xmax - m.xmin) * 0.04
         const ly = f(lx)
+        if (p > 0 && p < 1) {
+          const a = Math.max(item.from ?? m.xmin, m.xmin)
+          const b = Math.min(item.to ?? m.xmax, m.xmax)
+          const px = a + (b - a) * ease(p)
+          const py = f(px)
+          if (Number.isFinite(py) && py <= m.ymax && py >= m.ymin)
+            pen = { x: m.px(px), y: m.py(py), color: col(item.c) }
+        }
         svg.push(
           <g key={key} {...glow}>
             <path
@@ -737,6 +886,17 @@ export function Stage({
         const mx = (x1 + x2) / 2 - (y2 - y1) * bend * 0.3
         const my = (y1 + y2) / 2 + (x2 - x1) * bend * 0.3
         const d = bend ? `M${x1},${y1} Q${mx},${my} ${x2},${y2}` : `M${x1},${y1} L${x2},${y2}`
+        if (p > 0 && p < 1) {
+          const k = ease(p)
+          const u = 1 - k
+          pen = bend
+            ? {
+                x: u * u * x1 + 2 * u * k * mx + k * k * x2,
+                y: u * u * y1 + 2 * u * k * my + k * k * y2,
+                color: col(item.c),
+              }
+            : { x: x1 + (x2 - x1) * k, y: y1 + (y2 - y1) * k, color: col(item.c) }
+        }
         svg.push(
           <g key={key} {...glow}>
             <path
@@ -1023,6 +1183,16 @@ export function Stage({
     }
   }
 
+  // The working column scrolls up like a notebook once it is full; the newest line slides in.
+  const columnRoom = STAGE_H - top - bottomRoom - 40
+  let used = 0
+  board.left.forEach(({ item, p }, i) => {
+    const h = lineHeight(item, leftW) + 20
+    used += i === board.left.length - 1 ? h * Math.min(1, p * 4) : h
+  })
+  const scroll = Math.max(0, used - columnRoom)
+  const writing = board.left.some(({ p }) => p > 0 && p < 1)
+
   return (
     <div
       ref={box}
@@ -1077,6 +1247,7 @@ export function Stage({
             </filter>
           </defs>
           <g clipPath={board.graph ? 'url(#lesson-frame)' : undefined}>{svg}</g>
+          {pen && !writing ? <PenTip x={pen.x} y={pen.y} color={pen.color} /> : null}
         </svg>
         {board.title ? (
           <h2
@@ -1091,42 +1262,84 @@ export function Stage({
             }}
           >
             {board.title}
+            <span
+              aria-hidden
+              className="mx-auto mt-1 block h-[3px] rounded-full"
+              style={{
+                width: Math.min(900, textWidth(board.title, 52)),
+                background: theme.colors.yellow,
+                opacity: 0.8,
+              }}
+            />
           </h2>
         ) : null}
         {board.left.length ? (
           <div
-            className="absolute flex flex-col gap-5"
+            className="absolute overflow-hidden"
             style={{
-              left: board.split ? 80 : 200,
-              top: top + 20,
-              width: board.split ? 700 : STAGE_W - 400,
+              left: leftX - 30,
+              top: top,
+              width: leftW + 60,
+              height: STAGE_H - top - bottomRoom,
+              maskImage:
+                scroll > 0 ? 'linear-gradient(to bottom, transparent 0, #000 70px)' : undefined,
             }}
           >
-            {board.left.map(({ item, p, focus, key }) => (
-              <div
-                key={key}
-                style={{
-                  clipPath: `inset(-20% ${(1 - ease(p)) * 100}% -20% 0)`,
-                  opacity: Math.min(1, p * 3),
-                  filter: focus ? `drop-shadow(0 0 10px ${theme.colors.yellow})` : undefined,
-                }}
-              >
-                {item.t === 'math' ? (
-                  <Tex tex={item.tex} color={col(item.c)} size={42} />
-                ) : item.t === 'text' ? (
-                  <p
-                    style={{
-                      color: col(item.c),
-                      fontSize: 32,
-                      fontFamily: theme.font,
-                      lineHeight: 1.3,
-                    }}
+            <div
+              className="flex flex-col gap-5"
+              style={{ padding: '20px 30px', transform: `translateY(${-scroll}px)` }}
+            >
+              {board.left.map(({ item, p, focus, key }) => {
+                const w =
+                  item.t === 'math'
+                    ? Math.min(leftW, texWidth(item.tex, 42))
+                    : item.t === 'text'
+                      ? Math.min(leftW, textWidth(item.text, 32))
+                      : 0
+                const live = p > 0 && p < 1
+                return (
+                  <div
+                    key={key}
+                    className="relative"
+                    style={{ minHeight: lineHeight(item, leftW) * 0.8 }}
                   >
-                    {item.text}
-                  </p>
-                ) : null}
-              </div>
-            ))}
+                    <div
+                      style={{
+                        width: 'fit-content',
+                        maxWidth: leftW,
+                        clipPath: `inset(-30% ${(1 - ease(p)) * 100}% -30% -2%)`,
+                        filter: focus ? `drop-shadow(0 0 10px ${theme.colors.yellow})` : undefined,
+                      }}
+                    >
+                      {item.t === 'math' ? (
+                        <Tex tex={item.tex} color={col(item.c)} size={42} />
+                      ) : item.t === 'text' ? (
+                        <p
+                          style={{
+                            color: col(item.c),
+                            fontSize: 32,
+                            fontFamily: theme.font,
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {item.text}
+                        </p>
+                      ) : null}
+                    </div>
+                    {live && (item.t === 'math' || item.t === 'text') ? (
+                      <svg
+                        className="pointer-events-none absolute overflow-visible"
+                        style={{ left: w * ease(p), top: item.t === 'math' ? 46 : 36 }}
+                        width={1}
+                        height={1}
+                      >
+                        <PenTip x={0} y={0} color={col(item.c)} />
+                      </svg>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         ) : null}
         <div className="absolute inset-0">{html}</div>
@@ -1135,11 +1348,11 @@ export function Stage({
             <p
               className="rounded-xl px-5 py-2.5 text-center"
               style={{
-                background: 'rgba(0,0,0,0.62)',
+                background: 'rgba(0,0,0,0.55)',
                 color: '#fff',
-                fontSize: 28,
-                lineHeight: 1.35,
-                maxWidth: 1250,
+                fontSize: 27,
+                lineHeight: 1.3,
+                maxWidth: 1100,
               }}
             >
               {caption}

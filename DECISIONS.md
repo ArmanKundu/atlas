@@ -175,6 +175,13 @@ The owner wants AI that works on weak laptops with no account or limits, and a w
 ### D-027 One open library, details filled in by the uploader's AI
 
 - **Context:** the owner wants a single library everyone can see, with no private spaces, invites or codes, and less typing when sharing.
-- **Decision:** the Shared page shows only the group library (`spaces.is_group`, which every profile joins on creation); the spaces sidebar, create/join, invites and people dialogs are gone from the app. The account cap was raised from 5 to 100.
+- **Decision:** the Shared page shows only the group library (`spaces.is_group`, which every profile joins on creation); the spaces sidebar, create/join, invites and people dialogs are gone from the app. The account cap stays at 5 (`app_settings.max_accounts`); the access table records each account's email.
 - **AI fill:** a share can go up with nothing but the file. It is stored at once with a fallback title and an `ai-pending` tag; the uploader's own AI then reads it (the existing digest pass plus a `## Details` JSON line) and fills only the fields the student left blank, then drops the tag. If the AI cannot read it, the tag is dropped anyway; cards stop showing "pending" after 30 minutes regardless.
 - **Voice:** the spoken "Talk it through" mode was removed at the owner's request; on-device dictation (Whisper) stays as a mic button in the Explainer.
+
+### D-028 The Explainer plays as one handwritten video, checked for overlaps
+
+- **Context:** the owner found lessons felt like a slideshow, and words and boxes sometimes landed on top of each other.
+- **Decision:** the board is written live in a handwriting font (Kalam, KaTeX restyled to match) with a pen tip following the stroke; the working column scrolls like a notebook instead of jumping. The player has one scrubber and short subtitles, and the side rail is a plain transcript.
+- **Overlaps:** labels are placed by `LabelPlacer` (`src/shared/label-layout.ts`), which tries nearby spots and avoids other labels, curves, the working column and the subtitles, drawing a leader line when it moves one. After each lesson is written, `auditLesson` measures boxes, icons, atoms and labels; if anything overlaps, doesn't fit or is off the board, the AI gets one pass to fix just those, and the fix is kept only if it has fewer problems.
+- **Sharing:** finished lessons still auto-share to the library; a Share button beside Download does it by hand.
