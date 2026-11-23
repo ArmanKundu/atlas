@@ -11,7 +11,7 @@ export const SHARED_FILE_LIMIT = 50 * 1024 * 1024
 /** The free plan's total file storage. */
 export const SHARED_STORAGE_QUOTA = 1024 * 1024 * 1024
 
-export const SHARED_KINDS = ['note', 'file', 'deck', 'link'] as const
+export const SHARED_KINDS = ['note', 'file', 'deck', 'link', 'lesson'] as const
 export type SharedKind = (typeof SHARED_KINDS)[number]
 
 /** What a shared resource is, for filtering and icons. */
@@ -29,6 +29,7 @@ export const MATERIALS = [
   'worksheet',
   'timetable',
   'flashcards',
+  'lesson',
   'other',
 ] as const
 export type Material = (typeof MATERIALS)[number]
@@ -46,6 +47,7 @@ export const MATERIAL_LABELS: Record<Material, string> = {
   worksheet: 'Worksheet',
   timetable: 'Timetable',
   flashcards: 'Flashcards',
+  lesson: 'Lesson',
   other: 'Other',
 }
 
@@ -376,6 +378,8 @@ export const PublishSchema = z.discriminatedUnion('kind', [
     ...meta,
   }),
   z.object({ kind: z.literal('link'), url: z.url().startsWith('https://'), ...meta }),
+  /** An Explainer lesson: the scenes travel as JSON and play in everyone's Atlas. */
+  z.object({ kind: z.literal('lesson'), lessonId: z.string().max(64), ...meta }),
 ])
 export type PublishInput = z.input<typeof PublishSchema>
 
@@ -405,7 +409,7 @@ export const DeckCardSchema = z.object({ front: z.string(), back: z.string() })
 
 /** Where a remix landed in this profile. */
 export const RemixResultSchema = z.object({
-  kind: z.enum(['note', 'source', 'flashcards', 'link']),
+  kind: z.enum(['note', 'source', 'flashcards', 'link', 'lesson']),
   id: z.string().nullable(),
   count: z.number(),
 })

@@ -5,6 +5,7 @@ export const KIND_LABEL: Record<SharedKind, string> = {
   file: 'File',
   deck: 'Flashcards',
   link: 'Link',
+  lesson: 'Lesson',
 }
 
 /** "just now", "5 min ago", "3 days ago", or a date for anything older than a month. */

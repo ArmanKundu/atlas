@@ -3,6 +3,7 @@ import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import {
   buildDdl,
   columnDdl,
+  LESSONS_V4,
   PAPERS_V3,
   QUESTION_COLS_V3,
   SCHEMA_V1,
@@ -63,6 +64,11 @@ CREATE TABLE ai_usage (day TEXT NOT NULL, provider TEXT NOT NULL, calls INTEGER 
 ${Object.entries(QUESTION_COLS_V3)
   .map(([name, type]) => `ALTER TABLE questions ADD COLUMN ${columnDdl(name, type)};`)
   .join('\n')}`,
+  },
+  {
+    version: 4,
+    name: 'explainer lessons',
+    sql: buildDdl({ lessons: LESSONS_V4 }),
   },
 ]
 

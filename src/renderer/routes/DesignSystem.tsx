@@ -26,6 +26,8 @@ import { PillBar, PillButton, PillDivider } from '@/design/Pill'
 import { Segmented } from '@/design/Segmented'
 import { EmptyState, ErrorState, SkeletonList } from '@/design/States'
 import { useToast } from '@/design/Toast'
+import { Player } from '@/features/explainer/Player'
+import { SAMPLE_LESSONS } from '@/features/explainer/samples'
 import { ShareDialog } from '@/features/shared/ShareDialog'
 import { BoardCard } from '@/features/whiteboard/BoardCard'
 import { PYTHAGORAS_BOARD, SAMPLE_BOARD } from '@/features/whiteboard/sample'
@@ -285,6 +287,17 @@ export function DesignSystem() {
 
       <Section title="Whiteboard">
         <BoardSample />
+      </Section>
+
+      <Section
+        title="Explainer"
+        description="Lessons drawn in time with the voice. Atlas computes the graphs."
+      >
+        <div className="grid max-w-5xl grid-cols-2 gap-4">
+          {SAMPLE_LESSONS.map((lesson) => (
+            <Player key={lesson.title} lesson={lesson} autoPlay={false} />
+          ))}
+        </div>
       </Section>
 
       <Section title="Share form" description="Sharing into the group library (sample space).">

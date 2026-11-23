@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  Clapperboard,
   FileText,
   GraduationCap,
   House,
@@ -42,6 +43,12 @@ export const NAV_PRIMARY: NavItem[] = [
     label: 'Assistant',
     icon: MessageCircle,
     keywords: ['chat', 'ai', 'ask', 'tutor', 'bot', 'helper'],
+  },
+  {
+    to: '/explain',
+    label: 'Explainer',
+    icon: Clapperboard,
+    keywords: ['whiteboard', 'video', 'lesson', 'visual', 'explain', 'animation', 'khan', 'tutor'],
   },
   {
     to: '/library',

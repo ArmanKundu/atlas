@@ -9,6 +9,8 @@ import { ErrorState, SkeletonList } from '@/design/States'
 import { useToast } from '@/design/Toast'
 import { changed, useAction, useLive } from '@/lib/api'
 import { call } from '@/lib/ipc'
+import { parseLesson } from '@shared/lesson'
+import { Player } from '@/features/explainer/Player'
 import { KindIcon } from './KindIcon'
 import { KIND_LABEL, timeAgo } from './kinds'
 import { EditItemDialog } from './EditItemDialog'
@@ -20,6 +22,7 @@ const REMIX_LABEL = {
   file: 'Save to my library',
   deck: 'Add to my flashcards',
   link: 'Open link',
+  lesson: 'Save to my lessons',
 } as const
 
 /** The right-hand panel: the full item, with reactions, Remix and (if allowed) Edit and Remove. */
@@ -51,8 +54,15 @@ export function SharedPreview({
       return
     }
     const result = await call('shared:remix', { id: it.id })
-    changed('shared', 'notes', 'flashcards', 'sources')
-    if (result.kind === 'note' && result.id) {
+    changed('shared', 'notes', 'flashcards', 'sources', 'lessons')
+    if (result.kind === 'lesson' && result.id) {
+      const lessonId = result.id
+      toast({
+        title: 'Saved to your lessons',
+        tone: 'success',
+        action: { label: 'Open', onSelect: () => void navigate(`/explain?lesson=${lessonId}`) },
+      })
+    } else if (result.kind === 'note' && result.id) {
       toast({
         title: 'Copied to your notes',
         description: 'It is yours now: edit it however you like.',
@@ -154,6 +164,8 @@ export function SharedPreview({
                 </div>
               ) : it.kind === 'deck' ? (
                 <DeckPreview body={it.body} />
+              ) : it.kind === 'lesson' ? (
+                <LessonPreview body={it.body} />
               ) : it.kind === 'file' ? (
                 <div className="rounded-lg bg-sunken px-4 py-3">
                   <p className="font-medium text-ink">{it.fileName}</p>
@@ -261,6 +273,24 @@ function DeckPreview({ body }: { body: string }) {
         </div>
       ))}
       {cards.length > 30 ? <p className="text-ink-3">and {cards.length - 30} more</p> : null}
+    </div>
+  )
+}
+
+function LessonPreview({ body }: { body: string }) {
+  const lesson = parseLesson(body)
+  if (!lesson) return <p className="text-ink-3">This lesson could not be read.</p>
+  return (
+    <div>
+      <Player lesson={lesson} autoPlay={false} />
+      <ol className="mt-3 flex flex-col gap-2 text-ink-2">
+        {lesson.scenes.map((s, i) => (
+          <li key={i}>
+            <span className="text-2xs text-ink-3">{i + 1}. </span>
+            {s.say}
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }

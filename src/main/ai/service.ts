@@ -14,6 +14,7 @@ import type { Logger } from '../log'
 import type { ProfileManager } from '../profiles'
 import { AiError, shouldFallThrough } from './errors'
 import { agentSystemPrompt } from './prompts/agents'
+import { lessonFollowUpPrompt, lessonSystemPrompt, type LessonOptions } from './prompts/lesson'
 import { DIGEST_PROMPT, TASK_PROMPTS, type CompleteTask } from './prompts/tasks'
 import { extname } from 'node:path'
 import { extractText } from '../extract-text'
@@ -95,6 +96,17 @@ export interface AiServiceDeps {
   log: Logger
   emitDelta: (payload: { chatId: string; messageId: string; text: string }) => void
   emitFinished: (payload: { chatId: string; message: ChatMessage }) => void
+  emitLesson?: (
+    event:
+      | { kind: 'delta'; requestId: string; text: string }
+      | {
+          kind: 'done'
+          requestId: string
+          text: string
+          provider: string | null
+          error: string | null
+        },
+  ) => void
 }
 
 /**
@@ -525,6 +537,142 @@ export class AiService {
       this.deps.log.warn(`digest failed: ${error instanceof AiError ? error.code : String(error)}`)
       return null
     }
+  }
+
+  /* ---------- Explainer ---------- */
+
+  /** What the student attached, as text for the prompt plus files a vision model should see. */
+  private async attachments(paths: string[]): Promise<{ text: string[]; files: string[] }> {
+    const text: string[] = []
+    const files: string[] = []
+    for (const path of paths) {
+      const name = path.split(/[\\/]/).pop() ?? 'file'
+      if (isImageFile(path)) {
+        files.push(path)
+        continue
+      }
+      try {
+        const out = await extractText(path)
+        const scanned = extname(path).toLowerCase() === '.pdf' && out.text.length < out.pages * 80
+        if (scanned) files.push(path)
+        else if (out.text.trim())
+          text.push(`Attached file "${name}":\n${out.text.slice(0, 40_000)}`)
+      } catch (error) {
+        this.deps.log.warn(`explainer: could not read an attachment: ${String(error)}`)
+      }
+    }
+    return { text, files }
+  }
+
+  /** Questions from the student's bank, with their marks and any worked solution. */
+  private questionText(ids: string[]): string[] {
+    const db = this.db()
+    return ids.flatMap((qid) => {
+      const q = db.get('questions', qid)
+      if (!q) return []
+      const answer = db.list('answers', { questionId: qid }, { limit: 1 })[0]
+      const where = [q['year'], q['paper'], q['number'] ? `Question ${String(q['number'])}` : null]
+        .filter(Boolean)
+        .join(', ')
+      return [
+        [
+          `Question${where ? ` (${where})` : ''}${q['marks'] ? `, ${String(q['marks'])} marks` : ''}:`,
+          String(q['stemMd'] ?? ''),
+          answer?.['contentMd'] ? `Worked solution on file:\n${String(answer['contentMd'])}` : '',
+          q['sampleMd'] ? `Examiner's sample answer:\n${String(q['sampleMd'])}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      ]
+    })
+  }
+
+  /**
+   * Writes a visual lesson with the user's AI, streaming it through `explainer:delta` so the
+   * player can start on the first scene, then `explainer:done`.
+   */
+  async explain(input: {
+    requestId: string
+    prompt: string
+    subjectId: string | null
+    options: LessonOptions
+    files: string[]
+    questionIds: string[]
+    followUp: { lesson: string; scene: number } | null
+  }): Promise<void> {
+    const emit = this.deps.emitLesson
+    if (!emit) return
+    if (this.running.has(input.requestId))
+      throw new AtlasError('conflict', 'That lesson is already being written.')
+    const { text: attached, files } = await this.attachments(input.files)
+    const questions = this.questionText(input.questionIds)
+    const sources = input.prompt.trim() ? this.retrieve(input.prompt, input.subjectId) : []
+    const system = [
+      input.followUp ? lessonFollowUpPrompt(input.options) : lessonSystemPrompt(input.options),
+      this.studentContext(input.subjectId),
+      sources.length
+        ? `Pages from the student's own library that may help (their teacher's notation and methods; follow them):\n\n${sources.map((s) => `${s.title}, page ${s.page}\n${s.snippet}`).join('\n\n')}`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n')
+    const ask = [
+      input.prompt.trim() ||
+        (files.length || questions.length || attached.length
+          ? 'Explain how to do this, step by step.'
+          : ''),
+      ...questions,
+      ...attached,
+      files.length
+        ? `${files.length} image(s) of the question are attached. Read them carefully.`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n')
+    if (!ask) throw new AtlasError('bad_request', 'Ask a question or attach one first.')
+    const messages: ChatTurn[] = input.followUp
+      ? [
+          { role: 'user', content: 'Make me a lesson.' },
+          { role: 'assistant', content: `\`\`\`atlas-lesson\n${input.followUp.lesson}\n\`\`\`` },
+          {
+            role: 'user',
+            content: `I paused on scene ${input.followUp.scene + 1}. ${ask}`,
+          },
+        ]
+      : [{ role: 'user', content: ask }]
+
+    const controller = new AbortController()
+    this.running.set(input.requestId, controller)
+    let text = ''
+    void this.run({
+      task: 'explainer',
+      system,
+      messages,
+      signal: controller.signal,
+      files: files.length ? files : undefined,
+      prefer: files.length ? (id) => files.every((f) => canSeeFiles(id, f)) : undefined,
+      onText: (chunk) => {
+        text += chunk
+        emit({ kind: 'delta', requestId: input.requestId, text: chunk })
+      },
+    })
+      .then((result) => ({
+        text: result.text || text,
+        provider: providerDef(result.provider).name,
+        error: null,
+      }))
+      .catch((error: unknown) => {
+        const failure = error instanceof AiError ? error : new AiError('unknown')
+        return {
+          text,
+          provider: null,
+          error: failure.code === 'cancelled' ? null : failure.message,
+        }
+      })
+      .then((done) => {
+        this.running.delete(input.requestId)
+        emit({ kind: 'done', requestId: input.requestId, ...done })
+      })
   }
 
   async test(provider: ProviderId): Promise<{ ok: boolean; message: string }> {

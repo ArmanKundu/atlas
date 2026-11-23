@@ -103,3 +103,29 @@ Shared rules:
 - **Dark theme:** the same system inverted: near-black canvas, dark grey surfaces, ink becomes off-white.
 
 The decision is recorded in `DECISIONS.md` (D-001).
+
+## VideoTutor (videotutor.io), studied 2026-11-23
+
+Their site was down when tried (its settings API returned 500 and the credit service 503), so this
+comes from their home screen and their two YouTube videos (frames and transcripts).
+
+- **Home:** one big prompt card on a soft lilac-to-blue wash: "Welcome back! Let's keep going.",
+  a rotating example question as placeholder, a tutor persona chip (Funny Pi: jokes; Professional Pi:
+  patient), an **Exam Mode** switch (fast strategies and common traps), a mic for voice input, and
+  a dashed **Upload your question** drop zone (JPG, PNG, PDF up to 20 MB). Below: daily challenge,
+  streak, fun facts, recent learning. A second tab, "Learning studio", lists past lessons.
+- **Lesson look:** a 16:9 board, one idea per scene. Maths scenes put the title on top, the working
+  on the **left** (a line of plain text, then a coloured LaTeX line), and the **diagram on the right**
+  (circle split into coloured quarters with labels, a triangle filled in yellow, the sliver shaded).
+  Colours carry meaning: the same colour for a quantity in the working and in the diagram.
+- **Rendering:** Manim-style (Computer Modern serif labels, smooth axes, graphs drawn on, dark or
+  flat backgrounds) for maths and physics; flat illustrations (sun, Earth, a chloroplast, a lipid
+  bilayer with labelled photosystems, arrows) for science. Level-aware: the same question drawn
+  for Year 3 (cartoon tree, sun, water drop) or Year 12 (cell with labelled organelles).
+- **Player:** previous scene / pause / next scene, voice-over per scene, captions. Follow-up
+  questions make new videos. Several languages.
+- **What Atlas does better:** the lesson is live, not a rendered video, so it starts playing as soon
+  as the first scene is written and you can stop at any scene and ask "why?"; graphs, areas and
+  intersections are computed by Atlas, not guessed by the AI; questions can come from your own
+  exams, scans and library; lessons are shared with the group and voted on; it runs on your own AI
+  with a free offline voice; and it exports an MP4.

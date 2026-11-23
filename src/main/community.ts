@@ -941,6 +941,10 @@ export class CommunityLibrary {
       row['body'] = JSON.stringify(cards)
     } else if (input.kind === 'link') {
       row['link_url'] = input.url
+    } else if (input.kind === 'lesson') {
+      const lesson = this.deps.db().get('lessons', input.lessonId)
+      if (!lesson) throw new AtlasError('not_found', 'That lesson is no longer here.')
+      row['body'] = JSON.stringify(lesson['lesson'])
     } else if (input.path) {
       localFile = input.path
       Object.assign(row, await this.upload(input.spaceId, me, await this.readLocal(input.path)))
@@ -966,7 +970,8 @@ export class CommunityLibrary {
     const { data, error } = await sb.from('items').insert(row).select('id').single()
     if (error) throw friendly(error, 'Could not share that.')
     const id = String((data as Row)['id'])
-    if (input.aiSummary && input.kind !== 'deck' && input.kind !== 'link') {
+    if (input.kind === 'lesson') this.deps.db().update('lessons', input.lessonId, { sharedId: id })
+    if (input.aiSummary && !['deck', 'link', 'lesson'].includes(input.kind)) {
       const body = typeof row['body'] === 'string' ? row['body'] : null
       this.deps.onPublished?.({ id, input, localPath: localFile, body })
     }
@@ -1104,6 +1109,25 @@ export class CommunityLibrary {
       return { kind: 'flashcards', id: null, count: cards.length }
     }
     if (item.kind === 'link') return { kind: 'link', id: null, count: 0 }
+    if (item.kind === 'lesson') {
+      let lesson: unknown
+      try {
+        lesson = JSON.parse(item.body)
+      } catch {
+        throw new AtlasError('bad_response', 'That lesson could not be read.')
+      }
+      const row = db.insert('lessons', {
+        subjectId,
+        title: item.title,
+        prompt: item.description,
+        lesson,
+        units: item.units,
+        tags: item.tags,
+        attachments: [],
+        sharedId: id,
+      })
+      return { kind: 'lesson', id: String(row['id']), count: 1 }
+    }
 
     const { data: full } = await sb.from('items').select('file_path').eq('id', id).single()
     const path = String((full as Row)['file_path'])

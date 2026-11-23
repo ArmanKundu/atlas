@@ -1,13 +1,20 @@
-import { FileText, Layers, Link2, NotebookPen } from 'lucide-react'
+import { Clapperboard, FileText, Layers, Link2, NotebookPen } from 'lucide-react'
 import type { SharedKind } from '@shared/community'
 import { cn } from '@/lib/cn'
 
-const ICONS = { note: NotebookPen, file: FileText, deck: Layers, link: Link2 } as const
+const ICONS = {
+  note: NotebookPen,
+  file: FileText,
+  deck: Layers,
+  link: Link2,
+  lesson: Clapperboard,
+} as const
 const TONES: Record<SharedKind, string> = {
   note: 'bg-blue-soft text-blue',
   file: 'bg-danger-soft text-danger',
   deck: 'bg-success-soft text-success',
   link: 'bg-warn-soft text-warn',
+  lesson: 'bg-accent text-accent-fg',
 }
 
 export function KindIcon({ kind, className }: { kind: SharedKind; className?: string }) {

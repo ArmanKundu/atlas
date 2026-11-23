@@ -574,6 +574,7 @@ function Browser({
                 { value: 'file', label: 'Files' },
                 { value: 'deck', label: 'Flashcards' },
                 { value: 'link', label: 'Links' },
+                { value: 'lesson', label: 'Lessons' },
               ]}
             />
             <Segmented
@@ -799,6 +800,7 @@ function detail(item: SharedCard): string {
   if (item.kind === 'file') return item.fileSize ? formatBytes(item.fileSize) : 'File'
   if (item.kind === 'link') return item.linkUrl ? new URL(item.linkUrl).hostname : 'Link'
   if (item.kind === 'note') return `${Math.max(1, Math.round(item.bodyLength / 1500))} min read`
+  if (item.kind === 'lesson') return 'Explainer lesson'
   return KIND_LABEL[item.kind]
 }
 

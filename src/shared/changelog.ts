@@ -19,6 +19,40 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '0.5.0',
+    date: '2026-11-23',
+    headline: 'The Explainer: a video lesson for any question',
+    summary:
+      'Ask anything, paste a screenshot or pick an exam question, and your AI makes a narrated, animated lesson that starts playing in seconds. Save it as an MP4, and it is shared with the group.',
+    items: [
+      {
+        icon: 'clapperboard',
+        title: 'Explainer',
+        body: 'A new page in the sidebar. Type a question, paste or drop a photo of one, or attach a file from your library. Atlas draws the working and the diagrams in time with the voice.',
+      },
+      {
+        icon: 'graduation-cap',
+        title: 'Pick a question from an exam',
+        body: 'Choose subject, exam, topic and difficulty, or just describe the question, and the lesson uses the marks and any worked solution on file.',
+      },
+      {
+        icon: 'message-circle',
+        title: 'Pause and ask why',
+        body: 'Stuck on a step? Ask about the scene you are on and get a short lesson on just that.',
+      },
+      {
+        icon: 'download',
+        title: 'Download as a video',
+        body: 'Lessons save as MP4 with the narration, drawn frame by frame for a clean picture.',
+      },
+      {
+        icon: 'users',
+        title: 'Shared with the group',
+        body: 'New lessons appear in Shared under Lessons, tagged by unit or as extra, with upvotes. Anyone can save one to their own lessons.',
+      },
+    ],
+  },
+  {
     version: '0.4.0',
     date: '2026-11-23',
     headline: 'One library for the whole group',

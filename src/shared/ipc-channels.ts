@@ -19,6 +19,9 @@ export const IPC_EVENTS = [
   'scanner:received',
   'scanner:progress',
   'shared:changed',
+  'explainer:delta',
+  'explainer:done',
+  'explainer:exportProgress',
 ] as const
 
 export type IpcEvent = (typeof IPC_EVENTS)[number]

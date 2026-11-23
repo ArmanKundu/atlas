@@ -386,6 +386,25 @@ export const PAPERS_V3: TableDef = {
   },
 }
 
+/** v4: explainer lessons, made by the user's AI and played in the Explainer. */
+export const LESSONS_V4: TableDef = {
+  soft: true,
+  indexes: [['subject_id']],
+  fts: ['title', 'prompt'],
+  cols: {
+    subject_id: 'text',
+    title: 'text!',
+    prompt: 'text!',
+    lesson: 'json{}',
+    level: 'text',
+    units: 'json[]',
+    tags: 'json[]',
+    attachments: 'json[]',
+    provider: 'text',
+    shared_id: 'text',
+  },
+}
+
 /** v3 additions to questions: report boxes, multiple choice, command terms, type, report quotes. */
 export const QUESTION_COLS_V3 = {
   report_regions: 'json[]',
@@ -400,6 +419,7 @@ export const QUESTION_COLS_V3 = {
  * The current shape of every table: v1 plus later migrations.
  * v2 adds `questions.regions`, the boxes drawn around a question on its source's pages.
  * v3 adds `papers` and more question fields for the paper workspace.
+ * v4 adds `lessons`, the Explainer's videos.
  */
 export const TABLES: Record<string, TableDef> = {
   ...SCHEMA_V1,
@@ -408,6 +428,7 @@ export const TABLES: Record<string, TableDef> = {
     cols: { ...SCHEMA_V1.questions.cols, regions: 'json[]', ...QUESTION_COLS_V3 },
   },
   papers: PAPERS_V3,
+  lessons: LESSONS_V4,
 }
 export type TableName = keyof typeof SCHEMA_V1
 

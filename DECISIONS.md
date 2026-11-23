@@ -163,3 +163,11 @@ The owner wants AI that works on weak laptops with no account or limits, and a w
 
 - **Decision:** `shell:openWeb` opens https pages in a separate BrowserWindow with no preload, sandboxed, and its own persistent cookie partition. The user agent drops "Electron" so Google sign-in works. Drive and Docs links anywhere in Atlas open there; other sites still open in the browser.
 - **Why:** shared Drive folders stay inside the app without giving any site access to Atlas or its data.
+
+### D-026 The Explainer: lessons as scene JSON, videos drawn offscreen
+
+- **Context:** the owner wants VideoTutor-style narrated video lessons for any question, from any subject, made with the student's own AI, and downloadable.
+- **Decision:** the AI writes a lesson as JSON scenes (narration, a working column, diagram items) in a fenced `atlas-lesson` block. Atlas does every calculation itself (curves, areas, intersections, tangents) and renders the scenes in the app with SVG and KaTeX, timed to the Kokoro voice. Scenes play as soon as each one is complete in the stream. Lessons live in a `lessons` table (migration 4) and are shared to the group as a new `lesson` item kind, with the JSON as the body.
+- **Video:** a hidden offscreen window draws the lesson one frame at a time; the main process copies each frame (`capturePage`) and the window encodes them with WebCodecs (H.264, AAC narration mixed with an OfflineAudioContext) into MP4 with `mp4-muxer`. No screen recording, so no macOS Screen Recording permission.
+- **Why not real video generation:** pictures drawn from data stay exact (a wrong graph is worse than none), cost nothing beyond the text tokens and work offline once written.
+- **Trade-offs:** making a video takes about five times the lesson's length on an older Intel Mac.

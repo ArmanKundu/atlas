@@ -39,6 +39,7 @@ import {
 } from './feedback'
 import { Updater } from './updater'
 import { createMainWindow, printRouteToPdf } from './window'
+import { VideoExporter } from './video-export'
 
 // Set by electron-vite while `npm run dev` is running; absent in a built app.
 const devServerUrl = (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) || undefined
@@ -105,6 +106,19 @@ async function main(): Promise<void> {
     log,
     emitDelta: (payload) => broadcast(windows(), 'ai:delta', payload),
     emitFinished: (payload) => broadcast(windows(), 'ai:finished', payload),
+    emitLesson: ({ kind, ...payload }) =>
+      kind === 'delta'
+        ? broadcast(windows(), 'explainer:delta', payload as { requestId: string; text: string })
+        : broadcast(
+            windows(),
+            'explainer:done',
+            payload as {
+              requestId: string
+              text: string
+              provider: string | null
+              error: string | null
+            },
+          ),
   })
   const calendar = new CalendarSync(profiles, secrets, log, () =>
     broadcast(windows(), 'calendar:changed', { at: Date.now() }),
@@ -136,6 +150,24 @@ async function main(): Promise<void> {
       shell.showItemInFolder(path)
   })
   updater.start()
+
+  const videos = new VideoExporter({
+    devServerUrl,
+    log,
+    emitProgress: (payload) => broadcast(windows(), 'explainer:exportProgress', payload),
+  })
+  registry.handle('explainer:exportVideo', async ({ lessonId, title }) => ({
+    saved: await videos.export({
+      lessonId,
+      title,
+      parent: BrowserWindow.getFocusedWindow() ?? mainWindow,
+    }),
+  }))
+  registry.handle('explainer:cancelExport', () => videos.cancel())
+  registry.handle('explainer:captureFrame', () => videos.frame())
+  registry.handle('explainer:videoProgress', ({ done, total }) => videos.progress(done, total))
+  registry.handle('explainer:videoReady', ({ bytes }) => videos.finished(bytes))
+  registry.handle('explainer:videoFailed', ({ message }) => videos.failed(message))
 
   const filesDirNow = (): string => {
     const current = profiles.current

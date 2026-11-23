@@ -333,6 +333,19 @@ export const ChatInput = z.object({
   pinned: z.boolean().default(false),
 })
 
+export const LessonInput = z.object({
+  subjectId: refId,
+  title: text(300).min(1),
+  prompt: text(20_000),
+  lesson: z.record(z.string(), z.unknown()).default({}),
+  level: optText(40),
+  units: z.array(z.number().int().min(1).max(4)).default([]),
+  tags: z.array(text(60)).default([]),
+  attachments: z.array(text(2000)).default([]),
+  provider: optText(60),
+  sharedId: optText(80),
+})
+
 /** Table name and write schema for every entity exposed over `db:*`. */
 export const ENTITIES = {
   subjects: { table: 'subjects', input: SubjectInput, create: true },
@@ -353,6 +366,7 @@ export const ENTITIES = {
   chats: { table: 'chats', input: ChatInput, create: true },
   papers: { table: 'papers', input: PaperInput, create: true },
   annotations: { table: 'annotations', input: AnnotationInput, create: true },
+  lessons: { table: 'lessons', input: LessonInput, create: true },
 } as const
 
 export type EntityName = keyof typeof ENTITIES
@@ -377,6 +391,7 @@ export type Attempt = EntityRow<'attempts'>
 export type Mistake = EntityRow<'mistakes'>
 export type Paper = EntityRow<'papers'>
 export type Annotation = EntityRow<'annotations'>
+export type LessonRow = EntityRow<'lessons'>
 
 /** A source row as stored: the editable fields plus what the import pipeline recorded. */
 export type Source = EntityRow<'sources'> & {

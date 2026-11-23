@@ -9,6 +9,8 @@ import { TimerProvider } from '@/features/timer/TimerProvider'
 import { AppStateProvider, useAppState } from '@/lib/app-state'
 import { DesignSystem } from '@/routes/DesignSystem'
 import { Exam } from '@/routes/Exam'
+import { Explain } from '@/routes/Explain'
+import { Recorder } from '@/features/explainer/Recorder'
 import { ExamBuilder } from '@/routes/ExamBuilder'
 import { PaperWorkspace } from '@/routes/PaperWorkspace'
 import { Planner } from '@/routes/Planner'
@@ -33,6 +35,8 @@ const router = createHashRouter([
   { path: '/sit/:paperId', element: <Sit /> },
   // A paper takes the whole window too: three panes need the width.
   { path: '/paper/:paperId', element: <PaperWorkspace /> },
+  // A hidden window draws a lesson frame by frame to make its video.
+  { path: '/record/:lessonId', element: <Recorder /> },
   {
     path: '/',
     element: <AppShell />,
@@ -40,6 +44,7 @@ const router = createHashRouter([
       { index: true, element: <Today />, handle: { crumb: 'Today' } },
       { path: 'subjects/:subjectId', element: <SubjectRoute />, handle: { crumb: 'Subject' } },
       { path: 'assistant', element: <AssistantRoute />, handle: { crumb: 'Assistant' } },
+      { path: 'explain', element: <Explain />, handle: { crumb: 'Explainer' } },
       { path: 'library', element: <LibraryRoute />, handle: { crumb: 'Library' } },
       { path: 'shared', element: <Shared />, handle: { crumb: 'Shared library' } },
       { path: 'viewer/:sourceId', element: <Viewer />, handle: { crumb: 'Library' } },

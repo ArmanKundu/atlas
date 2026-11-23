@@ -5,7 +5,7 @@ Phases follow `BUILD_PROMPT.md` §14; extra work the owner asked for is listed a
 
 ## Now
 
-**Group library for up to five friends (owner's plan, 23 Nov).** Atlas becomes one shared, public library for six subjects, with the exam system and AI on top. Done: scanner, whiteboard, subjects, shared library, in-app web links, packaged-app test. Next: shared VCAA exams (waiting on the owner's go-ahead to download), timetables in the Planner, subject tools.
+**Group library for up to five friends (owner's plan, 23 Nov).** Atlas becomes one shared, public library for six subjects, with the exam system and AI on top. Done: scanner, whiteboard, subjects, shared library, in-app web links, packaged-app test, the Explainer (video lessons from any question, MP4 download, shared to the group). Next: shared VCAA exams (waiting on the owner's go-ahead to download), timetables in the Planner, subject tools.
 
 ## Group library (owner's plan, 23 Nov)
 

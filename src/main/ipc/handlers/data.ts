@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { BrowserWindow, dialog } from 'electron'
 import { AtlasError } from '@shared/errors'
@@ -275,6 +276,28 @@ export function registerDataHandlers(deps: DataHandlerDeps): void {
   registry.handle('ai:messages', ({ chatId }) => ai.messages(chatId))
   registry.handle('ai:send', ({ chatId, content }) => ai.send(chatId, content))
   registry.handle('ai:cancel', ({ chatId }) => ai.cancel(chatId))
+  registry.handle('explainer:generate', (input) => {
+    const database = db()
+    const library = (input.sourceIds ?? []).flatMap((sourceId) => {
+      const relative = database.get('sources', sourceId)?.['filePath']
+      return typeof relative === 'string' ? [join(filesDir(), relative)] : []
+    })
+    return ai.explain({
+      requestId: input.requestId,
+      prompt: input.prompt,
+      subjectId: input.subjectId ?? null,
+      options: {
+        subject: input.subject ?? null,
+        level: input.level ?? null,
+        style: input.style ?? 'clear',
+        exam: input.exam ?? false,
+      },
+      files: [...(input.files ?? []), ...library],
+      questionIds: input.questionIds ?? [],
+      followUp: input.followUp ?? null,
+    })
+  })
+  registry.handle('explainer:cancel', ({ requestId }) => ai.cancel(requestId))
   registry.handle('ai:complete', ({ task, prompt, subjectId }) =>
     ai.complete(task, prompt, subjectId ?? null),
   )

@@ -358,6 +358,45 @@ export const ipcContract = {
     response: z.object({ user: ChatMessageSchema, assistant: ChatMessageSchema }),
   },
   'ai:cancel': { request: z.object({ chatId: id }), response: none },
+  'explainer:generate': {
+    request: z.object({
+      requestId: z.string().min(4).max(80),
+      prompt: z.string().max(20_000),
+      subjectId: id.nullable().default(null),
+      subject: z.string().max(120).nullable().default(null),
+      level: z.string().max(80).nullable().default(null),
+      style: z.enum(['clear', 'fun']).default('clear'),
+      exam: z.boolean().default(false),
+      /** Files on disk: uploads, pasted screenshots. */
+      files: z.array(z.string().max(2000)).max(8).default([]),
+      /** Library files and questions to explain. */
+      sourceIds: z.array(id).max(8).default([]),
+      questionIds: z.array(id).max(8).default([]),
+      /** A question about a lesson already made: its JSON and the scene the student paused on. */
+      followUp: z
+        .object({ lesson: z.string().max(200_000), scene: z.number().int().min(0) })
+        .nullable()
+        .default(null),
+    }),
+    response: none,
+  },
+  'explainer:exportVideo': {
+    request: z.object({ lessonId: id, title: z.string().max(300) }),
+    response: z.object({ saved: z.boolean() }),
+  },
+  'explainer:cancelExport': { request: none, response: none },
+  // Used by the hidden window that draws and encodes a video.
+  'explainer:captureFrame': { request: none, response: z.instanceof(Uint8Array) },
+  'explainer:videoProgress': {
+    request: z.object({ done: z.number().int().min(0), total: z.number().int().min(1) }),
+    response: none,
+  },
+  'explainer:videoReady': {
+    request: z.object({ bytes: z.instanceof(Uint8Array) }),
+    response: none,
+  },
+  'explainer:videoFailed': { request: z.object({ message: z.string().max(500) }), response: none },
+  'explainer:cancel': { request: z.object({ requestId: z.string().max(80) }), response: none },
   'ai:complete': {
     request: z.object({
       task: z.enum([
@@ -404,6 +443,18 @@ export const ipcEvents = {
   'profile:changed': z.object({ activeId: z.string().nullable() }),
   'ai:delta': z.object({ chatId: z.string(), messageId: z.string(), text: z.string() }),
   'ai:finished': z.object({ chatId: z.string(), message: ChatMessageSchema }),
+  'explainer:delta': z.object({ requestId: z.string(), text: z.string() }),
+  'explainer:exportProgress': z.object({
+    lessonId: z.string(),
+    done: z.number(),
+    total: z.number(),
+  }),
+  'explainer:done': z.object({
+    requestId: z.string(),
+    text: z.string(),
+    provider: z.string().nullable(),
+    error: z.string().nullable(),
+  }),
   'library:changed': z.object({ sourceId: z.string().nullable() }),
   'calendar:changed': z.object({ at: z.number() }),
   'update:changed': UpdateStatusSchema,
