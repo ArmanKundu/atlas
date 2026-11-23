@@ -49,8 +49,17 @@ export class VideoExporter {
     return out
   }
 
+  private started = 0
+
   progress(done: number, total: number): void {
-    if (this.job) this.deps.emitProgress({ lessonId: this.job.lessonId, done, total })
+    if (!this.job) return
+    if (total === 0) this.deps.log.info('video: narration ready, drawing frames')
+    if (done <= 15) this.started = Date.now()
+    else if (done % 300 === 0 || done === total) {
+      const fps = (done - 15) / Math.max(0.001, (Date.now() - this.started) / 1000)
+      this.deps.log.info(`video: ${done}/${total} frames, ${fps.toFixed(1)} frames a second`)
+    }
+    this.deps.emitProgress({ lessonId: this.job.lessonId, done, total })
   }
 
   finished(bytes: Uint8Array): void {

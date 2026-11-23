@@ -93,7 +93,11 @@ export class Voice {
     voice?: string
     speed?: number
   }): Promise<{ wav: Uint8Array<ArrayBuffer>; seconds: number }> {
+    const t0 = Date.now()
     const reply = await this.send(input)
+    this.deps.log.info(
+      `voice: ${(reply.seconds ?? 0).toFixed(1)} s of speech in ${((Date.now() - t0) / 1000).toFixed(1)} s`,
+    )
     return { wav: new Uint8Array(reply.wav ?? new Uint8Array()), seconds: reply.seconds ?? 0 }
   }
 

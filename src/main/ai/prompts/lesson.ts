@@ -75,7 +75,15 @@ ${
 - {"k":"curve","fn":["cos(t)","sin(t)","t/4"],"t":[0,12.6],"c":"yellow","label":"helix"}
 - {"k":"molecule","atoms":[{"el":"O","at":[0,0,0]},{"el":"H","at":[0.76,0,0.59]},{"el":"H","at":[-0.76,0,0.59]}],"bonds":[[0,1],[0,2]],"scale":1.6} (bonds are [atom index, atom index, order]; atoms are coloured by element and labelled automatically)
 - {"k":"label","at":[x,y,z],"text":"words"}
+- {"k":"flow","path":[[x,y,z],...],"count":8,"speed":0.25,"c":"yellow","label":"electrons"}: small balls flowing along a path again and again (electrons in a wire, ions in a salt bridge, water pouring). Cones take "down": true to point down (a funnel, a conical tank).
 A model stays until another scene sets a new one or clears the board; keep the working (text and maths) on the left beside it. Labels are placed for you so they never overlap, but keep them to a few words.
+Direct the model like a film: give objects an "id", list ones that should wait off stage in the model's "hidden": ["id", ...], and set "look": [x,y,z] for what the camera looks at. Then later scenes (without a new "model") can say:
+- "shot": {"camera":[x,y,z],"look":[x,y,z]}: the camera glides there smoothly (move in close to zoom on a part, look edge-on at a plane, swing round to the side).
+- "show": ["id", ...] brings hidden parts in one after another; "hide": ["id", ...] takes parts away. "id@2.5" does it exactly 2.5 s into the scene (to animate a sequence: water levels rising, discs stacking).
+- "move": [{"id":"ion","to":[x,y,z]}]: a part slides to a new place during the scene (an ion leaving an electrode, a point sliding along a line).
+- "glow": ["id", ...]: parts pulse gently while the narrator talks about them.
+- "clearText": true wipes the working column but keeps the model, so a long 3D story can stay on one model.
+Plan every 3D lesson as one continuous model with shots, like a documentary: open wide, glide in to the part being explained, show it happening, pull back to the whole. Keep labels to 2 to 4 words and give every moving or highlighted part a colour that matches its working.
 `
 }
 ${

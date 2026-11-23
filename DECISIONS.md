@@ -231,3 +231,18 @@ The owner wants AI that works on weak laptops with no account or limits, and a w
   background once (pref `localAiAuto`). It is used for quick jobs even when Claude is connected:
   file and chat titles. It is the fallback when no other AI is set up. It is too small for
   lesson JSON, so lessons still prefer a connected provider.
+
+## D-033 Directed 3D lessons (2026-11-24)
+
+- A 3D lesson is now one continuous model with directions per scene, so the camera can travel
+  like a documentary instead of cutting to a new model every scene: `shot` (camera and look
+  point, glided over the scene), `show`/`hide` (ids, optionally `id@seconds`), `move` (glide a
+  part to a point), `glow` (light the part being talked about) and `clearText` (fresh working
+  without losing the model). Models gain `hidden` and `look`; new objects `flow` (particles
+  along a path, for electrons and ions) and cone `down`.
+- Everything is driven from the lesson clock rather than wall time, so the exported video and
+  the live player show exactly the same motion.
+- Rendering moved to ACES tone mapping, soft shadows, an environment map and a rim light.
+- `docs/explainer-3d-recipe.md` is the formula and checklist; its "Lessons learned" grows with
+  each render audit. `scripts/render-lesson.mjs` renders a lesson JSON to MP4 with the built
+  app for audits.

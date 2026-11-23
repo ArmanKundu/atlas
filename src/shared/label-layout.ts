@@ -81,7 +81,28 @@ export class LabelPlacer {
     this.placed.push(box)
   }
 
-  place(x: number, y: number, text: string, size: number, anchor: Anchor = 'start'): Placement {
+  /** Like `place`, but only takes a spot that is completely clear; otherwise places nothing. */
+  placeIfClear(
+    x: number,
+    y: number,
+    text: string,
+    size: number,
+    anchor: Anchor = 'start',
+  ): Placement | null {
+    const spot = this.place(x, y, text, size, anchor, false)
+    if (spot.crowded) return null
+    this.placed.push(spot.box)
+    return spot
+  }
+
+  place(
+    x: number,
+    y: number,
+    text: string,
+    size: number,
+    anchor: Anchor = 'start',
+    commit = true,
+  ): Placement {
     let best: Placement | null = null
     let bestScore = Infinity
     for (const [dx, dy] of candidates(size)) {
@@ -107,7 +128,7 @@ export class LabelPlacer {
       if (score === 0) break
     }
     const chosen = best ?? { x, y, box: textBox(x, y, text, size, anchor), crowded: true }
-    this.placed.push(chosen.box)
+    if (commit) this.placed.push(chosen.box)
     return chosen
   }
 }

@@ -6,7 +6,9 @@ import {
   parseLesson,
   parseLessonPartial,
   sceneTimeline,
+  unknownDirectionIds,
 } from '../../src/shared/lesson'
+import { auditLesson } from '../../src/shared/lesson-audit'
 
 const LESSON = {
   title: 'Area between curves',
@@ -229,5 +231,66 @@ describe('reading lessons leniently', () => {
   })
   it('reads a bare lesson followed by words', () => {
     expect(parseLesson(body + '\n\nLet me know if you want more.')?.title).toBe('T')
+  })
+})
+
+describe('unknownDirectionIds', () => {
+  const model = {
+    camera: [6, -6, 4],
+    hidden: ['ion'],
+    objects: [
+      { k: 'sphere', id: 'ion', at: [0, 0, 0], r: 0.2, c: 'blue' },
+      { k: 'box', id: 'zinc', at: [1, 0, 0], size: [0.5, 0.5, 2], c: 'grey' },
+    ],
+  }
+  const lesson = (directions: Record<string, unknown>) =>
+    parseLesson(
+      JSON.stringify({
+        title: 'Cell',
+        theme: 'night',
+        scenes: [
+          { title: 'One', say: 'Here is the cell.', items: [], model },
+          { title: 'Two', say: 'The ion moves.', items: [], ...directions },
+        ],
+      }),
+    )
+
+  it('accepts directions that name real parts, with timings', () => {
+    const l = lesson({ show: ['ion@1.5'], glow: ['zinc'], move: [{ id: 'ion', to: [2, 0, 0] }] })
+    expect(l).not.toBeNull()
+    expect(unknownDirectionIds(l as NonNullable<typeof l>)).toEqual([])
+  })
+
+  it('reports misspelt ids with their scene', () => {
+    const l = lesson({ show: ['ions'], move: [{ id: 'zink', to: [0, 0, 1] }] })
+    expect(unknownDirectionIds(l as NonNullable<typeof l>)).toEqual([
+      'scene 2: ions',
+      'scene 2: zink',
+    ])
+  })
+})
+
+describe('auditLesson and 3D ids', () => {
+  it('asks for misspelt 3D part ids to be fixed', () => {
+    const l = parseLesson(
+      JSON.stringify({
+        title: 'Cell',
+        theme: 'night',
+        scenes: [
+          {
+            title: 'One',
+            say: 'Here is the zinc.',
+            items: [],
+            model: {
+              objects: [{ k: 'box', id: 'zinc', at: [0, 0, 0], size: [1, 1, 1], c: 'grey' }],
+            },
+            glow: ['zink'],
+          },
+        ],
+      }),
+    )
+    expect(auditLesson(l as NonNullable<typeof l>)).toContain(
+      'Scene 1: zink is not the id of any part in the 3D model',
+    )
   })
 })

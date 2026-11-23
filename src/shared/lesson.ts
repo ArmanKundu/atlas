@@ -248,6 +248,8 @@ export const ModelObjectSchema = z.discriminatedUnion('k', [
     at: pt3,
     r: num.default(1),
     h: num.default(2),
+    /** Point down, like a funnel or a conical tank. */
+    down: z.boolean().catch(false).default(false),
     c: color.default('orange'),
     label: words(60).default(''),
     opacity: num.default(1),
@@ -322,6 +324,17 @@ export const ModelObjectSchema = z.discriminatedUnion('k', [
     scale: num.default(1),
   }),
   z.object({ k: z.literal('label'), id, at: pt3, text: words(80) }),
+  /** Small balls flowing along a path again and again: electrons in a wire, ions in a bridge. */
+  z.object({
+    k: z.literal('flow'),
+    id,
+    path: z.array(pt3).min(2).max(40),
+    count: num.default(6),
+    r: num.default(0.09),
+    speed: num.default(0.25),
+    c: color.default('yellow'),
+    label: words(60).default(''),
+  }),
 ])
 export type ModelObject = z.infer<typeof ModelObjectSchema>
 
@@ -331,12 +344,37 @@ export interface LessonModel {
   spin: boolean
   /** Where the camera starts, looking at the centre. */
   camera: [number, number, number]
+  /** Where the camera looks (the centre unless set). */
+  look: [number, number, number]
+  /** Objects (by id) that wait off stage until a scene shows them. */
+  hidden: string[]
 }
+
+const ids = z.array(z.string().max(48)).max(80).catch([]).default([])
 
 const ModelSchema = z.object({
   objects: z.array(z.unknown()).max(80).catch([]),
   spin: z.boolean().catch(false).default(false),
   camera: z.tuple([num, num, num]).catch([6, 5, 8]).default([6, 5, 8]),
+  look: z.tuple([num, num, num]).catch([0, 0, 0]).default([0, 0, 0]),
+  hidden: ids,
+})
+
+/**
+ * What a scene does to the 3D model already on the board: glide the camera to a new shot,
+ * bring hidden parts in, take parts away, slide parts to new places and make parts glow.
+ */
+export interface LessonDirections {
+  shot: { camera: [number, number, number]; look: [number, number, number] } | null
+  show: string[]
+  hide: string[]
+  move: { id: string; to: [number, number, number] }[]
+  glow: string[]
+}
+
+const ShotSchema = z.object({
+  camera: z.tuple([num, num, num]),
+  look: z.tuple([num, num, num]).catch([0, 0, 0]).default([0, 0, 0]),
 })
 
 /** A quick question the tutor asks at the end of a scene; the lesson waits for an answer. */
@@ -367,6 +405,10 @@ export interface LessonScene {
   chapter: string
   /** A key result to keep in the lesson's formula list (LaTeX), e.g. "C'(5) \\approx -4". */
   key: string
+  /** Camera moves and part changes for the 3D model on the board. */
+  directions: LessonDirections
+  /** Wipes only the working column, keeping the diagram or 3D model. */
+  clearText: boolean
 }
 
 export interface Lesson {
@@ -382,12 +424,22 @@ const SceneSchema = z.object({
   title: words(140).default(''),
   say: words(1500).default(''),
   clear: z.boolean().catch(false).default(false),
+  clearText: z.boolean().catch(false).default(false),
   graph: GraphSchema.nullable().optional().catch(null),
   items: z.array(z.unknown()).max(40).catch([]).default([]),
   model: ModelSchema.nullable().optional().catch(null),
   check: CheckSchema.nullable().optional().catch(null),
   chapter: words(80).catch('').default(''),
   key: words(300).catch('').default(''),
+  shot: ShotSchema.nullable().optional().catch(null),
+  show: ids,
+  hide: ids,
+  move: z
+    .array(z.object({ id: z.string().max(40), to: z.tuple([num, num, num]) }))
+    .max(40)
+    .catch([])
+    .default([]),
+  glow: ids,
 })
 
 const LessonSchema = z.object({
@@ -413,6 +465,8 @@ function toScene(raw: unknown): LessonScene | null {
         }),
         spin: s.data.model.spin,
         camera: s.data.model.camera,
+        look: s.data.model.look,
+        hidden: s.data.model.hidden,
       }
     : null
   const check = s.data.check
@@ -430,6 +484,14 @@ function toScene(raw: unknown): LessonScene | null {
         : null,
     chapter: s.data.chapter,
     key: s.data.key,
+    clearText: s.data.clearText,
+    directions: {
+      shot: s.data.shot ?? null,
+      show: s.data.show,
+      hide: s.data.hide,
+      move: s.data.move,
+      glow: s.data.glow,
+    },
   }
 }
 
@@ -485,6 +547,30 @@ export function parseLesson(text: string): Lesson | null {
 }
 
 /** The parts of a JSON array (under `key`) that are complete so far, as raw text. */
+/**
+ * Parts that a scene's directions (show, hide, glow, move) or a model's hidden list name but the
+ * model does not have, as "scene 3: zinc". A misspelt id silently does nothing, so lessons are
+ * checked for these before they are kept.
+ */
+export function unknownDirectionIds(lesson: Lesson): string[] {
+  const out: string[] = []
+  let known = new Set<string>()
+  lesson.scenes.forEach((s, i) => {
+    if (s.model) {
+      known = new Set<string>()
+      for (const o of s.model.objects) if (o.id) known.add(o.id)
+    }
+    const d = s.directions
+    const named = [
+      ...[...d.show, ...d.hide, ...d.glow].map((e) => e.split('@')[0] ?? ''),
+      ...d.move.map((m) => m.id),
+      ...(s.model?.hidden ?? []),
+    ]
+    for (const id of named) if (id && !known.has(id)) out.push(`scene ${i + 1}: ${id}`)
+  })
+  return out
+}
+
 export function completeElements(code: string, key: string): string[] {
   const at = code.indexOf(`"${key}"`)
   if (at < 0) return []

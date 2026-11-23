@@ -1,4 +1,4 @@
-import { compileFormula, type Lesson, type LessonItem } from './lesson'
+import { compileFormula, unknownDirectionIds, type Lesson, type LessonItem } from './lesson'
 import { overlap, textWidth, type Box } from './label-layout'
 
 /**
@@ -87,5 +87,8 @@ export function auditLesson(lesson: Lesson): string[] {
       }
     }
   })
+  // 3D directions that name a part the model does not have silently do nothing.
+  for (const miss of unknownDirectionIds(lesson))
+    issues.push(`${miss.replace(/^scene/, 'Scene')} is not the id of any part in the 3D model`)
   return [...new Set(issues)].slice(0, 20)
 }

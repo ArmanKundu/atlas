@@ -86,9 +86,13 @@ export function Recorder() {
       ])
       const speak = voiceOn !== false && status === 'ready'
       const voice = typeof voiceId === 'string' ? voiceId : 'af_heart'
-      const buffers = await Promise.all(
-        parsed.scenes.map((s) => (speak ? clip(s.say, voice) : Promise.resolve(null))),
-      )
+      // One scene at a time: the voice model works best on one sentence group at once.
+      const buffers: (AudioBuffer | null)[] = []
+      for (const s of parsed.scenes) {
+        if (!alive) return
+        buffers.push(speak ? await clip(s.say, voice) : null)
+      }
+      void call('explainer:videoProgress', { done: 0, total: 0 })
       const lengths = parsed.scenes.map((s, i) => {
         const b = buffers[i]
         return b ? b.duration + 0.6 : speakingSeconds(s.say)
@@ -193,6 +197,7 @@ export function Recorder() {
           scene={at.scene}
           t={at.t}
           seconds={seconds}
+          still
           caption={subtitleAt(lesson.scenes[at.scene]?.say ?? '', at.t, seconds[at.scene] ?? 6)}
         />
       ) : null}

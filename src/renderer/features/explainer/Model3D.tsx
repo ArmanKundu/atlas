@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { Hand, RotateCcw, RotateCw } from 'lucide-react'
-import type { LessonColor, LessonModel, ModelObject } from '@shared/lesson'
+import type { LessonColor, LessonDirections, LessonModel, ModelObject } from '@shared/lesson'
 import { LabelPlacer } from '@shared/label-layout'
 import { compileExpression } from '@shared/whiteboard'
 
@@ -31,7 +32,60 @@ const ELEMENTS: Record<string, [string, number]> = {
 const v3 = (p: readonly [number, number, number]): THREE.Vector3 =>
   new THREE.Vector3(p[0], p[2], -p[1])
 
+/** One scene's directions for the model, placed on the model's clock (seconds). */
+export type ModelCue = LessonDirections & { at: number; len: number }
+
+/** Size of the handwritten labels on a 3D model, in CSS pixels. */
+const LABEL_SIZE = 27
+const clamp01 = (k: number): number => Math.max(0, Math.min(1, k))
+/** Smooth start and stop, for camera glides and moving parts. */
+const smooth = (k: number): number => {
+  const x = clamp01(k)
+  return x * x * x * (x * (x * 6 - 15) + 10)
+}
+
+/** Where a camera glide or a slide happens inside its scene: most of it, easing in and out. */
+function glide(cue: ModelCue, time: number, share = 0.7, maxSeconds = 4): number {
+  const len = Math.min(maxSeconds, Math.max(0.6, cue.len * share))
+  return smooth((time - cue.at - 0.15) / len)
+}
+
+/** A point `u` (0 to 1) of the way along a path. */
+function along(points: THREE.Vector3[], lengths: number[], u: number, out: THREE.Vector3): void {
+  const total = lengths[lengths.length - 1] ?? 0
+  const want = u * total
+  for (let i = 1; i < points.length; i++) {
+    const end = lengths[i] ?? 0
+    if (want <= end || i === points.length - 1) {
+      const startLen = lengths[i - 1] ?? 0
+      const a = points[i - 1] ?? out
+      const b = points[i] ?? out
+      const k = end > startLen ? (want - startLen) / (end - startLen) : 0
+      out.copy(a).lerp(b, clamp01(k))
+      return
+    }
+  }
+}
+
+/**
+ * When, in seconds after its scene starts, a cue list brings in or takes away `id`. Entries may
+ * say "id@2.5" for an exact time; plain ids that appear are staggered so they arrive in turn.
+ */
+function when(list: string[], id: string, stagger: boolean): number | null {
+  for (let j = 0; j < list.length; j++) {
+    const entry = list[j] ?? ''
+    const [name, at] = entry.split('@')
+    if (name !== id) continue
+    const exact = at !== undefined ? Number(at) : NaN
+    if (Number.isFinite(exact)) return Math.max(0, exact)
+    return 0.2 + (stagger ? j * 0.45 : 0)
+  }
+  return null
+}
+
 interface Tagged {
+  /** The lesson's id for the object this part belongs to. */
+  id?: string
   object: THREE.Object3D
   label: string
   /** Where the label points, relative to the object. */
@@ -48,6 +102,8 @@ function material(colour: string, opacity = 1): THREE.MeshStandardMaterial {
     metalness: 0.05,
     transparent: opacity < 1,
     opacity,
+    // Faint glass must not hide what is inside it.
+    depthWrite: opacity > 0.5,
     side: THREE.DoubleSide,
   })
 }
@@ -63,6 +119,25 @@ function rod(a: THREE.Vector3, b: THREE.Vector3, r: number, mat: THREE.Material)
 
 function build(o: ModelObject, col: (c: LessonColor) => string, ink: string): Omit<Tagged, 'at'>[] {
   switch (o.k) {
+    case 'flow': {
+      const group = new THREE.Group()
+      const points = o.path.map((p) => v3(p))
+      const lengths = [0]
+      points.forEach((p, i) => {
+        const prev = points[i - 1]
+        if (prev) lengths.push((lengths[i - 1] ?? 0) + p.distanceTo(prev))
+      })
+      const count = Math.max(1, Math.min(24, Math.round(o.count)))
+      const mat = material(col(o.c))
+      mat.emissive = new THREE.Color(col(o.c))
+      mat.emissiveIntensity = 0.45
+      for (let j = 0; j < count; j++)
+        group.add(new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.03, o.r), 24, 16), mat))
+      group.userData.flow = { points, lengths, speed: o.speed, count }
+      const mid = new THREE.Vector3()
+      along(points, lengths, 0.5, mid)
+      return [{ object: group, label: o.label, anchor: mid, draggable: false }]
+    }
     case 'sphere': {
       const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(Math.max(0.05, o.r), 48, 32),
@@ -89,10 +164,11 @@ function build(o: ModelObject, col: (c: LessonColor) => string, ink: string): Om
     }
     case 'cone': {
       const mesh = new THREE.Mesh(
-        new THREE.ConeGeometry(o.r, o.h, 48),
+        new THREE.ConeGeometry(o.r, o.h, 64),
         material(col(o.c), o.opacity),
       )
       mesh.position.copy(v3(o.at))
+      if (o.down) mesh.rotation.x = Math.PI
       return [
         { object: mesh, label: o.label, anchor: new THREE.Vector3(0, o.h / 2, 0), draggable: true },
       ]
@@ -311,10 +387,19 @@ export function Model3D({
   ink,
   width,
   height,
+  time = 0,
+  cues = [],
+  still = false,
 }: {
   model: LessonModel
   /** How far the scene that brought in the model has played, 0 to 1. */
   progress: number
+  /** Seconds since the scene that brought in the model began. */
+  time?: number
+  /** Camera shots and part changes asked for by the scenes so far. */
+  cues?: ModelCue[]
+  /** Making a video: no buttons or hints, and everything moves by the lesson's clock. */
+  still?: boolean
   colors: Record<LessonColor, string>
   ink: string
   width: number
@@ -324,12 +409,16 @@ export function Model3D({
   const labelLayer = useRef<HTMLDivElement>(null)
   const lineLayer = useRef<SVGSVGElement>(null)
   const progressRef = useRef(progress)
+  const timeRef = useRef(time)
+  const cuesRef = useRef(cues)
   const [spin, setSpin] = useState(model.spin)
   const spinRef = useRef(spin)
   useEffect(() => {
     progressRef.current = progress
+    timeRef.current = time
+    cuesRef.current = cues
     spinRef.current = spin
-  }, [progress, spin])
+  }, [progress, time, cues, spin])
   const resetRef = useRef<() => void>(() => undefined)
   const [hint, setHint] = useState(true)
 
@@ -346,26 +435,57 @@ export function Model3D({
     })
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio))
     renderer.setSize(width, height, false)
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.05
+    renderer.shadowMap.enabled = true
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.domElement.style.width = '100%'
     renderer.domElement.style.height = '100%'
     el.prepend(renderer.domElement)
 
     const scene = new THREE.Scene()
-    scene.add(new THREE.HemisphereLight('#ffffff', '#445566', 1.6))
-    const sun = new THREE.DirectionalLight('#ffffff', 1.8)
+    // Soft studio light: a room reflected in glossy parts, a sky light and one key light with
+    // soft shadows on an invisible floor.
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    const room = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    scene.environment = room
+    scene.environmentIntensity = 0.45
+    scene.add(new THREE.HemisphereLight('#ffffff', '#3a4656', 1.1))
+    const sun = new THREE.DirectionalLight('#ffffff', 2.2)
     sun.position.set(5, 10, 7)
+    sun.castShadow = true
+    sun.shadow.mapSize.set(2048, 2048)
+    sun.shadow.radius = 6
+    sun.shadow.bias = -0.0004
+    const shadowCam = sun.shadow.camera
+    shadowCam.left = -9
+    shadowCam.right = 9
+    shadowCam.top = 9
+    shadowCam.bottom = -9
+    shadowCam.near = 0.5
+    shadowCam.far = 40
     scene.add(sun)
+    const rim = new THREE.DirectionalLight('#9fc6ff', 0.6)
+    rim.position.set(-6, 4, -8)
+    scene.add(rim)
 
     const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 200)
     const home = v3(model.camera)
+    const homeLook = v3(model.look)
     camera.position.copy(home)
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
-    controls.target.set(0, 0, 0)
+    controls.target.copy(homeLook)
+    // The lesson drives the camera until the student turns it themselves.
+    let driven = true
     resetRef.current = () => {
       camera.position.copy(home)
-      controls.target.set(0, 0, 0)
-      for (const t of tagged) t.object.position.copy(t.object.userData.home as THREE.Vector3)
+      controls.target.copy(homeLook)
+      driven = true
+      for (const t of tagged) {
+        t.object.position.copy(t.object.userData.home as THREE.Vector3)
+        t.object.userData.dragged = false
+      }
     }
 
     const col = (c: LessonColor): string => colors[c]
@@ -377,9 +497,30 @@ export function Model3D({
         if (!part.object.parent) scene.add(part.object)
         part.object.userData.home = part.object.position.clone()
         part.object.userData.scale = part.object.scale.clone()
-        tagged.push({ ...part, at })
+        part.object.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            const transparent = (child.material as THREE.Material).transparent
+            child.castShadow = !transparent
+            child.receiveShadow = true
+          }
+        })
+        tagged.push({ ...part, at, id: o.id })
       }
     })
+    const hidden = new Set(model.hidden)
+    // A floor that only shows shadows, just under the lowest part.
+    const bounds = new THREE.Box3()
+    for (const t of tagged) if (t.object instanceof THREE.Mesh) bounds.expandByObject(t.object)
+    if (!bounds.isEmpty()) {
+      const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(40, 40),
+        new THREE.ShadowMaterial({ opacity: 0.22 }),
+      )
+      floor.rotation.x = -Math.PI / 2
+      floor.position.y = bounds.min.y - 0.02
+      floor.receiveShadow = true
+      scene.add(floor)
+    }
 
     // Grab and move objects on a plane facing the camera.
     const ray = new THREE.Raycaster()
@@ -412,6 +553,7 @@ export function Model3D({
       const target = hits.map((h) => rootOf(h.object)).find(Boolean)
       if (!target) return
       dragging = target.object
+      dragging.userData.dragged = true
       controls.enabled = false
       dragPlane.setFromNormalAndCoplanarPoint(
         camera.getWorldDirection(new THREE.Vector3()).negate(),
@@ -440,11 +582,15 @@ export function Model3D({
     renderer.domElement.addEventListener('pointerdown', down)
     renderer.domElement.addEventListener('pointermove', move)
     renderer.domElement.addEventListener('pointerup', up)
-    controls.addEventListener('start', () => setHint(false))
+    controls.addEventListener('start', () => {
+      setHint(false)
+      driven = false
+    })
 
     // One label element per tagged object, positioned every frame.
     labels.replaceChildren()
     lines.replaceChildren()
+    const onScreen = new Set<number>()
     const els = tagged.map((t) => {
       if (!t.label) return null
       const div = document.createElement('div')
@@ -456,9 +602,11 @@ export function Model3D({
         top: '0',
         whiteSpace: 'nowrap',
         color: ink,
-        fontSize: '32px',
+        fontSize: `${LABEL_SIZE}px`,
         fontFamily: '"Kalam", cursive',
-        textShadow: '0 1px 6px rgba(0,0,0,0.45)',
+        // A dark halo keeps white labels readable over bright parts (water, a glowing disc).
+        textShadow:
+          '0 0 2px rgba(0,0,0,0.95), 0 1px 3px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.55)',
         pointerEvents: 'none',
       })
       labels.appendChild(div)
@@ -473,46 +621,133 @@ export function Model3D({
     const world = new THREE.Vector3()
     let frame = 0
     const clock = new THREE.Clock()
+    const up3 = new THREE.Vector3(0, 1, 0)
+    const pos = new THREE.Vector3()
+    const look = new THREE.Vector3()
+    const goal = new THREE.Vector3()
+    const glowing = new Set<THREE.Object3D>()
     const tick = (): void => {
       const dt = clock.getDelta()
-      if (spinRef.current && controls.enabled && !dragging) {
-        const angle = dt * 0.35
-        const p = camera.position.clone().sub(controls.target)
-        p.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
-        camera.position.copy(controls.target).add(p)
+      const T = timeRef.current
+      const list = cuesRef.current
+      if (driven && !dragging) {
+        // Glide from shot to shot, then turn slowly around what we look at if asked.
+        pos.copy(home)
+        look.copy(homeLook)
+        for (const c of list) {
+          if (!c.shot || T < c.at) continue
+          const k = glide(c, T)
+          pos.lerp(goal.copy(v3(c.shot.camera)), k)
+          look.lerp(goal.copy(v3(c.shot.look)), k)
+        }
+        if (spinRef.current)
+          pos
+            .sub(look)
+            .applyAxisAngle(up3, T * 0.16)
+            .add(look)
+        camera.position.copy(pos)
+        controls.target.copy(look)
+        camera.lookAt(look)
+      } else {
+        if (spinRef.current && controls.enabled && !dragging) {
+          const p = camera.position.clone().sub(controls.target)
+          p.applyAxisAngle(up3, dt * 0.35)
+          camera.position.copy(controls.target).add(p)
+        }
+        controls.update()
       }
-      controls.update()
       const prog = progressRef.current
+      const current = [...list].reverse().find((c) => T >= c.at)
       for (const t of tagged) {
-        const k = Math.max(0, Math.min(1, (prog - t.at) / 0.2))
-        const e = 1 - (1 - k) ** 3
+        let v = t.id && hidden.has(t.id) ? 0 : clamp01((prog - t.at) / 0.2)
+        if (t.id) {
+          for (const c of list) {
+            const shown = when(c.show, t.id, true)
+            if (shown !== null) v = Math.max(v, clamp01((T - c.at - shown) / 0.6))
+            const gone = when(c.hide, t.id, false)
+            if (gone !== null) v = Math.min(v, 1 - clamp01((T - c.at - gone) / 0.5))
+          }
+        }
+        const e = 1 - (1 - v) ** 3
         const base = t.object.userData.scale as THREE.Vector3
         t.object.scale.copy(base).multiplyScalar(Math.max(0.0001, e))
-        t.object.visible = k > 0
+        t.object.visible = v > 0
+        if (t.id && !t.object.userData.dragged) {
+          const at = goal.copy(t.object.userData.home as THREE.Vector3)
+          for (const c of list) {
+            const m = c.move.find((x) => x.id === t.id)
+            if (m && T >= c.at) at.lerp(v3(m.to), glide(c, T, 0.75, 6))
+          }
+          t.object.position.copy(at)
+        }
+        const flow = t.object.userData.flow as
+          { points: THREE.Vector3[]; lengths: number[]; speed: number; count: number } | undefined
+        if (flow) {
+          t.object.children.forEach((ball, j) => {
+            const u = (((T * flow.speed + j / flow.count) % 1) + 1) % 1
+            along(flow.points, flow.lengths, u, ball.position)
+          })
+        }
+        // Parts the scene is talking about glow gently.
+        const glow = !!t.id && !!current?.glow.includes(t.id)
+        if (glow || glowing.has(t.object)) {
+          const level = glow ? 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(T * 4)) : 0
+          t.object.traverse((child) => {
+            if (
+              child instanceof THREE.Mesh &&
+              child.material instanceof THREE.MeshStandardMaterial
+            ) {
+              child.material.emissive.copy(child.material.color)
+              child.material.emissiveIntensity = level
+            }
+          })
+          if (glow) glowing.add(t.object)
+          else glowing.delete(t.object)
+        }
       }
       renderer.render(scene, camera)
 
+      // Labels are placed in priority order: what the narrator is talking about, then what was
+      // already on screen (so labels do not flicker), then the rest. A label with no clear spot
+      // waits off screen instead of landing on another one.
       const placer = new LabelPlacer({ x: 8, y: 8, w: width - 16, h: height - 16 })
-      tagged.forEach((t, i) => {
+      const talking = new Set(current?.glow ?? [])
+      const rank = (i: number): number =>
+        tagged[i]?.id && talking.has(tagged[i]?.id ?? '') ? 0 : onScreen.has(i) ? 1 : 2
+      const order = tagged.map((_, i) => i).sort((a, b) => rank(a) - rank(b) || a - b)
+      for (const i of order) {
+        const t = tagged[i]
         const pair = els[i]
-        if (!pair) return
+        if (!t || !pair) continue
+        const hide = (): void => {
+          onScreen.delete(i)
+          pair.div.style.opacity = '0'
+          pair.line.setAttribute('stroke-opacity', '0')
+        }
         const shown =
           t.object.visible && t.object.scale.x > 0.6 * (t.object.userData.scale as THREE.Vector3).x
         if (!shown) {
-          pair.div.style.opacity = '0'
-          pair.line.setAttribute('stroke-opacity', '0')
-          return
+          hide()
+          continue
         }
         world.copy(t.anchor)
         t.object.localToWorld(world)
         const s = world.project(camera)
         if (s.z > 1) {
-          pair.div.style.opacity = '0'
-          return
+          hide()
+          continue
         }
         const x = ((s.x + 1) / 2) * width
         const y = ((1 - s.y) / 2) * height
-        const spot = placer.place(x + 10, y - 10, t.label, 32, 'start')
+        const spot =
+          rank(i) === 0
+            ? placer.place(x + 10, y - 10, t.label, LABEL_SIZE, 'start')
+            : placer.placeIfClear(x + 10, y - 10, t.label, LABEL_SIZE, 'start')
+        if (!spot) {
+          hide()
+          continue
+        }
+        onScreen.add(i)
         pair.div.style.opacity = '1'
         pair.div.style.transform = `translate(${spot.box.x + 6}px, ${spot.box.y}px)`
         const moved = Math.hypot(spot.x - (x + 10), spot.y - (y - 10)) > 30
@@ -521,7 +756,7 @@ export function Model3D({
         pair.line.setAttribute('x2', String(spot.box.x + 6))
         pair.line.setAttribute('y2', String(spot.box.y + spot.box.h / 2))
         pair.line.setAttribute('stroke-opacity', moved ? '0.5' : '0')
-      })
+      }
       frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
@@ -539,6 +774,8 @@ export function Model3D({
           for (const m of mats) (m as THREE.Material).dispose()
         }
       })
+      room.dispose()
+      pmrem.dispose()
       renderer.dispose()
       renderer.domElement.remove()
     }
@@ -558,7 +795,7 @@ export function Model3D({
         height={height}
       />
       <div ref={labelLayer} className="pointer-events-none absolute inset-0" />
-      <div className="absolute right-3 bottom-3 flex gap-1.5">
+      <div className={still ? 'hidden' : 'absolute right-3 bottom-3 flex gap-1.5'}>
         <button
           type="button"
           aria-label="Reset the view"
@@ -582,7 +819,7 @@ export function Model3D({
           />
         </button>
       </div>
-      {hint ? (
+      {hint && !still ? (
         <div
           className="pointer-events-none absolute top-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/50 px-4 py-2 text-white"
           style={{ fontSize: 26 }}

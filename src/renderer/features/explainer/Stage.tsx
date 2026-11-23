@@ -78,7 +78,7 @@ import {
   type LessonModel,
   type LessonTheme,
 } from '@shared/lesson'
-import { Model3D } from './Model3D'
+import { Model3D, type ModelCue } from './Model3D'
 import { LabelPlacer, textWidth, type Anchor, type Box } from '@shared/label-layout'
 
 export const STAGE_W = 1600
@@ -227,6 +227,9 @@ interface BoardState {
   /** A 3D model on the diagram side, and how far its scene has played. */
   model: LessonModel | null
   modelP: number
+  /** Seconds since the scene that brought in the model began, and what each scene since asks. */
+  modelT: number
+  cues: ModelCue[]
 }
 
 const LEFT_TYPES = new Set(['text', 'math'])
@@ -258,6 +261,8 @@ function boardAt(lesson: Lesson, scene: number, t: number, seconds: number[]): B
   )
   let model: LessonModel | null = null
   let modelP = 1
+  let modelT = 0
+  let cues: ModelCue[] = []
 
   let title = ''
   let graph: Graph | null = null
@@ -267,9 +272,18 @@ function boardAt(lesson: Lesson, scene: number, t: number, seconds: number[]): B
     if (!s) continue
     if (s.title) title = s.title
     if (s.graph) graph = s.graph
+    if (s.clearText && i > start)
+      for (const other of placed) if (LEFT_TYPES.has(other.item.t)) other.p = -1
     if (s.model) {
       model = s.model
       modelP = i < scene ? 1 : Math.min(1, t / Math.max(0.5, (seconds[i] ?? 6) * 0.7))
+      modelT = 0
+      cues = []
+    }
+    if (model) {
+      const len = seconds[i] ?? 6
+      cues.push({ at: modelT, len, ...s.directions })
+      modelT += i < scene ? len : t
     }
     const times = sceneTimeline(s, seconds[i] ?? 6)
     s.items.forEach((item, k) => {
@@ -302,6 +316,8 @@ function boardAt(lesson: Lesson, scene: number, t: number, seconds: number[]): B
     split: hasLeft && hasDiagram,
     model,
     modelP,
+    modelT,
+    cues,
   }
 }
 
@@ -323,6 +339,16 @@ interface Mapper {
   xmax: number
   ymin: number
   ymax: number
+}
+
+/** Narrows the plot so the widest y tick label fits inside the frame (about 11 px a character). */
+function graphFrame(frame: Frame, graph: Graph): Frame {
+  const stepY = niceStep(graph.y[1] - graph.y[0])
+  let widest = 0
+  for (let y = Math.ceil(graph.y[0] / stepY) * stepY; y <= graph.y[1] + 1e-9; y += stepY)
+    widest = Math.max(widest, nice(y).length)
+  const room = Math.max(0, widest * 11 + 22 - 30)
+  return { ...frame, x: frame.x + room, w: frame.w - room }
 }
 
 function mapper(frame: Frame, graph: Graph | null): Mapper {
@@ -464,6 +490,7 @@ export function Stage({
   seconds,
   caption,
   models3d = true,
+  still = false,
 }: {
   lesson: Lesson
   scene: number
@@ -472,6 +499,8 @@ export function Stage({
   caption?: string | null
   /** Show 3D models; when off, a small note stands in their place. */
   models3d?: boolean
+  /** Making a video: no buttons or hints on the 3D model, and it moves by the lesson's clock. */
+  still?: boolean
 }) {
   const box = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.5)
@@ -490,9 +519,11 @@ export function Stage({
   // An exam walkthrough keeps the question pinned in a strip across the top.
   const strip = lesson.question ? 62 : 0
   const top = (board.title ? 130 : 70) + strip
-  const frame: Frame = board.split
+  const base: Frame = board.split
     ? { x: 830, y: top + 10, w: 700, h: STAGE_H - top - 90 }
     : { x: 160, y: top + 10, w: STAGE_W - 320, h: STAGE_H - top - 90 }
+  // Leave room left of the plot for the y-axis numbers, so "120" is not cut off.
+  const frame: Frame = board.graph ? graphFrame(base, board.graph) : base
   const m = mapper(frame, board.graph)
   const col = (c: LessonColor): string => theme.colors[c]
 
@@ -1258,7 +1289,8 @@ export function Stage({
               </marker>
             ))}
             <clipPath id="lesson-frame">
-              <rect x={frame.x - 30} y={frame.y - 30} width={frame.w + 60} height={frame.h + 60} />
+              {/* The unnarrowed frame, so the y-axis numbers beside the plot stay visible. */}
+              <rect x={base.x - 30} y={base.y - 30} width={base.w + 60} height={base.h + 60} />
             </clipPath>
             <filter id="lesson-glow" x="-30%" y="-30%" width="160%" height="160%">
               <feGaussianBlur stdDeviation="6" result="b" />
@@ -1407,6 +1439,9 @@ export function Stage({
             <Model3D
               model={board.model}
               progress={board.modelP}
+              time={board.modelT}
+              cues={board.cues}
+              still={still}
               colors={theme.colors}
               ink={theme.colors.ink}
               width={frame.w}
