@@ -12,6 +12,7 @@ import {
   type IpcMainInvokeEvent,
 } from 'electron'
 import { APP_NAME, APP_SCHEME } from '@shared/constants'
+import { extractText } from './extract-text'
 import { AiService } from './ai/service'
 import { CalendarSync } from './calendar/sync'
 import { SecretStore } from './ai/secrets'
@@ -44,6 +45,10 @@ const devServerUrl = (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) |
 
 // End-to-end tests point each run at a throwaway data folder.
 const testUserData = process.env['ATLAS_USER_DATA']
+// End-to-end tests read files with the packaged text extractor through this hook.
+if (testUserData) {
+  ;(globalThis as { __atlasExtractText?: typeof extractText }).__atlasExtractText = extractText
+}
 if (testUserData) app.setPath('userData', testUserData)
 
 app.setName(APP_NAME)

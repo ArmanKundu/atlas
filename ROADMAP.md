@@ -5,21 +5,21 @@ Phases follow `BUILD_PROMPT.md` §14; extra work the owner asked for is listed a
 
 ## Now
 
-**Group library for up to five friends (owner's plan, 23 Nov).** Atlas becomes one shared, public library for six subjects, with the exam system and AI on top. Order: scanner, whiteboard, subjects, shared library, in-app web links, packaged-app test.
+**Group library for up to five friends (owner's plan, 23 Nov).** Atlas becomes one shared, public library for six subjects, with the exam system and AI on top. Done: scanner, whiteboard, subjects, shared library, in-app web links, packaged-app test. Next: shared VCAA exams (waiting on the owner's go-ahead to download), timetables in the Planner, subject tools.
 
 ## Group library (owner's plan, 23 Nov)
 
-- [ ] **Six subjects only:** English, Mathematical Methods, General Mathematics, Chemistry, Biology, Accounting. Each has Units 1, 2, 3 and 4.
-- [ ] **Public by default:** everything people add is shared with the group. Only grades, results and private settings stay on your laptop.
-- [ ] **Upload form:** title, short description, subject, units (1–4), type (PDF, PowerPoint, image, video, audio, notes, link, exam, timetable), and the teacher who made it.
-- [ ] **AI summary, on by default:** the uploader's own AI reads the file (handwriting too), writes a text version and a summary, and both are shared. Can be turned off per upload.
-- [ ] **Teachers:** tag who made a resource and filter by teacher; later the assistant and exam builder can prefer a teacher's material.
-- [ ] **Web links that open inside Atlas:** Google Drive, Docs, Slides and other sites in an in-app browser tab.
+- [x] **Six subjects only:** English, Mathematical Methods, General Mathematics, Chemistry, Biology, Accounting. Each has Units 1, 2, 3 and 4.
+- [x] **Public by default:** everything people add is shared with the group. Only grades, results and private settings stay on your laptop.
+- [x] **Upload form:** title, short description, subject, units (1–4), type (PDF, PowerPoint, image, video, audio, notes, link, exam, timetable), and the teacher who made it.
+- [~] **AI summary, on by default:** the uploader's own AI reads the file (handwriting too), writes a text version and a summary, and both are shared. Can be turned off per upload. _Done for PDF, PowerPoint, Word, notes, photos and scans. Not yet: video and audio transcription; not yet tried against a real AI end to end._
+- [~] **Teachers:** tag who made a resource and filter by teacher; later the assistant and exam builder can prefer a teacher's material. _Tagging and filtering done; the assistant preference is still to do._
+- [x] **Web links that open inside Atlas:** Google Drive, Docs, Slides and other sites in an in-app browser tab.
 - [ ] **Shared exams in Supabase:** VCAA and other past papers stored once in the cloud for everyone, with their reports. The VCAA site is down, so papers may come from the Wayback Machine (needs the owner's go-ahead).
-- [ ] **Timetables:** a place to upload class and exam timetables, shared with the group, used later for "what's coming up".
-- [ ] **Phone scanner like Genius Scan:** automatic page edges and crop, straightened pages, page-by-page capture, filters, better design; scans can go straight to the shared library.
-- [ ] **Whiteboard for maths, chemistry and biology:** live "drafting" view while the AI works, accurate shapes (squares, right angles, labels outside lines), diagrams for each subject.
-- [ ] **Test the packaged app,** not only the development build.
+- [~] **Timetables:** a place to upload class and exam timetables, shared with the group, used later for "what's coming up". _Uploading as type Timetable works; reading it into the Planner is still to do._
+- [x] **Phone scanner like Genius Scan:** automatic page edges and crop, straightened pages, page-by-page capture, filters, better design; scans can go straight to the shared library.
+- [~] **Whiteboard for maths, chemistry and biology:** live "drafting" view while the AI works, accurate shapes (squares, right angles, labels outside lines), diagrams for each subject. _Shapes and the drafting view are done; not yet tried with a live AI stream._
+- [x] **Test the packaged app,** not only the development build. _macOS Intel build tested (setup, PDF import and reading, scanner). Apple silicon and Windows builds are made but not run here._
 - [ ] **Later: subject tools.** Graphing calculator (Maths), scientific calculator, data booklet and periodic table (Chemistry). The owner will send inspiration.
 
 ## Phases

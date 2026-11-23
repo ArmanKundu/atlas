@@ -19,6 +19,45 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '0.4.0',
+    date: '2026-11-23',
+    headline: 'One library for the whole group',
+    summary:
+      'Six subjects with Units 1 to 4, a shared library everyone adds to, AI summaries of every upload, a much better phone scanner and Google Drive inside Atlas.',
+    items: [
+      {
+        icon: 'users',
+        title: 'One shared library',
+        body: 'Everything you share goes to the group library by default. Tag it with the subject, Units 1 to 4, the type of material and the teacher, and filter by any of them. Your grades stay on your laptop.',
+      },
+      {
+        icon: 'sparkles',
+        title: 'AI summaries for everyone',
+        body: 'When you share a file, your own AI reads it (handwriting and scans too) and adds a summary and a text version that the whole group can search. You can turn it off for any upload.',
+      },
+      {
+        icon: 'scan-line',
+        title: 'A proper phone scanner',
+        body: 'It finds the page edges, straightens and cleans each page, and lets you fix the corners. Take pages one after another, then save them as one PDF. Share a scan with the group in one click.',
+      },
+      {
+        icon: 'presentation',
+        title: 'Watch the whiteboard being drafted',
+        body: 'The board draws itself while the AI is still writing, then readies the voice. Squares, triangles and labels now come out the right shape, for maths, chemistry and biology.',
+      },
+      {
+        icon: 'book-open',
+        title: 'Google Drive inside Atlas',
+        body: 'Shared links and Google Drive, Docs and Slides open in an Atlas window that remembers your sign-in.',
+      },
+      {
+        icon: 'graduation-cap',
+        title: 'Your six subjects',
+        body: 'English, Mathematical Methods, General Mathematics, Chemistry, Biology and Accounting, each with Units 1 to 4. Pick yours in Settings, Subjects.',
+      },
+    ],
+  },
+  {
     version: '0.3.0',
     date: '2026-11-23',
     headline: 'A whiteboard tutor, a built-in AI and a phone scanner',

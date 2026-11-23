@@ -151,3 +151,15 @@ The owner wants AI that works on weak laptops with no account or limits, and a w
 - **Phone scanner:** a one-time link on the home network, shown as a QR code. Atlas serves a small page from a local HTTP server that accepts only private-network addresses, needs a random token and closes after 30 minutes or when the dialog closes. No relay server and no app to install.
 - **Camera:** phones only allow a live camera on https pages, and a self-signed certificate would show a scary warning. So the page uses the phone's own camera (flash and flip work there) and adds live auto-capture only where the browser allows it.
 - **Files:** the library reads PDFs, so pages become one multi-page PDF, or in photos mode one single-page PDF each. They are filed as class notes in the chosen subject.
+
+### D-024 One group library, read by the uploader's own AI
+
+- **Context:** the owner's group (up to five accounts) wants one public library for six subjects, with summaries of every upload. Atlas has no backend and never pays for AI.
+- **Decision:** a space flagged `is_group` that every profile joins as an editor on sign-up; the share form defaults to it. Items carry `units` (1–4), `material`, `teacher`, `ai_summary`, `ai_text`, `ai_by`. After a share, the uploader's Atlas extracts the text in the main process (pdf.js, a small zip reader for PowerPoint and Word) and asks the uploader's AI for "## Summary" and "## Text"; photos and scanned PDFs go to a provider that can see files (Claude API, Claude Code with the Read tool on that folder only, Codex with `--image`). The result is saved to the item.
+- **Why:** the cost stays with whoever shares, nothing runs on a server, and everyone gets searchable text even for handwriting. Grades never leave the laptop.
+- **Trade-offs:** if the uploader has no AI or closes Atlas straight away, the item has no summary (it can be added later). Video and audio are skipped for now.
+
+### D-025 Web pages in a sandboxed Atlas window
+
+- **Decision:** `shell:openWeb` opens https pages in a separate BrowserWindow with no preload, sandboxed, and its own persistent cookie partition. The user agent drops "Electron" so Google sign-in works. Drive and Docs links anywhere in Atlas open there; other sites still open in the browser.
+- **Why:** shared Drive folders stay inside the app without giving any site access to Atlas or its data.

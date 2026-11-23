@@ -68,6 +68,10 @@ function officeText(xml: string, run: 'a:t' | 'w:t', para: 'a:p' | 'w:p'): strin
 
 async function pdfText(bytes: Buffer): Promise<Extracted> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  // In Node pdf.js runs its worker in-process. Hand it the worker module directly: once bundled,
+  // the file it would load by its relative path is not there.
+  const holder = globalThis as { pdfjsWorker?: unknown }
+  holder.pdfjsWorker ??= await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
   const task = pdfjs.getDocument({ data: new Uint8Array(bytes) })
   const doc = await task.promise
   const parts: string[] = []
