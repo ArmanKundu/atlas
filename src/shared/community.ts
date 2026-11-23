@@ -307,6 +307,8 @@ export const SharedCardSchema = z.object({
   aiSummary: z.string(),
   aiBy: z.string(),
   aiTextLength: z.number(),
+  /** The uploader's AI is still reading it and filling in the details. */
+  aiPending: z.boolean(),
 })
 export type SharedCard = z.infer<typeof SharedCardSchema>
 
@@ -343,7 +345,8 @@ export type SharedList = z.infer<typeof SharedListSchema>
 
 const meta = {
   spaceId: z.string().max(64),
-  title: z.string().trim().min(1).max(200),
+  /** May be empty when the AI is filling the details in. */
+  title: z.string().trim().max(200).default(''),
   description: z.string().max(2000).default(''),
   subject: z.string().max(80).default(''),
   tags: z.array(z.string().max(40)).max(12).default([]),
@@ -353,6 +356,21 @@ const meta = {
   teacher: z.string().trim().max(80).default(''),
   /** Let the uploader's own AI read it and write a summary and a text version for everyone. */
   aiSummary: z.boolean().default(true),
+  /** Share now and let the AI fill in whatever was left blank once it has read it. */
+  autofill: z.boolean().default(false),
+}
+
+/** Tag on an item whose details the uploader's AI is still filling in. */
+export const AI_PENDING_TAG = 'ai-pending'
+
+/** What the AI worked out about a shared resource; blank fields are left alone. */
+export interface AiDetails {
+  title: string
+  subject: string
+  material: string
+  units: number[]
+  teacher: string
+  description: string
 }
 
 /**

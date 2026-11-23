@@ -110,3 +110,13 @@ Four to eight short bullet points: what the resource is, which topics and key sk
 
 ## Text
 The full text of the resource as clean Markdown. For a photo, scan or handwriting, transcribe every word you can read, keeping headings, lists, tables and equations (use LaTeX between $ signs for maths and chemistry). Write [unclear] for anything you cannot read. Do not add anything that is not in the resource.`
+
+/** Asked on top of the digest when the student left the details for the AI to fill in. */
+export const DETAILS_PROMPT = (subjects: string[], materials: string[]): string => `
+
+Then add a third part:
+
+## Details
+One JSON object on a single line, no code fence, with these keys:
+{"title": "a short clear title, at most 80 characters, like 'Methods Unit 3 SAC 1 revision sheet' or '2024 Chemistry exam, Section B'", "subject": one of ${JSON.stringify(subjects)} or "", "material": one of ${JSON.stringify(materials)}, "units": the VCE units (1 to 4) it covers, as a list of numbers, or [] if unclear, "teacher": the teacher or author named on it, or "", "description": one or two sentences on what it is and who it helps}
+Only state what the resource shows. Use "" or [] when unsure.`

@@ -10,6 +10,7 @@ import {
   session,
   shell,
   type IpcMainInvokeEvent,
+  systemPreferences,
 } from 'electron'
 import { APP_NAME, APP_SCHEME } from '@shared/constants'
 import { extractText } from './extract-text'
@@ -24,7 +25,10 @@ import { PrefsStore } from './prefs'
 import { ProfileManager } from './profiles'
 import { buildCsp, isAppUrl, resolveRendererPath } from './security'
 import { CommunityLibrary } from './community'
+import { MATERIALS } from '@shared/community'
+import { GROUP_SUBJECTS } from '@shared/group-subjects'
 import { Voice } from './voice'
+import { Hearing } from './hearing'
 import { PhoneScanner } from './scanner'
 import { importPaths } from './library'
 import { localModels } from './ai/local-model'
@@ -195,13 +199,27 @@ async function main(): Promise<void> {
           subject: input.subject,
           material: input.material,
           body: body ?? undefined,
+          details: input.autofill
+            ? { subjects: GROUP_SUBJECTS.map((g) => g.name), materials: [...MATERIALS] }
+            : undefined,
         })
         .then(async (digest) => {
-          if (!digest) return
-          await shared.saveDigest({ id, ...digest })
+          if (digest && input.aiSummary) {
+            await shared.saveDigest({
+              id,
+              summary: digest.summary,
+              text: digest.text,
+              by: digest.by,
+            })
+          }
+          if (input.autofill) await shared.applyAiDetails(id, input, digest?.details ?? null)
           broadcast(windows(), 'shared:changed', { id })
         })
-        .catch((error: unknown) => log.warn(`shared digest failed: ${String(error)}`))
+        .catch(async (error: unknown) => {
+          log.warn(`shared digest failed: ${String(error)}`)
+          if (input.autofill) await shared.applyAiDetails(id, input, null).catch(() => undefined)
+          broadcast(windows(), 'shared:changed', { id })
+        })
     },
   })
   ai.setSharedContext((question) => shared.assistantContext(question))
@@ -288,9 +306,19 @@ async function main(): Promise<void> {
   registry.handle('voice:status', () => voice.state)
   registry.handle('voice:prepare', () => voice.prepare())
   registry.handle('voice:speak', (input) => voice.speak(input))
+  const hearing = new Hearing({
+    log,
+    progress: (p) => broadcast(windows(), 'models:progress', p),
+  })
+  registry.handle('hearing:status', () => hearing.state)
+  registry.handle('hearing:prepare', () => hearing.prepare())
+  registry.handle('hearing:transcribe', async ({ pcm }) => ({
+    text: await hearing.transcribe(pcm),
+  }))
   app.on('will-quit', () => {
     updater.stop()
     voice.stop()
+    hearing.stop()
     profiles.lock()
   })
   const missing = registry.missing()
@@ -342,10 +370,29 @@ function registerRendererProtocol(): void {
 /** No permissions, and (in development) the CSP applied to the dev server's responses. */
 function lockDownSession(): void {
   const defaultSession = session.defaultSession
-  defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) =>
-    callback(false),
+  // Only the microphone, only for Atlas's own pages (speaking a question). Nothing else.
+  defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
+    const types = 'mediaTypes' in details ? (details.mediaTypes ?? []) : []
+    const micOnly =
+      permission === 'media' &&
+      types.length > 0 &&
+      types.every((t) => t === 'audio') &&
+      isAppUrl(details.requestingUrl, devServerUrl)
+    if (!micOnly) return callback(false)
+    // Tests use a fake microphone and cannot answer the macOS prompt.
+    if (process.platform !== 'darwin' || testUserData) return callback(true)
+    if (systemPreferences.getMediaAccessStatus('microphone') === 'granted') return callback(true)
+    void systemPreferences
+      .askForMediaAccess('microphone')
+      .then(callback)
+      .catch(() => callback(false))
+  })
+  defaultSession.setPermissionCheckHandler(
+    (_webContents, permission, _origin, details) =>
+      permission === 'media' &&
+      details.mediaType === 'audio' &&
+      isAppUrl(details.requestingUrl ?? '', devServerUrl),
   )
-  defaultSession.setPermissionCheckHandler(() => false)
 
   if (!devServerUrl) return
   const csp = buildCsp({ devServerUrl })

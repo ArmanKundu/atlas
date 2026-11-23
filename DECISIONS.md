@@ -171,3 +171,10 @@ The owner wants AI that works on weak laptops with no account or limits, and a w
 - **Video:** a hidden offscreen window draws the lesson one frame at a time; the main process copies each frame (`capturePage`) and the window encodes them with WebCodecs (H.264, AAC narration mixed with an OfflineAudioContext) into MP4 with `mp4-muxer`. No screen recording, so no macOS Screen Recording permission.
 - **Why not real video generation:** pictures drawn from data stay exact (a wrong graph is worse than none), cost nothing beyond the text tokens and work offline once written.
 - **Trade-offs:** making a video takes about five times the lesson's length on an older Intel Mac.
+
+### D-027 One open library, details filled in by the uploader's AI
+
+- **Context:** the owner wants a single library everyone can see, with no private spaces, invites or codes, and less typing when sharing.
+- **Decision:** the Shared page shows only the group library (`spaces.is_group`, which every profile joins on creation); the spaces sidebar, create/join, invites and people dialogs are gone from the app. The account cap was raised from 5 to 100.
+- **AI fill:** a share can go up with nothing but the file. It is stored at once with a fallback title and an `ai-pending` tag; the uploader's own AI then reads it (the existing digest pass plus a `## Details` JSON line) and fills only the fields the student left blank, then drops the tag. If the AI cannot read it, the tag is dropped anyway; cards stop showing "pending" after 30 minutes regardless.
+- **Voice:** the spoken "Talk it through" mode was removed at the owner's request; on-device dictation (Whisper) stays as a mic button in the Explainer.

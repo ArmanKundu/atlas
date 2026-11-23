@@ -26,6 +26,16 @@ export const CHANGELOG: Release[] = [
       'Ask anything, paste a screenshot or pick an exam question, and your AI makes a narrated, animated lesson that starts playing in seconds. Save it as an MP4, and it is shared with the group.',
     items: [
       {
+        icon: 'users',
+        title: 'One library for everyone',
+        body: 'No more spaces, invites or join codes. Sign in and you see everything everyone has shared, and anything you share goes straight to everyone.',
+      },
+      {
+        icon: 'sparkles',
+        title: 'Your AI fills in the details',
+        body: 'Share a file or note without typing anything. It goes up straight away, then your AI reads it and adds the title, subject, type, units, teacher, a description and a summary.',
+      },
+      {
         icon: 'clapperboard',
         title: 'Explainer',
         body: 'A new page in the sidebar. Type a question, paste or drop a photo of one, or attach a file from your library. Atlas draws the working and the diagrams in time with the voice.',

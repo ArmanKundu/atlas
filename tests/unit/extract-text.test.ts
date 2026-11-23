@@ -35,3 +35,26 @@ describe('parseDigest', () => {
     expect(out.text).toBe('# Enzymes\nThey speed up reactions.')
   })
 })
+
+describe('parseDetails', () => {
+  it('reads the details line and keeps the text part clean', async () => {
+    const { parseDetails, parseDigest } = await import('../../src/main/ai/service')
+    const answer =
+      '## Summary\n- Derivatives\n\n## Text\nFind f′(x).\n\n## Details\n{"title": "Methods SAC revision", "subject": "Mathematical Methods", "material": "worksheet", "units": [3, "4", 7], "teacher": "Ms Lee", "description": "Practice on derivatives."}'
+    expect(parseDigest(answer).text).toBe('Find f′(x).')
+    expect(parseDetails(answer)).toEqual({
+      title: 'Methods SAC revision',
+      subject: 'Mathematical Methods',
+      material: 'worksheet',
+      units: [3, 4],
+      teacher: 'Ms Lee',
+      description: 'Practice on derivatives.',
+    })
+  })
+
+  it('gives null when there is no usable details line', async () => {
+    const { parseDetails } = await import('../../src/main/ai/service')
+    expect(parseDetails('## Summary\n- x')).toBeNull()
+    expect(parseDetails('## Details\n{not json}')).toBeNull()
+  })
+})

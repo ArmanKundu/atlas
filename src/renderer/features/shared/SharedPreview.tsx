@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Download, ExternalLink, Pencil, Repeat2, Sparkles, Trash2, X } from 'lucide-react'
+import { Download, ExternalLink, Loader2, Pencil, Repeat2, Sparkles, Trash2, X } from 'lucide-react'
 import { MATERIAL_LABELS, formatBytes, type SharedItem, type Space } from '@shared/community'
 import { Button, IconButton } from '@/design/Button'
 import { Badge } from '@/design/Form'
@@ -146,6 +146,12 @@ export function SharedPreview({
               <span>{it.remixes} remixes</span>
             </p>
 
+            {it.aiPending && !it.aiSummary ? (
+              <section className="mt-5 flex items-center gap-2 rounded-lg bg-sunken px-4 py-3 text-2xs text-ink-2">
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                The uploader’s AI is reading this and writing a summary and details…
+              </section>
+            ) : null}
             {it.aiSummary ? (
               <section className="mt-5 rounded-lg bg-sunken px-4 py-3">
                 <h3 className="flex items-center gap-1.5 text-2xs font-semibold text-ink-2">

@@ -15,7 +15,8 @@ import type { ProfileManager } from '../profiles'
 import { AiError, shouldFallThrough } from './errors'
 import { agentSystemPrompt } from './prompts/agents'
 import { lessonFollowUpPrompt, lessonSystemPrompt, type LessonOptions } from './prompts/lesson'
-import { DIGEST_PROMPT, TASK_PROMPTS, type CompleteTask } from './prompts/tasks'
+import type { AiDetails } from '@shared/community'
+import { DETAILS_PROMPT, DIGEST_PROMPT, TASK_PROMPTS, type CompleteTask } from './prompts/tasks'
 import { extname } from 'node:path'
 import { extractText } from '../extract-text'
 import {
@@ -486,7 +487,9 @@ export class AiService {
     subject: string
     material: string
     body?: string
-  }): Promise<{ summary: string; text: string; by: string } | null> {
+    /** Also work out the title, subject, type, units, teacher and description. */
+    details?: { subjects: string[]; materials: string[] }
+  }): Promise<{ summary: string; text: string; by: string; details: AiDetails | null } | null> {
     const path = input.path
     const ext = path ? extname(path).toLowerCase() : ''
     if (['.mp4', '.mov', '.m4v', '.webm', '.mp3', '.m4a', '.wav', '.aac', '.ogg'].includes(ext))
@@ -521,7 +524,9 @@ export class AiService {
     try {
       const result = await this.run({
         task: 'digest',
-        system: DIGEST_PROMPT,
+        system: input.details
+          ? DIGEST_PROMPT + DETAILS_PROMPT(input.details.subjects, input.details.materials)
+          : DIGEST_PROMPT,
         messages: [{ role: 'user', content: prompt }],
         signal: AbortSignal.timeout(300_000),
         onText: () => undefined,
@@ -532,7 +537,12 @@ export class AiService {
       const text = scanned ? parsed.text : parsed.text || extracted
       if (!parsed.summary) return null
       const by = providerDef(result.provider).name
-      return { summary: parsed.summary.slice(0, 20_000), text: text.slice(0, 400_000), by }
+      return {
+        summary: parsed.summary.slice(0, 20_000),
+        text: text.slice(0, 400_000),
+        by,
+        details: input.details ? parseDetails(result.text) : null,
+      }
     } catch (error) {
       this.deps.log.warn(`digest failed: ${error instanceof AiError ? error.code : String(error)}`)
       return null
@@ -705,9 +715,34 @@ export class AiService {
   }
 }
 
+/** Reads the "## Details" JSON line the AI adds when it fills in a shared item's details. */
+export function parseDetails(answer: string): AiDetails | null {
+  const part = /##\s*Details\s*\n([\s\S]*)$/i.exec(answer)?.[1] ?? ''
+  const start = part.indexOf('{')
+  const end = part.lastIndexOf('}')
+  if (start < 0 || end <= start) return null
+  try {
+    const raw = JSON.parse(part.slice(start, end + 1)) as Record<string, unknown>
+    const str = (v: unknown, max: number): string =>
+      typeof v === 'string' ? v.trim().slice(0, max) : ''
+    return {
+      title: str(raw['title'], 140),
+      subject: str(raw['subject'], 80),
+      material: str(raw['material'], 20),
+      units: Array.isArray(raw['units'])
+        ? [...new Set(raw['units'].map(Number).filter((n) => [1, 2, 3, 4].includes(n)))]
+        : [],
+      teacher: str(raw['teacher'], 80),
+      description: str(raw['description'], 600),
+    }
+  } catch {
+    return null
+  }
+}
+
 /** Splits a digest answer into its "## Summary" and "## Text" parts. */
 export function parseDigest(answer: string): { summary: string; text: string } {
   const summary = /##\s*Summary\s*\n([\s\S]*?)(?=\n##\s*Text\b|$)/i.exec(answer)?.[1]?.trim() ?? ''
-  const text = /##\s*Text\s*\n([\s\S]*)$/i.exec(answer)?.[1]?.trim() ?? ''
+  const text = /##\s*Text\s*\n([\s\S]*?)(?=\n##\s*Details\b|$)/i.exec(answer)?.[1]?.trim() ?? ''
   return { summary: summary || (text ? '' : answer.trim()), text }
 }

@@ -6,7 +6,9 @@ import { BrowserWindow, app, dialog } from 'electron'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { AtlasError } from '@shared/errors'
 import { LIBRARY_KEY, LIBRARY_URL } from '@shared/constants'
+import { GROUP_SUBJECTS } from '@shared/group-subjects'
 import {
+  AI_PENDING_TAG,
   FeedbackInputSchema,
   ProfileInputSchema,
   PublishSchema,
@@ -19,6 +21,7 @@ import {
   formatBytes,
   searchTerms,
   type AccessEntry,
+  type AiDetails,
   type Capacity,
   type CommunityStatus,
   type Feedback,
@@ -122,7 +125,14 @@ function toCard(row: Row, me: string, spaces: Map<string, Space>): SharedCard {
     title: String(row['title'] ?? ''),
     description: String(row['description'] ?? ''),
     subject: String(row['subject'] ?? ''),
-    tags: Array.isArray(row['tags']) ? (row['tags'] as string[]) : [],
+    tags: (Array.isArray(row['tags']) ? (row['tags'] as string[]) : []).filter(
+      (t) => t !== AI_PENDING_TAG,
+    ),
+    // Pending for at most half an hour, in case the uploader closed Atlas mid-way.
+    aiPending:
+      Array.isArray(row['tags']) &&
+      (row['tags'] as string[]).includes(AI_PENDING_TAG) &&
+      Date.now() - Date.parse(String(row['created_at'])) < 30 * 60_000,
     fileName: (row['file_name'] as string | null) ?? null,
     fileSize: row['file_size'] === null ? null : Number(row['file_size']),
     linkUrl: (row['link_url'] as string | null) ?? null,
@@ -967,11 +977,16 @@ export class CommunityLibrary {
       throw new AtlasError('bad_request', 'Choose a file to share.')
     }
 
+    const readable = input.kind === 'note' || input.kind === 'file'
+    const autofill = input.autofill && readable
+    if (autofill) row['tags'] = [...new Set([...input.tags, AI_PENDING_TAG])].slice(0, 12)
+    if (!String(row['title'] ?? '').trim()) row['title'] = fallbackTitle(row, input)
+
     const { data, error } = await sb.from('items').insert(row).select('id').single()
     if (error) throw friendly(error, 'Could not share that.')
     const id = String((data as Row)['id'])
     if (input.kind === 'lesson') this.deps.db().update('lessons', input.lessonId, { sharedId: id })
-    if (input.aiSummary && !['deck', 'link', 'lesson'].includes(input.kind)) {
+    if ((input.aiSummary || autofill) && readable) {
       const body = typeof row['body'] === 'string' ? row['body'] : null
       this.deps.onPublished?.({ id, input, localPath: localFile, body })
     }
@@ -1045,6 +1060,35 @@ export class CommunityLibrary {
       })
       .eq('id', input.id)
     if (error) throw friendly(error, 'Could not save the AI summary.')
+  }
+
+  /**
+   * Fills in what the student left blank with what their AI worked out, then clears the pending
+   * tag. Called with null details when the AI could not read it, so the item stops looking busy.
+   */
+  async applyAiDetails(id: string, input: PublishInput, details: AiDetails | null): Promise<void> {
+    await this.userId()
+    const sb = this.supabase()
+    const { data: current } = await sb.from('items').select('tags').eq('id', id).maybeSingle()
+    if (!current) return
+    const patch: Row = {
+      tags: ((current as Row)['tags'] as string[]).filter((t) => t !== AI_PENDING_TAG),
+    }
+    if (details) {
+      if (!input.title?.trim() && details.title) patch['title'] = details.title
+      const subject = GROUP_SUBJECTS.find(
+        (g) => g.name.toLowerCase() === details.subject.toLowerCase(),
+      )
+      if (!input.subject && subject) patch['subject'] = subject.name
+      if ((!input.material || input.material === 'other') && isMaterial(details.material))
+        patch['material'] = details.material
+      if (!input.units?.length && details.units.length) patch['units'] = details.units
+      if (!input.teacher?.trim() && details.teacher) patch['teacher'] = details.teacher
+      if (!input.description?.trim() && details.description)
+        patch['description'] = details.description.slice(0, 2000)
+    }
+    const { error } = await sb.from('items').update(patch).eq('id', id)
+    if (error) throw friendly(error, 'Could not save what the AI filled in.')
   }
 
   async remove(id: string): Promise<void> {
@@ -1208,4 +1252,29 @@ export class CommunityLibrary {
       .filter(Boolean)
       .join('\n\n')
   }
+}
+
+function isMaterial(value: string): value is Material {
+  return (MATERIALS as readonly string[]).includes(value)
+}
+
+/** A title for something shared without one, until the AI writes a better one. */
+function fallbackTitle(row: Row, input: { kind: string }): string {
+  const file = typeof row['file_name'] === 'string' ? row['file_name'] : ''
+  if (file) return file.replace(/\.[^.]+$/, '').slice(0, 200)
+  const body = typeof row['body'] === 'string' ? row['body'] : ''
+  const line = body
+    .split('\n')
+    .map((l) => l.replace(/^[#>*\-\s]+/, '').trim())
+    .find(Boolean)
+  if (line && input.kind === 'note') return line.slice(0, 120)
+  const url = typeof row['link_url'] === 'string' ? row['link_url'] : ''
+  if (url) {
+    try {
+      return new URL(url).hostname.replace(/^www\./, '')
+    } catch {
+      // fall through
+    }
+  }
+  return 'Untitled'
 }

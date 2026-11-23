@@ -25,6 +25,7 @@ import { LibraryPicker, QuestionPicker } from '@/features/explainer/Pickers'
 import { questionName, stemPreview } from '@/features/explainer/names'
 import { SAMPLE_LESSONS } from '@/features/explainer/samples'
 import { shareLesson } from '@/features/explainer/share'
+import { MicButton } from '@/features/voice/MicButton'
 import { useLessonStream, type LessonRequest } from '@/features/explainer/useLessonStream'
 import { db, useLive } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -233,6 +234,9 @@ export function Explain() {
       }
       onPaste={(files) => void addFiles(files).catch((e: unknown) => setError(String(e)))}
       onSubmit={() => submit()}
+      mic={
+        <MicButton onText={(text) => setDraft((d) => (d.trim() ? `${d.trim()} ${text}` : text))} />
+      }
       streaming={streaming}
       onStop={stream.cancel}
       attach={
@@ -558,6 +562,7 @@ function Composer({
   onStop,
   attach,
   options,
+  mic,
 }: {
   draft: string
   setDraft: (text: string) => void
@@ -569,6 +574,7 @@ function Composer({
   onStop: () => void
   attach: ReactNode
   options: ReactNode
+  mic: ReactNode
 }) {
   const [dragging, setDragging] = useState(false)
   const canSend = useMemo(
@@ -655,6 +661,7 @@ function Composer({
         {attach}
         {options}
         <span className="flex-1" />
+        {mic}
         {streaming ? (
           <button
             type="button"

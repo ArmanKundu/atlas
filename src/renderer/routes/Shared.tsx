@@ -1,29 +1,20 @@
-import { useDeferredValue, useEffect, useState } from 'react'
+import { useDeferredValue, useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import {
   Bell,
-  Globe,
-  KeyRound,
   LayoutGrid,
   List,
-  Lock,
   LogOut,
-  MoreHorizontal,
-  Plus,
   Search,
-  Settings2,
   Share2,
   ShieldCheck,
   ThumbsUp,
-  Trash2,
-  UserPlus,
   Users,
 } from 'lucide-react'
 import {
   MATERIALS,
   MATERIAL_LABELS,
   SHARED_STORAGE_QUOTA,
-  canManage,
   canWrite,
   formatBytes,
   type CommunityStatus,
@@ -43,15 +34,11 @@ import { useToast } from '@/design/Toast'
 import { AdminDialog } from '@/features/shared/AdminDialog'
 import { EmailSignIn } from '@/features/shared/EmailSignIn'
 import { InboxDialog } from '@/features/shared/InboxDialog'
-import { JoinDialog } from '@/features/shared/JoinDialog'
 import { KindIcon } from '@/features/shared/KindIcon'
 import { KIND_LABEL, timeAgo } from '@/features/shared/kinds'
-import { PeopleDialog } from '@/features/shared/PeopleDialog'
 import { ShareDialog } from '@/features/shared/ShareDialog'
 import { SharedPreview } from '@/features/shared/SharedPreview'
-import { Avatar, RoleBadge, SpaceTile } from '@/features/shared/SpaceBits'
-import { SpaceDialog } from '@/features/shared/SpaceDialog'
-import { banner } from '@/features/shared/spaceStyle'
+import { Avatar } from '@/features/shared/SpaceBits'
 import { useSharedStatus } from '@/features/shared/useSharedStatus'
 import { changed, useAction, useLive } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -121,154 +108,79 @@ export function Shared() {
 function Home({ status, profile }: { status: CommunityStatus; profile: Profile }) {
   const toast = useToast()
   const spaces = useLive(['shared'], () => call('shared:spaces'))
-  const [current, setCurrent] = useSetting<string>('shared.space', 'all')
-  const [creating, setCreating] = useState(false)
-  const [joining, setJoining] = useState(false)
   const [inbox, setInbox] = useState(false)
   const [admin, setAdmin] = useState(false)
   const signOut = useAction(async () => {
     await call('shared:signOut')
     changed('shared')
   })
-
-  const list = spaces.data ?? []
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const item = params.get('item')
-  const space = item ? null : (list.find((s) => s.id === current) ?? null)
-  return (
-    <div className="flex h-full min-h-0">
-      <aside
-        className="flex w-60 shrink-0 flex-col border-r border-line bg-canvas"
-        aria-label="Spaces"
-      >
-        <div className="flex h-12 shrink-0 items-center gap-1 px-3">
-          <p className="flex-1 px-1 text-2xs font-medium text-ink-3">Spaces</p>
-          <IconButton label="Inbox" onClick={() => setInbox(true)}>
-            <span className="relative">
-              <Bell className="size-4" aria-hidden />
-              {status.unread > 0 ? (
-                <span className="absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-blue px-1 text-[0.625rem] font-semibold text-white">
-                  {status.unread}
-                </span>
-              ) : null}
+  const toolbar = (
+    <>
+      <IconButton label="Inbox" onClick={() => setInbox(true)}>
+        <span className="relative">
+          <Bell className="size-4" aria-hidden />
+          {status.unread > 0 ? (
+            <span className="absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-blue px-1 text-[0.625rem] font-semibold text-white">
+              {status.unread}
             </span>
-          </IconButton>
-          <Menu
-            trigger={
-              <button
-                type="button"
-                aria-label="Your account"
-                className="rounded-full p-0.5 hover:bg-hover"
-              >
-                <Avatar profile={profile} size={24} />
-              </button>
-            }
-            items={[
-              {
-                label: `@${profile.username}`,
-                icon: <Users className="size-4" aria-hidden />,
-                onSelect: () =>
-                  toast({ title: profile.displayName, description: status.email ?? '' }),
-              },
-              ...(status.isAdmin
-                ? [
-                    {
-                      label: 'Atlas admin',
-                      icon: <ShieldCheck className="size-4" aria-hidden />,
-                      onSelect: () => setAdmin(true),
-                    },
-                  ]
-                : []),
-              {
-                label: 'Sign out',
-                icon: <LogOut className="size-4" aria-hidden />,
-                onSelect: () => void signOut.run(),
-              },
-            ]}
-          />
-        </div>
-        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
+          ) : null}
+        </span>
+      </IconButton>
+      <Menu
+        trigger={
           <button
             type="button"
-            aria-current={space === null || undefined}
-            onClick={() => {
-              setParams({})
-              setCurrent('all')
-            }}
-            className={cn(
-              'flex h-9 items-center gap-2.5 rounded-md px-2 text-left text-ink-2 hover:bg-hover',
-              space === null && 'bg-active font-medium text-ink',
-            )}
+            aria-label="Your account"
+            className="rounded-full p-0.5 hover:bg-hover"
           >
-            <span className="flex size-6 items-center justify-center rounded-md bg-sunken">
-              <LayoutGrid className="size-3.5" aria-hidden />
-            </span>
-            Everything
+            <Avatar profile={profile} size={28} />
           </button>
-          {list.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              aria-current={space?.id === s.id || undefined}
-              onClick={() => {
-                setParams({})
-                setCurrent(s.id)
-              }}
-              className={cn(
-                'flex h-10 items-center gap-2.5 rounded-md px-2 text-left text-ink-2 hover:bg-hover',
-                space?.id === s.id && 'bg-active text-ink',
-              )}
-            >
-              <SpaceTile icon={s.icon} color={s.color} size={26} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium text-ink">{s.name}</span>
-                <span className="block truncate text-2xs text-ink-3">
-                  {s.memberCount} {s.memberCount === 1 ? 'member' : 'members'} · {s.itemCount}{' '}
-                  shared
-                </span>
-              </span>
-            </button>
-          ))}
-          {spaces.error ? <p className="px-2 text-2xs text-danger">{spaces.error}</p> : null}
-        </nav>
-        <div className="flex shrink-0 gap-2 border-t border-line p-3">
-          <Button
-            variant="primary"
-            className="flex-1"
-            icon={<Plus className="size-3.5" aria-hidden />}
-            onClick={() => setCreating(true)}
-          >
-            Create
-          </Button>
-          <Button
-            className="flex-1"
-            icon={<KeyRound className="size-3.5" aria-hidden />}
-            onClick={() => setJoining(true)}
-          >
-            Join
-          </Button>
+        }
+        items={[
+          {
+            label: `@${profile.username}`,
+            icon: <Users className="size-4" aria-hidden />,
+            onSelect: () => toast({ title: profile.displayName, description: status.email ?? '' }),
+          },
+          ...(status.isAdmin
+            ? [
+                {
+                  label: 'Atlas admin',
+                  icon: <ShieldCheck className="size-4" aria-hidden />,
+                  onSelect: () => setAdmin(true),
+                },
+              ]
+            : []),
+          {
+            label: 'Sign out',
+            icon: <LogOut className="size-4" aria-hidden />,
+            onSelect: () => void signOut.run(),
+          },
+        ]}
+      />
+    </>
+  )
+  return (
+    <div className="flex h-full min-h-0">
+      {spaces.error ? (
+        <div className="p-8">
+          <ErrorState>{spaces.error}</ErrorState>
         </div>
-      </aside>
-
-      {spaces.data && list.length === 0 ? (
-        <Welcome onCreate={() => setCreating(true)} onJoin={() => setJoining(true)} />
       ) : (
         <Browser
-          key={`${space?.id ?? 'all'}:${item ?? ''}`}
+          key={item ?? ''}
           initialItem={item}
           status={status}
-          space={space}
-          spaces={list}
-          onLeft={() => setCurrent('all')}
+          spaces={spaces.data ?? []}
+          toolbar={toolbar}
         />
       )}
-
-      <SpaceDialog open={creating} onOpenChange={setCreating} onCreated={(s) => setCurrent(s.id)} />
-      <JoinDialog open={joining} onOpenChange={setJoining} onJoined={(id) => setCurrent(id)} />
       <InboxDialog
         open={inbox}
         onOpenChange={setInbox}
-        onOpenSpace={(id) => setCurrent(id)}
+        onOpenSpace={() => setInbox(false)}
         onOpenAdmin={() => {
           setInbox(false)
           setAdmin(true)
@@ -279,186 +191,15 @@ function Home({ status, profile }: { status: CommunityStatus; profile: Profile }
   )
 }
 
-function Welcome({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => void }) {
-  return (
-    <div className="flex min-w-0 flex-1 items-start justify-center overflow-y-auto p-8 pt-[10vh]">
-      <div className="w-full max-w-[640px] text-center">
-        <Mascot size={64} />
-        <h1 className="mt-4 text-[1.5rem] font-semibold tracking-[-0.02em] text-ink">
-          Start a space, or join one
-        </h1>
-        <p className="mx-auto mt-1.5 max-w-[52ch] text-ink-2">
-          A space is a small community: a class, a subject or a study group. Everyone in it can
-          browse and remix what is shared; owners choose who can add things.
-        </p>
-        <div className="mt-8 grid grid-cols-2 gap-3 text-left">
-          <button
-            type="button"
-            onClick={onCreate}
-            className="overflow-hidden rounded-xl border border-line bg-surface text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
-          >
-            <div className="h-16" style={{ background: banner('sky') }} />
-            <div className="p-4">
-              <p className="flex items-center gap-2 font-semibold text-ink">
-                <Plus className="size-4" aria-hidden /> Create a space
-              </p>
-              <p className="mt-1 text-2xs text-ink-3">
-                Name it, pick an icon and banner, then invite friends or share its code.
-              </p>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={onJoin}
-            className="overflow-hidden rounded-xl border border-line bg-surface text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
-          >
-            <div className="h-16" style={{ background: banner('meadow') }} />
-            <div className="p-4">
-              <p className="flex items-center gap-2 font-semibold text-ink">
-                <KeyRound className="size-4" aria-hidden /> Join with a code
-              </p>
-              <p className="mt-1 text-2xs text-ink-3">
-                Type the 8-character code a friend gave you. Invites land in your inbox.
-              </p>
-            </div>
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SpaceHero({
-  space,
-  meId,
-  onShare,
-  onLeft,
-}: {
-  space: Space
-  meId: string | null
-  onShare: () => void
-  onLeft: () => void
-}) {
-  const toast = useToast()
-  const [people, setPeople] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const manager = canManage(space.role)
-  const leave = useAction(async () => {
-    if (space.role === 'owner') {
-      await call('shared:deleteSpace', { id: space.id })
-      toast({ title: `Deleted ${space.name}` })
-    } else {
-      await call('shared:leave', { spaceId: space.id })
-      toast({ title: `You left ${space.name}` })
-    }
-    changed('shared')
-    onLeft()
-  })
-  return (
-    <div className="shrink-0">
-      <div className="h-24" style={{ background: banner(space.banner) }} />
-      <div className="flex items-end gap-4 px-8">
-        <SpaceTile
-          icon={space.icon}
-          color={space.color}
-          size={64}
-          className="-mt-8 shadow-pop ring-4 ring-canvas"
-        />
-        <div className="min-w-0 flex-1 pt-3">
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-[1.375rem] font-semibold tracking-[-0.02em] text-ink">
-              {space.name}
-            </h1>
-            <RoleBadge role={space.role} />
-          </div>
-          <p className="mt-0.5 flex items-center gap-1.5 truncate text-2xs text-ink-3">
-            {space.visibility === 'public' ? (
-              <Globe className="size-3" aria-hidden />
-            ) : (
-              <Lock className="size-3" aria-hidden />
-            )}
-            {space.visibility === 'public' ? 'Public' : 'Private'} · {space.memberCount}{' '}
-            {space.memberCount === 1 ? 'member' : 'members'}
-            {space.description ? ` · ${space.description}` : ''}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 pb-0.5">
-          <Button
-            icon={
-              manager ? (
-                <UserPlus className="size-3.5" aria-hidden />
-              ) : (
-                <Users className="size-3.5" aria-hidden />
-              )
-            }
-            onClick={() => setPeople(true)}
-          >
-            {manager ? 'Invite' : 'People'}
-          </Button>
-          {canWrite(space.role) ? (
-            <Button
-              variant="primary"
-              icon={<Share2 className="size-3.5" aria-hidden />}
-              onClick={onShare}
-            >
-              Share
-            </Button>
-          ) : null}
-          <Menu
-            trigger={
-              <IconButton label="More">
-                <MoreHorizontal className="size-4" aria-hidden />
-              </IconButton>
-            }
-            items={[
-              ...(manager
-                ? [
-                    {
-                      label: 'Space settings',
-                      icon: <Settings2 className="size-4" aria-hidden />,
-                      onSelect: () => setEditing(true),
-                    },
-                  ]
-                : []),
-              {
-                label: space.role === 'owner' ? 'Delete space' : 'Leave space',
-                icon:
-                  space.role === 'owner' ? (
-                    <Trash2 className="size-4" aria-hidden />
-                  ) : (
-                    <LogOut className="size-4" aria-hidden />
-                  ),
-                onSelect: () => {
-                  const sure = window.confirm(
-                    space.role === 'owner'
-                      ? `Delete ${space.name} and everything shared in it, for everyone? This cannot be undone.`
-                      : `Leave ${space.name}? You can join again with its code.`,
-                  )
-                  if (sure) void leave.run()
-                },
-              },
-            ]}
-          />
-        </div>
-      </div>
-      {leave.error ? <ErrorState className="mx-8 mt-3">{leave.error}</ErrorState> : null}
-      <PeopleDialog open={people} onOpenChange={setPeople} space={space} meId={meId} />
-      {manager ? <SpaceDialog open={editing} onOpenChange={setEditing} space={space} /> : null}
-    </div>
-  )
-}
-
 function Browser({
   status,
-  space,
   spaces,
-  onLeft,
+  toolbar,
   initialItem,
 }: {
   status: CommunityStatus
-  space: Space | null
   spaces: Space[]
-  onLeft: () => void
+  toolbar: ReactNode
   initialItem?: string | null
 }) {
   const [text, setText] = useState('')
@@ -480,7 +221,7 @@ function Browser({
     ['shared'],
     () =>
       call('shared:list', {
-        spaceId: space?.id ?? null,
+        spaceId: null,
         text: query,
         kind: kind === 'all' ? null : kind,
         subject,
@@ -490,7 +231,7 @@ function Browser({
         material,
         teacher,
       }),
-    [space?.id, query, kind, subject, sort, mine, unit, material, teacher],
+    [query, kind, subject, sort, mine, unit, material, teacher],
   )
 
   const data = list.data
@@ -499,23 +240,17 @@ function Browser({
   return (
     <div className="flex min-w-0 flex-1">
       <div className="flex min-w-0 flex-1 flex-col">
-        {space ? (
-          <SpaceHero
-            space={space}
-            meId={status.userId}
-            onShare={() => setSharing(true)}
-            onLeft={onLeft}
-          />
-        ) : (
-          <div className="flex shrink-0 items-start gap-4 px-8 pt-7">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-[1.5rem] font-semibold tracking-[-0.02em] text-ink">
-                Everything shared with you
-              </h1>
-              <p className="mt-1 text-ink-2">
-                Notes, files and flashcards from all your spaces. Remix anything into your own.
-              </p>
-            </div>
+        <div className="flex shrink-0 items-start gap-4 px-8 pt-7">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[1.5rem] font-semibold tracking-[-0.02em] text-ink">
+              The Atlas library
+            </h1>
+            <p className="mt-1 text-ink-2">
+              Everything everyone has shared: notes, files, flashcards and lessons. Open to all.
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {toolbar}
             {writable ? (
               <Button
                 variant="primary"
@@ -526,7 +261,7 @@ function Browser({
               </Button>
             ) : null}
           </div>
-        )}
+        </div>
 
         <div className="shrink-0 px-8 pt-5">
           <label className="flex h-10 items-center gap-2.5 rounded-lg bg-sunken px-3 ring-1 ring-transparent ring-inset focus-within:bg-surface focus-within:ring-line-strong">
@@ -534,7 +269,7 @@ function Browser({
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={space ? `Search ${space.name}` : 'Search all your spaces'}
+              placeholder="Search the library"
               aria-label="Search shared things"
               className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-3"
             />
@@ -660,7 +395,7 @@ function Browser({
             <SkeletonList rows={5} />
           ) : data.items.length === 0 ? (
             <EmptyState
-              eyebrow={space?.name ?? 'Shared'}
+              eyebrow="Library"
               title={
                 query || kind !== 'all' || subject || mine
                   ? 'Nothing matches'
@@ -668,16 +403,14 @@ function Browser({
               }
               art={<Mascot size={56} />}
               action={
-                (space ? canWrite(space.role) : writable) ? (
+                writable ? (
                   <Button variant="primary" onClick={() => setSharing(true)}>
                     Share something
                   </Button>
                 ) : undefined
               }
             >
-              {space && !canWrite(space.role)
-                ? 'You are a viewer here. What others share shows up here.'
-                : 'Write a note, upload a file or share flashcards, and it shows up here for everyone in the space.'}
+              Write a note, upload a file or share flashcards, and it shows up here for everyone.
             </EmptyState>
           ) : view === 'grid' ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
@@ -685,7 +418,7 @@ function Browser({
                 <GridCard
                   key={item.id}
                   item={item}
-                  showSpace={!space}
+                  showSpace={false}
                   active={selected === item.id}
                   onOpen={() => setSelected(item.id)}
                 />
@@ -697,7 +430,7 @@ function Browser({
                 <ListRow
                   key={item.id}
                   item={item}
-                  showSpace={!space}
+                  showSpace={false}
                   active={selected === item.id}
                   onOpen={() => setSelected(item.id)}
                 />
@@ -707,9 +440,7 @@ function Browser({
         </div>
 
         <div className="flex h-9 shrink-0 items-center gap-3 border-t border-line px-8 text-2xs text-ink-3">
-          <span>
-            {data?.items.length ?? 0} shared{space ? ` in ${space.name}` : ''}
-          </span>
+          <span>{data?.items.length ?? 0} shared</span>
           <span aria-hidden>·</span>
           <span className="flex items-center gap-2">
             Files: {formatBytes(used)} of {formatBytes(SHARED_STORAGE_QUOTA)}
@@ -738,7 +469,7 @@ function Browser({
         open={sharing}
         onOpenChange={setSharing}
         spaces={spaces}
-        defaultSpaceId={space?.id ?? null}
+        defaultSpaceId={null}
         teachers={data?.teachers ?? []}
       />
     </div>
@@ -774,7 +505,7 @@ function Badges({ item }: { item: SharedCard }) {
       ? MATERIAL_LABELS[item.material]
       : null,
     item.teacher || null,
-    item.aiSummary ? 'AI summary' : null,
+    item.aiPending ? 'AI filling in…' : item.aiSummary ? 'AI summary' : null,
   ].filter((c): c is string => Boolean(c))
   if (chips.length === 0) return null
   return (

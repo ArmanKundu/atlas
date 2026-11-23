@@ -233,6 +233,20 @@ export const ipcContract = {
     response: z.object({ wav: z.instanceof(Uint8Array), seconds: z.number() }),
   },
 
+  'hearing:status': {
+    request: none,
+    response: z.enum(['missing', 'downloading', 'ready', 'error']),
+  },
+  'hearing:prepare': {
+    request: none,
+    response: z.enum(['missing', 'downloading', 'ready', 'error']),
+  },
+  /** 16 kHz mono samples, as 32-bit floats. */
+  'hearing:transcribe': {
+    request: z.object({ pcm: z.instanceof(Float32Array) }),
+    response: z.object({ text: z.string() }),
+  },
+
   'files:saveBytes': {
     request: z.object({ bytes: z.instanceof(Uint8Array), name: z.string().max(120) }),
     response: z.boolean(),

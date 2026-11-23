@@ -14,6 +14,7 @@ export default defineConfig({
           index: resolve(__dirname, 'src/main/index.ts'),
           // Kokoro speech runs on its own thread (src/main/voice.ts).
           'voice-worker': resolve(__dirname, 'src/main/voice-worker.ts'),
+          'hear-worker': resolve(__dirname, 'src/main/hear-worker.ts'),
         },
       },
     },

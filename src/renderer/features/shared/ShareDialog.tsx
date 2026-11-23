@@ -165,7 +165,7 @@ export function ShareDialog({
   const [units, setUnits] = useState<Unit[]>([])
   const [material, setMaterial] = useState<Material>('other')
   const [teacher, setTeacher] = useState('')
-  const [aiSummary, setAiSummary] = useState(true)
+  const [autofill, setAutofill] = useState(true)
   const [ownWork, setOwnWork] = useState(false)
   const [pickError, setPickError] = useState<string | null>(null)
 
@@ -215,7 +215,7 @@ export function ShareDialog({
     setUnits([])
     setMaterial('other')
     setTeacher('')
-    setAiSummary(true)
+    setAutofill(true)
     setOwnWork(false)
     setPickError(null)
   }
@@ -255,6 +255,9 @@ export function ShareDialog({
 
   const readable = mode === 'upload' || mode === 'library' || mode === 'write' || mode === 'note'
 
+  // Readable things go up straight away; the AI fills in whatever was left blank afterwards.
+  const aiFills = readable && autofill
+
   const publish = useAction(async () => {
     const meta = {
       spaceId: target,
@@ -277,7 +280,8 @@ export function ShareDialog({
               ? ('link' as const)
               : material,
       teacher: teacher.trim(),
-      aiSummary: readable && aiSummary,
+      aiSummary: readable,
+      autofill: aiFills,
     }
     if (mode === 'write') await call('shared:publish', { kind: 'note', body, ...meta })
     else if (mode === 'note') await call('shared:publish', { kind: 'note', noteId: pick, ...meta })
@@ -295,7 +299,8 @@ export function ShareDialog({
     }
     changed('shared')
     toast({
-      title: `Shared to ${writable.find((s) => s.id === target)?.name ?? 'the space'}`,
+      title: 'Shared to the library',
+      description: aiFills ? 'Your AI is reading it and filling in the details.' : undefined,
       tone: 'success',
     })
     onOpenChange(false)
@@ -310,7 +315,7 @@ export function ShareDialog({
           ? /^https:\/\/\S+$/.test(url.trim())
           : Boolean(pick) && !tooBig
   const missing = !target
-    ? 'Pick a space'
+    ? 'The library is not ready yet'
     : !contentReady
       ? mode === 'write'
         ? 'Write something first'
@@ -319,7 +324,7 @@ export function ShareDialog({
           : mode === 'link'
             ? 'Paste a link that starts with https://'
             : 'Choose what to share'
-      : !title.trim()
+      : !title.trim() && !aiFills
         ? 'Give it a title'
         : !ownWork
           ? 'Tick the box to confirm you can share it'
@@ -332,7 +337,7 @@ export function ShareDialog({
         if (!next) publish.clear()
         onOpenChange(next)
       }}
-      title={remixOf ? `Share your version of “${remixOf.title}”` : 'Share with a space'}
+      title={remixOf ? `Share your version of “${remixOf.title}”` : 'Share to the library'}
       description={
         mode
           ? undefined
@@ -365,9 +370,8 @@ export function ShareDialog({
       }
     >
       {writable.length === 0 ? (
-        <ErrorState title="No space to share into">
-          You are a viewer in every space you are in. Create your own space, or ask an owner to make
-          you an editor.
+        <ErrorState title="The library is not ready">
+          Atlas could not find the shared library. Sign out and back in, or report it from Help.
         </ErrorState>
       ) : (
         <AnimatePresence mode="wait" initial={false}>
@@ -515,139 +519,147 @@ export function ShareDialog({
               </Step>
 
               <Step n={2} title="Describe it">
-                <div className="flex flex-col gap-3">
-                  {mode !== 'write' ? (
-                    <Field label="Title">
-                      <Input
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        maxLength={200}
-                        placeholder="What should people see?"
-                      />
-                    </Field>
-                  ) : null}
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Subject">
-                      <Select value={subject} onChange={(e) => setSubject(e.target.value)}>
-                        <option value="">Choose a subject…</option>
-                        {GROUP_SUBJECTS.map((g) => (
-                          <option key={g.key} value={g.name}>
-                            {g.name}
-                          </option>
-                        ))}
-                        {subject && !GROUP_SUBJECTS.some((g) => g.name === subject) ? (
-                          <option value={subject}>{subject}</option>
-                        ) : null}
-                      </Select>
-                    </Field>
-                    {mode === 'upload' || mode === 'library' || mode === 'link' ? (
-                      <Field label="Type of material">
-                        <Select
-                          value={material}
-                          onChange={(e) => setMaterial(e.target.value as Material)}
-                        >
-                          {MATERIALS.filter((m) => m !== 'flashcards').map((m) => (
-                            <option key={m} value={m}>
-                              {MATERIAL_LABELS[m]}
-                            </option>
-                          ))}
-                        </Select>
-                      </Field>
-                    ) : (
-                      <Field label="Tags" hint="Comma separated">
+                {aiFills ? (
+                  <div className="flex items-start gap-3 rounded-lg bg-sunken px-3.5 py-3">
+                    <Sparkles className="mt-0.5 size-4 shrink-0 text-blue" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-ink">Your AI fills this in</p>
+                      <p className="text-2xs text-ink-3">
+                        It shares now, then your AI reads it and adds the title, subject, type,
+                        units, teacher, a description and a summary. You can edit them afterwards.
+                      </p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => setAutofill(false)}>
+                      Fill in myself
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {mode !== 'write' ? (
+                      <Field label="Title">
                         <Input
-                          value={tags}
-                          onChange={(e) => setTags(e.target.value)}
-                          placeholder="SAC, revision"
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                          maxLength={200}
+                          placeholder="What should people see?"
                         />
                       </Field>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Units">
-                      <div className="flex gap-1.5" role="group" aria-label="Units">
-                        {UNITS.map((u) => {
-                          const on = units.includes(u)
-                          return (
-                            <button
-                              key={u}
-                              type="button"
-                              aria-pressed={on}
-                              onClick={() =>
-                                setUnits((list) =>
-                                  on ? list.filter((x) => x !== u) : [...list, u].sort(),
-                                )
-                              }
-                              className={cn(
-                                'h-8 flex-1 rounded-md border text-2xs font-semibold transition-colors',
-                                on
-                                  ? 'border-accent bg-accent text-accent-fg'
-                                  : 'border-line bg-surface text-ink-2 hover:bg-hover',
-                              )}
-                            >
-                              Unit {u}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </Field>
-                    <Field label="Teacher" hint="Optional">
-                      <Input
-                        value={teacher}
-                        onChange={(e) => setTeacher(e.target.value)}
-                        list="shared-teachers"
-                        maxLength={80}
-                        placeholder="Who made or gave it out"
+                    ) : null}
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Subject">
+                        <Select value={subject} onChange={(e) => setSubject(e.target.value)}>
+                          <option value="">Choose a subject…</option>
+                          {GROUP_SUBJECTS.map((g) => (
+                            <option key={g.key} value={g.name}>
+                              {g.name}
+                            </option>
+                          ))}
+                          {subject && !GROUP_SUBJECTS.some((g) => g.name === subject) ? (
+                            <option value={subject}>{subject}</option>
+                          ) : null}
+                        </Select>
+                      </Field>
+                      {mode === 'upload' || mode === 'library' || mode === 'link' ? (
+                        <Field label="Type of material">
+                          <Select
+                            value={material}
+                            onChange={(e) => setMaterial(e.target.value as Material)}
+                          >
+                            {MATERIALS.filter((m) => m !== 'flashcards').map((m) => (
+                              <option key={m} value={m}>
+                                {MATERIAL_LABELS[m]}
+                              </option>
+                            ))}
+                          </Select>
+                        </Field>
+                      ) : (
+                        <Field label="Tags" hint="Comma separated">
+                          <Input
+                            value={tags}
+                            onChange={(e) => setTags(e.target.value)}
+                            placeholder="SAC, revision"
+                          />
+                        </Field>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Units">
+                        <div className="flex gap-1.5" role="group" aria-label="Units">
+                          {UNITS.map((u) => {
+                            const on = units.includes(u)
+                            return (
+                              <button
+                                key={u}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() =>
+                                  setUnits((list) =>
+                                    on ? list.filter((x) => x !== u) : [...list, u].sort(),
+                                  )
+                                }
+                                className={cn(
+                                  'h-8 flex-1 rounded-md border text-2xs font-semibold transition-colors',
+                                  on
+                                    ? 'border-accent bg-accent text-accent-fg'
+                                    : 'border-line bg-surface text-ink-2 hover:bg-hover',
+                                )}
+                              >
+                                Unit {u}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </Field>
+                      <Field label="Teacher" hint="Optional">
+                        <Input
+                          value={teacher}
+                          onChange={(e) => setTeacher(e.target.value)}
+                          list="shared-teachers"
+                          maxLength={80}
+                          placeholder="Who made or gave it out"
+                        />
+                        <datalist id="shared-teachers">
+                          {teachers.map((t) => (
+                            <option key={t} value={t} />
+                          ))}
+                        </datalist>
+                      </Field>
+                    </div>
+                    <Field label="Description" hint="Optional">
+                      <Textarea
+                        rows={2}
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        maxLength={2000}
+                        placeholder="What's in it, and who it helps"
                       />
-                      <datalist id="shared-teachers">
-                        {teachers.map((t) => (
-                          <option key={t} value={t} />
-                        ))}
-                      </datalist>
                     </Field>
+                    {readable ? (
+                      <button
+                        type="button"
+                        onClick={() => setAutofill(true)}
+                        className="flex items-center gap-1.5 self-start text-2xs font-medium text-blue hover:underline"
+                      >
+                        <Sparkles className="size-3.5" aria-hidden />
+                        Let my AI fill these in instead
+                      </button>
+                    ) : null}
                   </div>
-                  <Field label="Description" hint="Optional">
-                    <Textarea
-                      rows={2}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      maxLength={2000}
-                      placeholder="What's in it, and who it helps"
-                    />
-                  </Field>
-                </div>
+                )}
               </Step>
 
               <Step n={3} title="Share it">
                 <div className="flex flex-col gap-3">
-                  <Field label="Space">
-                    <Select value={target} onChange={(e) => setSpaceId(e.target.value)}>
-                      {writable.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                  {readable ? (
-                    <label className="flex items-start gap-2.5 rounded-lg bg-sunken px-3 py-2.5 text-ink-2">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 size-4 accent-[var(--color-accent)]"
-                        checked={aiSummary}
-                        onChange={(e) => setAiSummary(e.target.checked)}
-                      />
-                      <span>
-                        <span className="flex items-center gap-1.5 font-medium text-ink">
-                          <Sparkles className="size-3.5" aria-hidden />
-                          Add an AI summary and text version
-                        </span>
-                        <span className="text-2xs text-ink-3">
-                          Your own AI reads it after it is shared (handwriting and scans too), so
-                          everyone can search and skim it. Uses your AI, not anyone else’s.
-                        </span>
-                      </span>
-                    </label>
+                  {writable.length > 1 ? (
+                    <Field label="Space">
+                      <Select value={target} onChange={(e) => setSpaceId(e.target.value)}>
+                        {writable.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
                   ) : null}
                   <label className="flex items-start gap-2.5 text-ink-2">
                     <input
