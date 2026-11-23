@@ -5,7 +5,22 @@ Phases follow `BUILD_PROMPT.md` §14; extra work the owner asked for is listed a
 
 ## Now
 
-**Exam system (Operon clone), see the brief in the session notes.** Phase 5 and 8 work feeds straight into it.
+**Group library for up to five friends (owner's plan, 23 Nov).** Atlas becomes one shared, public library for six subjects, with the exam system and AI on top. Order: scanner, whiteboard, subjects, shared library, in-app web links, packaged-app test.
+
+## Group library (owner's plan, 23 Nov)
+
+- [ ] **Six subjects only:** English, Mathematical Methods, General Mathematics, Chemistry, Biology, Accounting. Each has Units 1, 2, 3 and 4.
+- [ ] **Public by default:** everything people add is shared with the group. Only grades, results and private settings stay on your laptop.
+- [ ] **Upload form:** title, short description, subject, units (1–4), type (PDF, PowerPoint, image, video, audio, notes, link, exam, timetable), and the teacher who made it.
+- [ ] **AI summary, on by default:** the uploader's own AI reads the file (handwriting too), writes a text version and a summary, and both are shared. Can be turned off per upload.
+- [ ] **Teachers:** tag who made a resource and filter by teacher; later the assistant and exam builder can prefer a teacher's material.
+- [ ] **Web links that open inside Atlas:** Google Drive, Docs, Slides and other sites in an in-app browser tab.
+- [ ] **Shared exams in Supabase:** VCAA and other past papers stored once in the cloud for everyone, with their reports. The VCAA site is down, so papers may come from the Wayback Machine (needs the owner's go-ahead).
+- [ ] **Timetables:** a place to upload class and exam timetables, shared with the group, used later for "what's coming up".
+- [ ] **Phone scanner like Genius Scan:** automatic page edges and crop, straightened pages, page-by-page capture, filters, better design; scans can go straight to the shared library.
+- [ ] **Whiteboard for maths, chemistry and biology:** live "drafting" view while the AI works, accurate shapes (squares, right angles, labels outside lines), diagrams for each subject.
+- [ ] **Test the packaged app,** not only the development build.
+- [ ] **Later: subject tools.** Graphing calculator (Maths), scientific calculator, data booklet and periodic table (Chemistry). The owner will send inspiration.
 
 ## Phases
 

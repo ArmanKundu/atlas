@@ -1,304 +1,475 @@
+import { scanKit } from '@shared/scan-kit'
+
 /**
- * The scanner page the phone opens. One self-contained HTML file (no CDN, no tracking) so it
- * works on any phone browser without installing an app.
+ * The scanner page the phone opens: one self-contained HTML file (no CDN, no tracking), so it
+ * works in any phone browser with nothing to install.
  *
- * Phones only allow live camera access on secure (https) pages, and a page on the home network
- * is plain http, so the main path uses the phone's own camera app (with its flash and front/back
- * switch). Where the browser does allow a live camera, a live mode adds auto-capture, a torch
- * button and camera flipping.
+ * Phones only allow a live camera on secure (https) pages and this page is plain http on the
+ * home network, so photos come from the phone's own camera app (its flash and flip work there).
+ * After each photo the page finds the paper's edges, lets you nudge the corners, straightens and
+ * cleans the page, sends it to the computer straight away, and can open the camera again for the
+ * next page.
+ *
+ * Keep the script free of backticks, `${` and backslashes: it lives inside a template string.
  */
 export const SCANNER_PAGE = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#111214">
-<title>Atlas scanner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0f1012">
+<title>Atlas Scan</title>
 <style>
-  :root { color-scheme: light dark; --bg:#f6f6f4; --card:#fff; --ink:#16181c; --ink2:#5d636d; --line:#e3e3df; --accent:#16181c; --accentFg:#fff; --blue:#2563eb; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#111214; --card:#1b1d21; --ink:#f2f2f0; --ink2:#a1a6ae; --line:#2b2e33; --accent:#f2f2f0; --accentFg:#111214; } }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { margin:0; font: 16px/1.4 -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--ink); padding: max(16px, env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom)); }
-  h1 { font-size: 22px; margin: 4px 0 2px; letter-spacing: -0.02em; }
-  p.sub { margin: 0 0 16px; color: var(--ink2); font-size: 14px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 12px; }
-  label.f { display:block; font-size: 13px; color: var(--ink2); margin-bottom: 6px; }
-  input[type=text] { width:100%; font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
-  .seg { display:flex; background: var(--bg); border-radius: 10px; padding: 3px; gap: 3px; margin-top: 10px; }
-  .seg button { flex:1; border:0; background: transparent; color: var(--ink2); font: 600 14px system-ui; padding: 8px; border-radius: 8px; }
+  :root { --bg:#f4f4f1; --card:#ffffff; --ink:#15171a; --ink2:#5b616b; --ink3:#8b9099; --line:#e4e4df; --blue:#2f6bff; --ok:#1f9d55; --bad:#d64545; --dark:#0f1012; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1012; --card:#191b1f; --ink:#f3f3f0; --ink2:#a5aab2; --ink3:#767b84; --line:#2a2d32; } }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  svg { display: block; }
+  .screen { position: fixed; inset: 0; display: none; flex-direction: column; }
+  .screen.on { display: flex; }
+
+  /* Home */
+  #home { overflow-y: auto; padding: calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 112px); }
+  .top { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 34px; height: 34px; border-radius: 10px; background: var(--ink); color: var(--bg); display: grid; place-items: center; }
+  .brand { font-weight: 650; font-size: 17px; letter-spacing: -.01em; }
+  .pill { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink2); background: var(--card); padding: 6px 10px; border-radius: 99px; box-shadow: 0 0 0 1px var(--line) inset; }
+  .dot { width: 7px; height: 7px; border-radius: 99px; background: var(--ok); }
+  .pill.off .dot { background: var(--bad); }
+  h1 { font-size: 30px; line-height: 1.1; font-weight: 700; letter-spacing: -.025em; margin-top: 28px; }
+  .lede { color: var(--ink2); margin-top: 8px; font-size: 15px; }
+  .capture { margin-top: 24px; width: 100%; aspect-ratio: 1.45; border-radius: 22px; background: var(--dark); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; position: relative; overflow: hidden; }
+  .capture .frame { position: absolute; inset: 22px 36px; border-radius: 10px; }
+  .capture .frame i { position: absolute; width: 22px; height: 22px; border-color: rgba(255,255,255,.75); border-style: solid; }
+  .capture .frame i:nth-child(1) { left: 0; top: 0; border-width: 2.5px 0 0 2.5px; border-top-left-radius: 8px; }
+  .capture .frame i:nth-child(2) { right: 0; top: 0; border-width: 2.5px 2.5px 0 0; border-top-right-radius: 8px; }
+  .capture .frame i:nth-child(3) { right: 0; bottom: 0; border-width: 0 2.5px 2.5px 0; border-bottom-right-radius: 8px; }
+  .capture .frame i:nth-child(4) { left: 0; bottom: 0; border-width: 0 0 2.5px 2.5px; border-bottom-left-radius: 8px; }
+  .shutter { width: 64px; height: 64px; border-radius: 99px; border: 3px solid #fff; display: grid; place-items: center; }
+  .shutter span { width: 50px; height: 50px; border-radius: 99px; background: #fff; }
+  .capture b { font-weight: 600; font-size: 16px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .soft { background: var(--card); border-radius: 16px; padding: 14px; display: flex; align-items: center; gap: 10px; font-weight: 550; font-size: 15px; box-shadow: 0 0 0 1px var(--line) inset; }
+  .soft svg { width: 20px; height: 20px; color: var(--ink2); flex: none; }
+  .label { font-size: 13px; font-weight: 600; color: var(--ink2); text-transform: uppercase; letter-spacing: .04em; margin: 28px 2px 10px; display: flex; justify-content: space-between; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .thumb { position: relative; aspect-ratio: .75; border-radius: 12px; overflow: hidden; background: var(--card); box-shadow: 0 0 0 1px var(--line) inset; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .thumb .n { position: absolute; left: 6px; top: 6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: rgba(15,16,18,.72); color: #fff; font-size: 12px; font-weight: 650; display: grid; place-items: center; }
+  .thumb .s { position: absolute; right: 6px; bottom: 6px; width: 22px; height: 22px; border-radius: 99px; display: grid; place-items: center; background: rgba(15,16,18,.72); color: #fff; }
+  .thumb .s.ok { background: var(--ok); }
+  .thumb .s.bad { background: var(--bad); }
+  .thumb .s svg { width: 13px; height: 13px; }
+  .spin { width: 12px; height: 12px; border-radius: 99px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; animation: r .8s linear infinite; }
+  @keyframes r { to { transform: rotate(360deg); } }
+  .empty { color: var(--ink3); font-size: 14px; padding: 26px 0; text-align: center; border: 1.5px dashed var(--line); border-radius: 16px; }
+  .err { color: var(--bad); font-size: 14px; margin-top: 12px; min-height: 1px; }
+  .dock { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 20px calc(env(safe-area-inset-bottom) + 14px); background: linear-gradient(to top, var(--bg) 70%, transparent); }
+  .primary { width: 100%; height: 54px; border-radius: 16px; background: var(--blue); color: #fff; font-weight: 650; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .primary:disabled { opacity: .4; }
+  .primary.ink { background: var(--ink); color: var(--bg); }
+
+  /* Edit */
+  #edit { background: var(--dark); color: #fff; }
+  .ebar { display: flex; align-items: center; padding: calc(env(safe-area-inset-top) + 10px) 12px 10px; gap: 4px; }
+  .ebar .t { flex: 1; text-align: center; font-weight: 600; font-size: 16px; }
+  .ghost { height: 38px; padding: 0 12px; border-radius: 10px; color: rgba(255,255,255,.88); font-size: 15px; font-weight: 550; }
+  .ghost:active { background: rgba(255,255,255,.1); }
+  .stage { flex: 1; position: relative; margin: 0 14px; touch-action: none; }
+  .stage img, .stage canvas { position: absolute; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .stage svg { position: absolute; overflow: visible; }
+  .handle { fill: rgba(47,107,255,.18); stroke: #fff; stroke-width: 2.5; }
+  .busy { position: absolute; inset: 0; display: none; place-items: center; color: rgba(255,255,255,.8); font-size: 14px; }
+  .busy.on { display: grid; }
+  .tools { display: flex; gap: 6px; padding: 14px 14px 4px; overflow-x: auto; scrollbar-width: none; }
+  .tools > :first-child { margin-left: auto; }
+  .tools > :last-child { margin-right: auto; }
+  .chip { height: 36px; padding: 0 14px; border-radius: 99px; background: rgba(255,255,255,.1); color: rgba(255,255,255,.85); font-size: 14px; font-weight: 550; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+  .chip.on { background: #fff; color: var(--dark); }
+  .chip svg { width: 16px; height: 16px; }
+  .eactions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; padding: 12px 14px calc(env(safe-area-inset-bottom) + 14px); }
+  .eactions button { height: 52px; border-radius: 15px; font-weight: 650; font-size: 15px; }
+  .eactions .sec { background: rgba(255,255,255,.12); color: #fff; }
+  .eactions .pri { background: var(--blue); color: #fff; }
+
+  /* Sheet */
+  .veil { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; }
+  .veil.on { display: block; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-radius: 22px 22px 0 0; padding: 10px 20px calc(env(safe-area-inset-bottom) + 18px); transform: translateY(105%); transition: transform .28s cubic-bezier(.2,.8,.2,1); }
+  .sheet.on { transform: none; }
+  .grab { width: 38px; height: 5px; border-radius: 9px; background: var(--line); margin: 0 auto 16px; }
+  .sheet h2 { font-size: 20px; font-weight: 700; letter-spacing: -.015em; }
+  .sheet .sub { color: var(--ink2); font-size: 14px; margin-top: 4px; }
+  .field { display: block; margin-top: 18px; }
+  .field span { display: block; font-size: 13px; font-weight: 600; color: var(--ink2); margin-bottom: 6px; }
+  .field input { width: 100%; height: 48px; border-radius: 13px; border: 0; background: var(--bg); color: var(--ink); padding: 0 14px; font-size: 16px; outline: none; box-shadow: 0 0 0 1px var(--line) inset; }
+  .field input:focus { box-shadow: 0 0 0 2px var(--blue) inset; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); border-radius: 13px; padding: 4px; box-shadow: 0 0 0 1px var(--line) inset; }
+  .seg button { height: 40px; border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--ink2); }
   .seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .big { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; border:1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 16px; padding: 18px 8px; font: 600 15px system-ui; }
-  .big.main { grid-column: span 2; background: var(--accent); color: var(--accentFg); border-color: transparent; padding: 22px; font-size: 17px; }
-  .big svg { width: 26px; height: 26px; }
-  .row { display:flex; align-items:center; gap: 10px; font-size: 14px; color: var(--ink2); margin-top: 12px; }
-  .pages { display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .pg { position:relative; border-radius: 10px; overflow:hidden; background: #000; aspect-ratio: 3/4; }
-  .pg img { width:100%; height:100%; object-fit: cover; display:block; }
-  .pg .st { position:absolute; left:6px; bottom:6px; background: rgba(0,0,0,.6); color:#fff; font: 600 11px system-ui; padding: 2px 7px; border-radius: 99px; }
-  .pg .n { position:absolute; left:6px; top:6px; background: rgba(0,0,0,.6); color:#fff; font: 600 12px system-ui; padding: 2px 7px; border-radius: 99px; }
-  .pg .tools { position:absolute; inset:auto 0 0 0; display:flex; justify-content: space-between; padding: 4px; background: linear-gradient(transparent, rgba(0,0,0,.65)); }
-  .pg .tools button { border:0; background: rgba(255,255,255,.18); color:#fff; width: 30px; height: 30px; border-radius: 99px; font-size: 15px; }
-  .bar { position: fixed; left:0; right:0; bottom:0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); border-top: 1px solid var(--line); }
-  .send { width:100%; border:0; border-radius: 14px; padding: 16px; font: 700 17px system-ui; background: var(--blue); color:#fff; }
-  .send:disabled { opacity: .4; }
-  .progress { height: 4px; background: var(--line); border-radius: 99px; overflow: hidden; margin-bottom: 10px; display:none; }
-  .progress i { display:block; height:100%; width:0; background: var(--blue); transition: width .2s; }
-  .empty { text-align:center; color: var(--ink2); font-size: 14px; padding: 18px 0 6px; }
-  .live { position: fixed; inset: 0; background: #000; z-index: 10; display:none; flex-direction: column; }
-  .live video { flex:1; width:100%; object-fit: cover; }
-  .live .ctl { display:flex; align-items:center; justify-content: space-around; padding: 18px 12px calc(24px + env(safe-area-inset-bottom)); }
-  .live .ctl button { border:0; background: rgba(255,255,255,.16); color:#fff; border-radius: 99px; width: 52px; height: 52px; font: 600 12px system-ui; }
-  .live .ctl .shoot { width: 76px; height: 76px; background:#fff; border: 5px solid rgba(255,255,255,.4); background-clip: padding-box; }
-  .live .ctl .on { background: #facc15; color:#000; }
-  .live .hint { position:absolute; top: calc(16px + env(safe-area-inset-top)); left:0; right:0; text-align:center; color:#fff; font: 600 14px system-ui; text-shadow: 0 1px 4px #000; }
-  .live .flash { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; transition: opacity .25s; }
-  .done { text-align:center; padding: 40px 10px; display:none; }
-  .done .tick { width: 72px; height: 72px; border-radius: 99px; background: #16a34a; color:#fff; display:grid; place-items:center; margin: 0 auto 14px; font-size: 38px; }
-  .err { color: #dc2626; font-size: 14px; margin-top: 8px; min-height: 1em; }
-  input[type=file] { display:none; }
-  .switch { margin-left:auto; position:relative; width: 46px; height: 28px; }
-  .switch input { opacity:0; width:0; height:0; }
-  .switch span { position:absolute; inset:0; background: var(--line); border-radius: 99px; transition: .2s; }
-  .switch span:before { content:''; position:absolute; width: 22px; height: 22px; left:3px; top:3px; background:#fff; border-radius:99px; transition:.2s; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
-  .switch input:checked + span { background: var(--blue); }
-  .switch input:checked + span:before { transform: translateX(18px); }
+  .sheet .primary { margin-top: 22px; }
+  .bar { height: 4px; border-radius: 9px; background: var(--line); overflow: hidden; margin-top: 14px; display: none; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--blue); transition: width .2s; }
+
+  /* Done */
+  #done { align-items: center; justify-content: center; text-align: center; padding: 32px; gap: 10px; }
+  .tick { width: 72px; height: 72px; border-radius: 99px; background: var(--ok); color: #fff; display: grid; place-items: center; margin-bottom: 8px; }
+  .tick svg { width: 34px; height: 34px; }
+  #done p { color: var(--ink2); max-width: 300px; }
+  #done .primary { max-width: 320px; margin-top: 18px; }
+  input[type=file] { display: none; }
 </style>
 </head>
 <body>
-<main id="app">
-  <h1>Scan to Atlas</h1>
-  <p class="sub">Pages go straight to your computer over your own Wi-Fi.</p>
 
-  <div class="card">
-    <label class="f" for="title">Name</label>
-    <input id="title" type="text" placeholder="e.g. Chemistry worksheet 4" autocomplete="off">
-    <div class="seg" role="tablist">
-      <button id="mPdf" class="on" type="button">PDF (multi-page)</button>
-      <button id="mPhotos" type="button">Separate photos</button>
-    </div>
-    <div class="row">Clean up as a document (black and white, sharper)
-      <label class="switch"><input id="enhance" type="checkbox" checked><span></span></label>
-    </div>
+<section class="screen on" id="home">
+  <div class="top">
+    <div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></div>
+    <div class="brand">Atlas Scan</div>
+    <div class="pill" id="conn"><span class="dot"></span><span id="connText">Connected</span></div>
+  </div>
+  <h1>Scan your pages</h1>
+  <p class="lede">Atlas finds the edges, straightens each page and sends it to your computer as you go.</p>
+
+  <button class="capture" id="shoot" type="button" aria-label="Take a photo of a page">
+    <div class="frame"><i></i><i></i><i></i><i></i></div>
+    <div class="shutter"><span></span></div>
+    <b>Take a photo</b>
+  </button>
+  <div class="row2">
+    <button class="soft" id="pick" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>From photos</button>
+    <button class="soft" id="selfie" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10a8 8 0 0 0-14-5.3L4 7M4 14a8 8 0 0 0 14 5.3L20 17"/><path d="M4 3v4h4M20 21v-4h-4"/></svg>Front camera</button>
   </div>
 
-  <div class="grid2" style="margin-bottom:12px">
-    <button class="big main" id="shoot" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
-      Take a photo of a page
-    </button>
-    <button class="big" id="live" type="button" hidden>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
-      Auto scan
-    </button>
-    <button class="big" id="selfie" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10a8 8 0 0 0-14-5.3L4 7M4 14a8 8 0 0 0 14 5.3L20 17"/><path d="M4 3v4h4M20 21v-4h-4"/></svg>
-      Front camera
-    </button>
-    <button class="big" id="pick" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
-      From photos
-    </button>
-  </div>
-  <p class="sub" style="margin-top:-4px">Tip: your camera’s own flash and flip buttons work here. Fill the frame with the page.</p>
-
-  <div class="card">
-    <label class="f">Pages</label>
-    <div class="pages" id="pages"></div>
-    <div class="empty" id="empty">No pages yet. Take a photo to start.</div>
-  </div>
+  <div class="label"><span>Pages</span><span id="count"></span></div>
+  <div class="grid" id="pages"></div>
+  <div class="empty" id="empty">Your pages appear here.</div>
   <div class="err" id="err"></div>
-</main>
-
-<section class="done" id="done">
-  <div class="tick">✓</div>
-  <h1 id="doneTitle">Sent to Atlas</h1>
-  <p class="sub">It is in your library on your computer.</p>
-  <button class="send" id="again" type="button" style="max-width:320px">Scan something else</button>
 </section>
 
-<div class="bar" id="bar">
-  <div class="progress" id="prog"><i></i></div>
-  <button class="send" id="send" type="button" disabled>Save in Atlas</button>
+<div class="dock" id="dock"><button class="primary ink" id="finish" type="button" disabled>Save in Atlas</button></div>
+
+<section class="screen" id="edit">
+  <div class="ebar">
+    <button class="ghost" id="eBack" type="button">Retake</button>
+    <div class="t" id="eTitle">Page 1</div>
+    <button class="ghost" id="eDelete" type="button">Delete</button>
+  </div>
+  <div class="stage" id="stage">
+    <img id="eImg" alt="">
+    <svg id="eSvg"><polygon id="ePoly" fill="rgba(47,107,255,.14)" stroke="#2f6bff" stroke-width="2.5" stroke-linejoin="round"/></svg>
+    <div class="busy" id="eBusy">Finding the page…</div>
+  </div>
+  <div class="tools" id="filters">
+    <button class="chip" data-f="color" type="button">Colour</button>
+    <button class="chip" data-f="gray" type="button">Greyscale</button>
+    <button class="chip" data-f="bw" type="button">Black and white</button>
+    <button class="chip" data-f="original" type="button">Original</button>
+  </div>
+  <div class="tools">
+    <button class="chip" id="eRotate" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Rotate</button>
+    <button class="chip" id="eFull" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/></svg>Whole photo</button>
+    <button class="chip" id="eAuto" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 5.8L20 10l-5 3.9L16.2 20 12 16.6 7.8 20 9 13.9 4 10l6.1-1.2z"/></svg>Find edges</button>
+  </div>
+  <div class="eactions">
+    <button class="sec" id="eDone" type="button">Keep</button>
+    <button class="pri" id="eNext" type="button">Keep, next page</button>
+  </div>
+</section>
+
+<div class="veil" id="veil"></div>
+<div class="sheet" id="sheet">
+  <div class="grab"></div>
+  <h2>Save in Atlas</h2>
+  <p class="sub" id="sheetSub">Saved to your library, in the subject you chose on the computer.</p>
+  <label class="field"><span>Name</span><input id="title" type="text" placeholder="e.g. Methods worksheet 4" autocomplete="off" enterkeyhint="done"></label>
+  <div class="field"><span>Save as</span>
+    <div class="seg"><button id="mPdf" class="on" type="button">One PDF</button><button id="mPhotos" type="button">A file per page</button></div>
+  </div>
+  <div class="bar" id="bar"><i></i></div>
+  <button class="primary" id="save" type="button">Save</button>
 </div>
 
-<div class="live" id="liveView">
-  <video id="video" playsinline muted autoplay></video>
-  <div class="hint" id="hint">Hold steady over the page. It captures by itself.</div>
-  <div class="flash" id="flashFx"></div>
-  <div class="ctl">
-    <button id="lClose" type="button">Done</button>
-    <button id="lTorch" type="button">Flash</button>
-    <button id="lShoot" class="shoot" type="button" aria-label="Capture"></button>
-    <button id="lAuto" class="on" type="button">Auto</button>
-    <button id="lFlip" type="button">Flip</button>
-  </div>
-</div>
+<section class="screen" id="done">
+  <div class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+  <h1 style="margin:0">Saved</h1>
+  <p id="doneText">It is in your Atlas library.</p>
+  <button class="primary ink" id="again" type="button">Scan something else</button>
+</section>
 
 <input id="fBack" type="file" accept="image/*" capture="environment">
 <input id="fFront" type="file" accept="image/*" capture="user">
 <input id="fPick" type="file" accept="image/*" multiple>
 
 <script>
-(() => {
+const kit = (${scanKit.toString()})()
+;(() => {
   const $ = (id) => document.getElementById(id)
-  const base = location.pathname.replace(/\\/$/, '')
-  const pages = []   // { blob, url, rotation, slot, upload }
-  let slots = 0
-  let mode = 'pdf'
+  const base = location.pathname.replace(/[/]$/, '')
   const batch = Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+  const MAX_SIDE = 2400
+  const pages = []      // { file, quad, filter, rotation, slot, state, thumb, upload }
+  const queue = []      // photos waiting to be edited
+  let slots = 0
+  let editing = null    // the page open in the editor
+  let isNew = false     // the open page has not been kept yet
+  let lastFilter = 'color'
+  let mode = 'pdf'
+  let fitted = null     // { x, y, w, h } of the photo on screen
 
-  function render() {
-    const box = $('pages'); box.innerHTML = ''
-    pages.forEach((p, i) => {
-      const el = document.createElement('div'); el.className = 'pg'
-      el.innerHTML = '<img alt=""><span class="n">' + (i + 1) + '</span><div class="tools"><button data-a="left" aria-label="Move earlier">‹</button><button data-a="rot" aria-label="Rotate">⟳</button><button data-a="del" aria-label="Remove">✕</button></div>'
-      if (p.state) { const s = document.createElement('span'); s.className = 'st'; s.textContent = p.state; el.appendChild(s) }
-      const img = el.querySelector('img'); img.src = p.url; img.style.transform = 'rotate(' + p.rotation + 'deg)'
-      el.querySelectorAll('button').forEach((b) => b.onclick = () => {
-        const a = b.dataset.a
-        if (a === 'del') { URL.revokeObjectURL(p.url); pages.splice(i, 1); drop(p) }
-        if (a === 'rot') { p.rotation = (p.rotation + 90) % 360; upload(p) }
-        if (a === 'left' && i > 0) { pages.splice(i, 1); pages.splice(i - 1, 0, p) }
-        render()
-      })
-      box.appendChild(el)
-    })
-    $('empty').style.display = pages.length ? 'none' : 'block'
-    $('send').disabled = !pages.length
-    $('send').textContent = pages.length ? 'Save ' + pages.length + ' page' + (pages.length === 1 ? '' : 's') + ' in Atlas' : 'Save in Atlas'
+  const ICON_OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
+  const ICON_BAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/></svg>'
+
+  function show(id) { for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id); $('dock').style.display = id === 'home' ? 'block' : 'none' }
+
+  async function decode(file, max) {
+    const bmp = await createImageBitmap(file)
+    const s = Math.min(1, max / Math.max(bmp.width, bmp.height))
+    const c = document.createElement('canvas')
+    c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s)
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height)
+    if (bmp.close) bmp.close()
+    return c
   }
 
-  function add(blob) {
-    if (pages.length >= 60) { $('err').textContent = 'That is the most pages for one scan (60).'; return }
-    const p = { blob, url: URL.createObjectURL(blob), rotation: 0, slot: slots++ }
-    pages.push(p); upload(p)
+  function fullQuad() { return [[0.02, 0.02], [0.98, 0.02], [0.98, 0.98], [0.02, 0.98]] }
+
+  async function detect(file) {
+    const c = await decode(file, 420)
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height)
+    return kit.detectQuad(d.data, c.width, c.height)
   }
 
-  // Each photo goes to the computer as soon as it is taken (again if it is rotated).
+  // Straighten, rotate and filter one page into a JPEG.
+  async function render(p, max) {
+    const src = await decode(p.file, MAX_SIDE)
+    const sd = src.getContext('2d').getImageData(0, 0, src.width, src.height)
+    const quad = p.quad.map((q) => [q[0] * src.width, q[1] * src.height])
+    const size = kit.pageSize(quad, max || MAX_SIDE)
+    const px = kit.warp(sd.data, src.width, src.height, quad, size[0], size[1])
+    kit.filter(px, size[0], size[1], p.filter)
+    const flat = document.createElement('canvas')
+    flat.width = size[0]; flat.height = size[1]
+    flat.getContext('2d').putImageData(new ImageData(px, size[0], size[1]), 0, 0)
+    const turn = p.rotation % 180 !== 0
+    const out = document.createElement('canvas')
+    out.width = turn ? size[1] : size[0]; out.height = turn ? size[0] : size[1]
+    const x = out.getContext('2d')
+    x.translate(out.width / 2, out.height / 2); x.rotate(p.rotation * Math.PI / 180)
+    x.drawImage(flat, -size[0] / 2, -size[1] / 2)
+    return new Promise((r) => out.toBlob(r, 'image/jpeg', 0.88))
+  }
+
   function upload(p) {
-    p.state = 'Sending…'; render()
+    p.state = 'busy'; drawPages()
     p.upload = (async () => {
-      const jpeg = await prepare(p)
+      const jpeg = await render(p)
+      if (p.thumb) URL.revokeObjectURL(p.thumb)
+      p.thumb = URL.createObjectURL(jpeg)
+      drawPages()
       const r = await fetch(base + '/page?batch=' + batch + '&index=' + p.slot, { method: 'POST', body: jpeg })
       if (!r.ok) throw new Error(await r.text())
     })()
     p.upload.then(
-      () => { p.state = '✓ On computer'; render() },
-      (e) => { p.state = 'Not sent'; $('err').textContent = (e && e.message) || 'Could not reach the computer. Is Atlas still open?'; render() },
+      () => { p.state = 'ok'; setConn(true); drawPages() },
+      (e) => { p.state = 'bad'; setConn(false); $('err').textContent = (e && e.message && e.message.length < 120 ? e.message : 'Could not reach your computer. Is Atlas still open on the same Wi-Fi?'); drawPages() },
     )
   }
 
-  function drop(p) {
+  function setConn(ok) {
+    $('conn').classList.toggle('off', !ok)
+    $('connText').textContent = ok ? 'Connected' : 'Not connected'
+  }
+
+  function drawPages() {
+    const box = $('pages'); box.innerHTML = ''
+    pages.forEach((p, i) => {
+      const el = document.createElement('button'); el.type = 'button'; el.className = 'thumb'
+      el.innerHTML = '<img alt=""><span class="n">' + (i + 1) + '</span>' +
+        '<span class="s ' + (p.state === 'ok' ? 'ok' : p.state === 'bad' ? 'bad' : '') + '">' +
+        (p.state === 'ok' ? ICON_OK : p.state === 'bad' ? ICON_BAD : '<span class="spin"></span>') + '</span>'
+      if (p.thumb) el.querySelector('img').src = p.thumb
+      el.onclick = () => openEditor(p, false)
+      box.appendChild(el)
+    })
+    $('empty').style.display = pages.length ? 'none' : 'block'
+    $('count').textContent = pages.length ? pages.length + (pages.length === 1 ? ' page' : ' pages') : ''
+    $('finish').disabled = !pages.length
+    $('finish').textContent = pages.length ? 'Save ' + pages.length + (pages.length === 1 ? ' page' : ' pages') + ' in Atlas' : 'Save in Atlas'
+  }
+
+  /* ---------- Editor ---------- */
+
+  async function openEditor(p, fresh) {
+    editing = p; isNew = fresh
+    show('edit')
+    $('eTitle').textContent = 'Page ' + (fresh ? pages.length + 1 : pages.indexOf(p) + 1)
+    $('eBack').textContent = fresh ? 'Retake' : 'Cancel'
+    $('eDelete').style.visibility = fresh ? 'hidden' : 'visible'
+    $('eNext').textContent = fresh ? 'Keep, next page' : 'Save changes'
+    $('eDone').textContent = fresh ? 'Keep' : 'Retake'
+    setFilterChips(p.filter)
+    rotLabel()
+    $('eImg').style.visibility = 'hidden'; $('eSvg').style.visibility = 'hidden'
+    $('eBusy').classList.add('on')
+    const preview = await decode(p.file, 1400)
+    if (editing !== p) return
+    preview.toBlob((b) => {
+      if (editing !== p) return
+      const url = URL.createObjectURL(b)
+      $('eImg').onload = () => { URL.revokeObjectURL(url); layout(preview.width, preview.height) }
+      $('eImg').src = url
+    }, 'image/jpeg', 0.9)
+    if (!p.quad) p.quad = (await detect(p.file)) || fullQuad()
+  }
+
+  function layout(w, h) {
+    const st = $('stage').getBoundingClientRect()
+    const s = Math.min(st.width / w, st.height / h)
+    fitted = { w: w * s, h: h * s, x: (st.width - w * s) / 2, y: (st.height - h * s) / 2 }
+    for (const el of [$('eImg'), $('eSvg')]) {
+      el.style.left = fitted.x + 'px'; el.style.top = fitted.y + 'px'
+      el.style.width = fitted.w + 'px'; el.style.height = fitted.h + 'px'
+    }
+    $('eSvg').setAttribute('viewBox', '0 0 ' + fitted.w + ' ' + fitted.h)
+    const wait = () => { if (!editing || !editing.quad) return setTimeout(wait, 50); drawQuad(); $('eBusy').classList.remove('on'); $('eImg').style.visibility = 'visible'; $('eSvg').style.visibility = 'visible' }
+    wait()
+  }
+
+  function drawQuad() {
+    const svg = $('eSvg')
+    for (const h of svg.querySelectorAll('circle')) h.remove()
+    const pts = editing.quad.map((q) => [q[0] * fitted.w, q[1] * fitted.h])
+    $('ePoly').setAttribute('points', pts.map((p) => p.join(',')).join(' '))
+    pts.forEach((pt, i) => {
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+      c.setAttribute('cx', pt[0]); c.setAttribute('cy', pt[1]); c.setAttribute('r', 15)
+      c.setAttribute('class', 'handle'); c.dataset.i = i
+      svg.appendChild(c)
+    })
+  }
+
+  // Drag the nearest corner, anywhere on the stage (fingers are bigger than handles).
+  let drag = -1
+  $('stage').addEventListener('pointerdown', (e) => {
+    if (!editing || !editing.quad || !fitted) return
+    const st = $('stage').getBoundingClientRect()
+    const x = e.clientX - st.left - fitted.x, y = e.clientY - st.top - fitted.y
+    let best = -1, bestD = 60
+    editing.quad.forEach((q, i) => { const d = Math.hypot(q[0] * fitted.w - x, q[1] * fitted.h - y); if (d < bestD) { bestD = d; best = i } })
+    drag = best
+    if (drag >= 0) $('stage').setPointerCapture(e.pointerId)
+  })
+  $('stage').addEventListener('pointermove', (e) => {
+    if (drag < 0) return
+    const st = $('stage').getBoundingClientRect()
+    const x = Math.min(1, Math.max(0, (e.clientX - st.left - fitted.x) / fitted.w))
+    const y = Math.min(1, Math.max(0, (e.clientY - st.top - fitted.y) / fitted.h))
+    editing.quad[drag] = [x, y]
+    drawQuad()
+  })
+  const endDrag = () => { drag = -1 }
+  $('stage').addEventListener('pointerup', endDrag)
+  $('stage').addEventListener('pointercancel', endDrag)
+
+  function setFilterChips(f) { for (const c of $('filters').children) c.classList.toggle('on', c.dataset.f === f) }
+  for (const c of $('filters').children) c.onclick = () => { editing.filter = c.dataset.f; lastFilter = c.dataset.f; setFilterChips(c.dataset.f) }
+  function rotLabel() { $('eRotate').lastChild.textContent = editing && editing.rotation ? 'Rotate · ' + editing.rotation + '°' : 'Rotate' }
+  $('eRotate').onclick = () => { editing.rotation = (editing.rotation + 90) % 360; rotLabel() }
+  $('eFull').onclick = () => { editing.quad = [[0, 0], [1, 0], [1, 1], [0, 1]]; drawQuad() }
+  $('eAuto').onclick = async () => { editing.quad = (await detect(editing.file)) || fullQuad(); drawQuad() }
+
+  function keep() {
+    const p = editing
+    if (isNew) { pages.push(p); p.slot = slots++ }
+    editing = null
+    upload(p)
+    drawPages()
+  }
+  function next() {
+    const p = queue.shift()
+    if (p) openEditor(p, true)
+    else show('home')
+  }
+
+  $('eNext').onclick = () => {
+    const wasNew = isNew
+    keep()
+    if (wasNew && !queue.length) { $('fBack').click(); show('home') }
+    else next()
+  }
+  $('eDone').onclick = () => {
+    if (isNew) { keep(); next(); return }
+    // Retake an existing page.
+    retakeOf = editing; editing = null; show('home'); $('fBack').click()
+  }
+  $('eBack').onclick = () => {
+    if (isNew) { editing = null; show('home'); $('fBack').click(); return }
+    editing = null; show('home')
+  }
+  $('eDelete').onclick = () => {
+    const p = editing; const i = pages.indexOf(p)
+    if (i >= 0) pages.splice(i, 1)
     fetch(base + '/drop?batch=' + batch + '&index=' + p.slot, { method: 'POST' }).catch(() => {})
+    editing = null; show('home'); drawPages()
   }
 
-  // Shrinks big photos, applies rotation and the optional document clean-up, returns a JPEG.
-  async function prepare(p) {
-    const bmp = await createImageBitmap(p.blob)
-    const scale = Math.min(1, 2200 / Math.max(bmp.width, bmp.height))
-    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale)
-    const turn = p.rotation % 180 !== 0
-    const c = document.createElement('canvas'); c.width = turn ? h : w; c.height = turn ? w : h
-    const x = c.getContext('2d')
-    x.translate(c.width / 2, c.height / 2); x.rotate(p.rotation * Math.PI / 180); x.drawImage(bmp, -w / 2, -h / 2, w, h)
-    if ($('enhance').checked) {
-      const d = x.getImageData(0, 0, c.width, c.height), a = d.data
-      // Grey, then stretch contrast between the darkest and lightest 2%.
-      const hist = new Uint32Array(256)
-      for (let i = 0; i < a.length; i += 4) { const g = (a[i] * 0.299 + a[i + 1] * 0.587 + a[i + 2] * 0.114) | 0; a[i] = g; hist[g]++ }
-      const n = a.length / 4; let lo = 0, hi = 255, acc = 0
-      for (; lo < 255 && (acc += hist[lo]) < n * 0.02; lo++);
-      acc = 0; for (; hi > 0 && (acc += hist[hi]) < n * 0.02; hi--);
-      const span = Math.max(1, hi - lo)
-      for (let i = 0; i < a.length; i += 4) { let v = ((a[i] - lo) / span) * 255; v = v > 200 ? 255 : v; a[i] = a[i + 1] = a[i + 2] = Math.max(0, Math.min(255, v)) }
-      x.putImageData(d, 0, 0)
+  /* ---------- Capture ---------- */
+
+  let retakeOf = null
+  function took(files) {
+    const list = Array.from(files || [])
+    if (!list.length) return
+    if (retakeOf) {
+      const p = retakeOf; retakeOf = null
+      p.file = list[0]; p.quad = null
+      openEditor(p, false)
+      return
     }
-    return new Promise((r) => c.toBlob(r, 'image/jpeg', 0.85))
+    for (const f of list) queue.push({ file: f, quad: null, filter: lastFilter, rotation: 0, state: 'busy' })
+    next()
   }
-
-  async function send() {
-    $('err').textContent = ''; $('send').disabled = true
-    const prog = $('prog'), bar = prog.querySelector('i'); prog.style.display = 'block'
-    try {
-      for (let i = 0; i < pages.length; i++) {
-        $('send').textContent = 'Sending page ' + (i + 1) + ' of ' + pages.length + '…'
-        const p = pages[i]
-        try { await p.upload } catch { upload(p); await p.upload }
-        bar.style.width = ((i + 1) / (pages.length + 1) * 100) + '%'
-      }
-      $('send').textContent = 'Saving…'
-      const r = await fetch(base + '/finish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch, title: $('title').value, mode, order: pages.map((p) => p.slot) }) })
-      if (!r.ok) throw new Error(await r.text())
-      bar.style.width = '100%'
-      $('app').style.display = 'none'; $('bar').style.display = 'none'; $('done').style.display = 'block'
-    } catch (e) {
-      $('err').textContent = (e && e.message) || 'Could not send. Check the computer is on and Atlas is open.'
-      $('send').disabled = false; render()
-    }
-    prog.style.display = 'none'; bar.style.width = '0'
-  }
-
-  $('mPdf').onclick = () => { mode = 'pdf'; $('mPdf').className = 'on'; $('mPhotos').className = '' }
-  $('mPhotos').onclick = () => { mode = 'photos'; $('mPhotos').className = 'on'; $('mPdf').className = '' }
   $('shoot').onclick = () => $('fBack').click()
   $('selfie').onclick = () => $('fFront').click()
   $('pick').onclick = () => $('fPick').click()
-  for (const id of ['fBack', 'fFront', 'fPick']) $(id).onchange = (e) => { for (const f of e.target.files) add(f); e.target.value = '' }
-  $('send').onclick = send
-  $('enhance').onchange = () => pages.forEach(upload)
+  for (const id of ['fBack', 'fFront', 'fPick']) $(id).onchange = (e) => { took(e.target.files); e.target.value = '' }
+
+  /* ---------- Save ---------- */
+
+  function sheet(on) { $('veil').classList.toggle('on', on); $('sheet').classList.toggle('on', on) }
+  $('finish').onclick = () => { $('err').textContent = ''; sheet(true) }
+  $('veil').onclick = () => sheet(false)
+  $('mPdf').onclick = () => { mode = 'pdf'; $('mPdf').className = 'on'; $('mPhotos').className = '' }
+  $('mPhotos').onclick = () => { mode = 'photos'; $('mPhotos').className = 'on'; $('mPdf').className = '' }
+  $('save').onclick = async () => {
+    const bar = $('bar'), fill = bar.querySelector('i')
+    $('save').disabled = true; bar.style.display = 'block'
+    try {
+      for (let i = 0; i < pages.length; i++) {
+        $('save').textContent = 'Sending page ' + (i + 1) + ' of ' + pages.length + '…'
+        const p = pages[i]
+        try { await p.upload } catch { upload(p); await p.upload }
+        fill.style.width = ((i + 1) / (pages.length + 1) * 100) + '%'
+      }
+      $('save').textContent = 'Saving…'
+      const r = await fetch(base + '/finish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch, title: $('title').value, mode, order: pages.map((p) => p.slot) }) })
+      if (!r.ok) throw new Error(await r.text())
+      fill.style.width = '100%'
+      sheet(false)
+      $('doneText').textContent = pages.length + (pages.length === 1 ? ' page is' : ' pages are') + ' in your Atlas library.'
+      show('done')
+    } catch (e) {
+      $('sheetSub').textContent = (e && e.message) || 'Could not save. Check Atlas is still open.'
+      $('sheetSub').style.color = 'var(--bad)'
+    }
+    $('save').disabled = false; $('save').textContent = 'Save'; bar.style.display = 'none'; fill.style.width = '0'
+  }
   $('again').onclick = () => location.reload()
 
-  /* ----- Live camera: only where the browser allows it (secure pages). ----- */
-  const canLive = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
-  if (canLive) $('live').hidden = false
-  let stream = null, facing = 'environment', auto = true, torch = false, loop = 0, still = 0, last = null, cooldown = 0
-  async function openLive() {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 2560 }, height: { ideal: 1920 } }, audio: false })
-      $('video').srcObject = stream; $('liveView').style.display = 'flex'; watch()
-    } catch (e) { $('err').textContent = 'The live camera is not available here. Use “Take a photo” instead.' }
-  }
-  function closeLive() { cancelAnimationFrame(loop); stream && stream.getTracks().forEach((t) => t.stop()); stream = null; $('liveView').style.display = 'none' }
-  function grab() {
-    const v = $('video'); const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight
-    c.getContext('2d').drawImage(v, 0, 0)
-    $('flashFx').style.opacity = 1; setTimeout(() => $('flashFx').style.opacity = 0, 120)
-    navigator.vibrate && navigator.vibrate(30)
-    c.toBlob((b) => b && add(b), 'image/jpeg', 0.92)
-    cooldown = performance.now() + 2500; still = 0
-    $('hint').textContent = 'Captured page ' + (pages.length + 1) + '. Turn the page.'
-  }
-  // Auto-capture: when the picture stops moving for about a second, take it.
-  function watch() {
-    const v = $('video'), c = document.createElement('canvas'), x = c.getContext('2d', { willReadFrequently: true })
-    c.width = 48; c.height = 36
-    const tick = () => {
-      if (v.videoWidth) {
-        x.drawImage(v, 0, 0, 48, 36); const d = x.getImageData(0, 0, 48, 36).data
-        if (last) {
-          let diff = 0; for (let i = 0; i < d.length; i += 4) diff += Math.abs(d[i] - last[i])
-          const moving = diff / (48 * 36) > 6
-          if (auto && performance.now() > cooldown) { still = moving ? 0 : still + 1; if (still > 28) grab() }
-          if (moving && performance.now() > cooldown) $('hint').textContent = 'Hold steady over the page. It captures by itself.'
-        }
-        last = d
-      }
-      loop = requestAnimationFrame(tick)
-    }
-    tick()
-  }
-  $('live').onclick = openLive
-  $('lClose').onclick = closeLive
-  $('lShoot').onclick = grab
-  $('lAuto').onclick = () => { auto = !auto; $('lAuto').className = auto ? 'on' : '' }
-  $('lFlip').onclick = () => { facing = facing === 'environment' ? 'user' : 'environment'; closeLive(); openLive() }
-  $('lTorch').onclick = async () => {
-    const track = stream && stream.getVideoTracks()[0]
-    try { torch = !torch; await track.applyConstraints({ advanced: [{ torch }] }); $('lTorch').className = torch ? 'on' : '' }
-    catch { $('hint').textContent = 'This camera has no flash control.' }
-  }
-  render()
+  window.addEventListener('resize', () => { if (editing && $('eImg').naturalWidth) layout($('eImg').naturalWidth, $('eImg').naturalHeight) })
+  drawPages()
 })()
 </script>
 </body>
