@@ -16,7 +16,7 @@ import { AiError, shouldFallThrough } from './errors'
 import { agentSystemPrompt } from './prompts/agents'
 import { lessonFollowUpPrompt, lessonSystemPrompt, type LessonOptions } from './prompts/lesson'
 import type { AiDetails } from '@shared/community'
-import { parseLesson } from '@shared/lesson'
+import { parseLesson, parseLessonPartial } from '@shared/lesson'
 import { auditLesson } from '@shared/lesson-audit'
 import { DETAILS_PROMPT, DIGEST_PROMPT, TASK_PROMPTS, type CompleteTask } from './prompts/tasks'
 import { extname } from 'node:path'
@@ -671,7 +671,7 @@ export class AiService {
       .then((result) => ({
         text: result.text || text,
         provider: providerDef(result.provider).name,
-        error: null,
+        error: null as string | null,
       }))
       .catch((error: unknown) => {
         const failure = error instanceof AiError ? error : new AiError('unknown')
@@ -682,6 +682,16 @@ export class AiService {
         }
       })
       .then(async (done) => {
+        if (!done.error && !controller.signal.aborted) {
+          if (!done.text.trim())
+            done.error =
+              "The AI didn't reply. Check your internet connection and that your AI is signed in, then try again."
+          else if (!parseLessonPartial(done.text)) {
+            // The answer was not a lesson (words instead of JSON, or broken JSON): ask once more.
+            const again = await this.resendLesson(done.text, system, messages, controller.signal)
+            if (again) done.text = again
+          }
+        }
         // Check the layout like a teacher would before showing it, and let the AI fix problems.
         const fixed =
           done.error || controller.signal.aborted
@@ -690,6 +700,35 @@ export class AiService {
         this.running.delete(input.requestId)
         emit({ kind: 'done', requestId: input.requestId, ...done, text: fixed ?? done.text })
       })
+  }
+
+  /** Asks the AI to send a lesson again when its first answer could not be read as one. */
+  private async resendLesson(
+    text: string,
+    system: string,
+    messages: ChatTurn[],
+    signal: AbortSignal,
+  ): Promise<string | null> {
+    try {
+      const result = await this.run({
+        task: 'explainer',
+        system,
+        messages: [
+          ...messages,
+          { role: 'assistant', content: text.slice(0, 20_000) },
+          {
+            role: 'user',
+            content:
+              'Atlas could not read that as a lesson. Send the whole lesson as one atlas-lesson block of valid JSON (title, subject, theme, scenes), with nothing before or after it.',
+          },
+        ],
+        signal,
+        onText: () => undefined,
+      })
+      return parseLessonPartial(result.text) ? result.text : null
+    } catch {
+      return null
+    }
   }
 
   /**

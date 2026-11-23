@@ -113,13 +113,23 @@ function Home({ status, profile }: { status: CommunityStatus; profile: Profile }
   const toast = useToast()
   const spaces = useLive(['shared'], () => call('shared:spaces'))
   const [inbox, setInbox] = useState(false)
-  const [admin, setAdmin] = useState(false)
+  const [adminOpen, setAdminOpen] = useState(false)
   const signOut = useAction(async () => {
     await call('shared:signOut')
     changed('shared')
   })
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const item = params.get('item')
+  // The sidebar's Admin link opens this with ?admin=1.
+  const admin = adminOpen || params.get('admin') === '1'
+  const setAdmin = (open: boolean): void => {
+    setAdminOpen(open)
+    if (!open && params.has('admin')) {
+      const next = new URLSearchParams(params)
+      next.delete('admin')
+      setParams(next, { replace: true })
+    }
+  }
   const toolbar = (
     <>
       <IconButton label="Inbox" onClick={() => setInbox(true)}>

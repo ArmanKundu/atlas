@@ -221,3 +221,13 @@ describe('3D models and quick checks', () => {
     expect(scene?.check?.answer).toBe(1)
   })
 })
+
+describe('reading lessons leniently', () => {
+  const body = '{"title":"T","subject":"S","theme":"board","scenes":[{"say":"Hi","items":[]}]}'
+  it('reads a lesson with an unusual fence label and words after it', () => {
+    expect(parseLesson('Sure!\n```atlas\n' + body + '\n```\nHope that helps.')?.title).toBe('T')
+  })
+  it('reads a bare lesson followed by words', () => {
+    expect(parseLesson(body + '\n\nLet me know if you want more.')?.title).toBe('T')
+  })
+})

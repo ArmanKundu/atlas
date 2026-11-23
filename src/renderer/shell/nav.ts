@@ -10,6 +10,7 @@ import {
   MessageCircle,
   NotebookPen,
   Settings,
+  ShieldCheck,
   Timer,
   Users,
   type LucideIcon,
@@ -113,3 +114,11 @@ export const NAV_SETTINGS: NavItem = {
 }
 
 export const NAV_ALL: NavItem[] = [NAV_TODAY, ...NAV_TOOLS, NAV_SETTINGS]
+
+/** Only shown to the Atlas admin: who is in, what each person can use, and reports. */
+export const NAV_ADMIN: NavItem = {
+  to: '/shared?admin=1',
+  label: 'Admin',
+  icon: ShieldCheck,
+  keywords: ['admin', 'users', 'access', 'features', 'reports', 'waitlist'],
+}

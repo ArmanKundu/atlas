@@ -15,7 +15,7 @@ import { isMac, modKey } from '@/lib/keys'
 import { useNow } from '@/lib/now'
 import { Mascot, MascotTile } from '@/mascot/Mascot'
 import type { MascotAccessory, MascotColour } from '@/mascot/options'
-import { NAV_PRIMARY, NAV_SECONDARY, NAV_SETTINGS, NAV_TODAY, type NavItem } from './nav'
+import { NAV_ADMIN, NAV_PRIMARY, NAV_SECONDARY, NAV_SETTINGS, NAV_TODAY, type NavItem } from './nav'
 
 const DAY = 86_400_000
 
@@ -299,6 +299,7 @@ export function Sidebar({
             </p>
           </div>
         )}
+        {shared.data?.isAdmin ? <SidebarLink item={NAV_ADMIN} collapsed={collapsed} quiet /> : null}
         <SidebarLink item={NAV_SETTINGS} collapsed={collapsed} quiet />
       </div>
     </nav>

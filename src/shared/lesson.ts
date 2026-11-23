@@ -435,12 +435,33 @@ function fromRaw(raw: unknown): Lesson | null {
   }
 }
 
-/** Takes the JSON out of a ```atlas-lesson block or a bare answer. */
+/**
+ * Takes the JSON out of a ```atlas-lesson block or a bare answer. Tolerates any fence label,
+ * words before or after, and a missing closing fence: it keeps the first `{` up to the brace that
+ * closes it (or to the end while it is still being written).
+ */
 function jsonPart(text: string): string {
-  const fence = /```(?:atlas-lesson|json)?\s*\n([\s\S]*?)(?:```|$)/.exec(text)
-  const body = fence?.[1] ?? text
+  const fence = /```[\w-]*[ \t]*\n([\s\S]*?)(?:```|$)/.exec(text)
+  const body = fence?.[1]?.includes('{') ? fence[1] : text
   const start = body.indexOf('{')
-  return start >= 0 ? body.slice(start) : body
+  if (start < 0) return body
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = start; i < body.length; i++) {
+    const ch = body[i]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (ch === '\\') escaped = true
+      else if (ch === '"') inString = false
+    } else if (ch === '"') inString = true
+    else if (ch === '{') depth++
+    else if (ch === '}') {
+      depth--
+      if (depth === 0) return body.slice(start, i + 1)
+    }
+  }
+  return body.slice(start)
 }
 
 export function parseLesson(text: string): Lesson | null {
