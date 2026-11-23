@@ -47,7 +47,7 @@ export function SharedPreview({
   const remix = useAction(async (it: SharedItem) => {
     if (it.kind === 'link' && it.linkUrl) {
       await call('shared:remix', { id: it.id })
-      await call('shell:openExternal', { url: it.linkUrl })
+      await call('shell:openWeb', { url: it.linkUrl })
       return
     }
     const result = await call('shared:remix', { id: it.id })

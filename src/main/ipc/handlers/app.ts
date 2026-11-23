@@ -1,9 +1,10 @@
-import { app, nativeTheme, shell, type BrowserWindow } from 'electron'
+import { app, BrowserWindow, nativeTheme, shell } from 'electron'
 import { AtlasError } from '@shared/errors'
 import { PlatformSchema, ipcEvents, type IpcEvent, type IpcEventPayload } from '@shared/ipc'
 import type { Logger } from '../../log'
 import type { PrefsStore } from '../../prefs'
 import { isSafeExternalUrl } from '../../security'
+import { openWebWindow } from '../../web-window'
 import type { IpcRegistry } from '../registry'
 
 export interface AppHandlerDeps {
@@ -52,6 +53,12 @@ export function registerAppHandlers({ registry, prefs, log, windows }: AppHandle
       throw new AtlasError('forbidden', 'Atlas only opens https and mail links.')
     }
     await shell.openExternal(url)
+  })
+
+  registry.handle('shell:openWeb', ({ url }) => {
+    if (!url.startsWith('https:'))
+      throw new AtlasError('forbidden', 'Atlas only opens https links.')
+    openWebWindow(url, log, BrowserWindow.getFocusedWindow() ?? undefined)
   })
 
   registry.handle('log:rendererError', ({ scope, message, stack }) => {

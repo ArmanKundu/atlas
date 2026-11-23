@@ -3,6 +3,17 @@ import { BrowserWindow, nativeTheme, shell } from 'electron'
 import { APP_NAME, APP_ORIGIN, TOPBAR_HEIGHT, WINDOW_DEFAULT, WINDOW_MIN } from '@shared/constants'
 import type { Logger } from './log'
 import { isAppUrl, isSafeExternalUrl } from './security'
+import { openWebWindow } from './web-window'
+
+/** Google Drive, Docs, Slides and Sheets links open inside Atlas; other sites in the browser. */
+export function opensInApp(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url)
+    return protocol === 'https:' && /^(drive|docs)\.google\.com$/.test(hostname)
+  } catch {
+    return false
+  }
+}
 
 /** Window background per theme, matching `--atlas-canvas`, so there is no flash before paint. */
 const CANVAS = { light: '#f5f5f7', dark: '#1c1c1e' } as const
@@ -47,14 +58,16 @@ export function createMainWindow(options: { devServerUrl?: string; log: Logger }
 
   // The renderer never opens windows or leaves the app. Links go to the system browser.
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (isSafeExternalUrl(url)) void shell.openExternal(url)
+    if (opensInApp(url)) openWebWindow(url, log, window)
+    else if (isSafeExternalUrl(url)) void shell.openExternal(url)
     else log.warn('blocked window.open to a non-https url')
     return { action: 'deny' }
   })
   window.webContents.on('will-navigate', (event, url) => {
     if (isAppUrl(url, devServerUrl)) return
     event.preventDefault()
-    if (isSafeExternalUrl(url)) void shell.openExternal(url)
+    if (opensInApp(url)) openWebWindow(url, log, window)
+    else if (isSafeExternalUrl(url)) void shell.openExternal(url)
   })
   window.webContents.on('render-process-gone', (_event, details) => {
     log.error(`renderer process gone: ${details.reason}`)

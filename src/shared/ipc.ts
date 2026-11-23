@@ -120,6 +120,8 @@ export const ipcContract = {
   'prefs:get': { request: none, response: PrefsSchema },
   'prefs:set': { request: PrefsPatchSchema, response: PrefsSchema },
   'shell:openExternal': { request: z.object({ url: z.url() }), response: none },
+  /** Opens an https page in its own sandboxed Atlas window (Google Drive, shared links). */
+  'shell:openWeb': { request: z.object({ url: z.url() }), response: none },
   'log:rendererError': { request: RendererErrorSchema, response: none },
 
   // Updates from GitHub releases
