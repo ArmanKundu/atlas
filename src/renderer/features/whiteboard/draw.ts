@@ -25,7 +25,16 @@ export type Piece =
       /** Overrides the tool's line width (highlighting a tall row). */
       width?: number
     }
-  | { kind: 'text'; x: number; y: number; text: string; size: number; color: string; ms: number }
+  | {
+      kind: 'text'
+      x: number
+      y: number
+      text: string
+      size: number
+      color: string
+      align: 'left' | 'center'
+      ms: number
+    }
   | { kind: 'clear'; ms: number }
 
 interface Axes {
@@ -66,7 +75,14 @@ function path(points: Pt[], color: BoardColor, tool: Tool): PathPiece {
   }
 }
 
-function text(x: number, y: number, words: string, size: number, color: BoardColor): Piece {
+function text(
+  x: number,
+  y: number,
+  words: string,
+  size: number,
+  color: BoardColor,
+  align: 'left' | 'center' = 'left',
+): Piece {
   return {
     kind: 'text',
     x,
@@ -74,6 +90,7 @@ function text(x: number, y: number, words: string, size: number, color: BoardCol
     text: words,
     size,
     color: INK[color],
+    align,
     ms: Math.min(2400, 180 + words.length * 55),
   }
 }
@@ -102,7 +119,7 @@ export function plan(ops: BoardOp[], state: { axes: Axes | null }): Piece[] {
   for (const op of ops) {
     switch (op.t) {
       case 'text':
-        out.push(text(op.x, op.y, op.text, op.size, op.color))
+        out.push(text(op.x, op.y, op.text, op.size, op.color, op.align))
         break
       case 'line':
         out.push(path([op.from, op.to], op.color, op.tool))
@@ -317,13 +334,21 @@ export function drawPiece(
   ctx.save()
   if (piece.kind === 'text') {
     ctx.font = `600 ${piece.size}px ${HAND}`
-    ctx.fillStyle = piece.color
     ctx.textBaseline = 'alphabetic'
     const shown = piece.text.slice(0, Math.ceil(piece.text.length * f))
-    ctx.fillText(shown, piece.x, piece.y)
+    // Centred text starts where the whole line would start, so it does not slide while writing.
+    const full = ctx.measureText(piece.text).width
+    const left = piece.align === 'center' ? piece.x - full / 2 : piece.x
+    // A halo in the paper colour keeps lines from running through the writing.
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = Math.max(4, piece.size * 0.3)
+    ctx.strokeStyle = PAPER
+    ctx.strokeText(shown, left, piece.y)
+    ctx.fillStyle = piece.color
+    ctx.fillText(shown, left, piece.y)
     const w = ctx.measureText(shown).width
     ctx.restore()
-    return [piece.x + w, piece.y - piece.size * 0.25]
+    return [left + w, piece.y - piece.size * 0.25]
   }
   strokeStyle(ctx, piece)
   const target = piece.length * f
@@ -353,11 +378,13 @@ export function drawPiece(
 }
 
 /** Paints the paper: off-white with a faint dot grid, like a real whiteboard. */
+const PAPER = '#fbfbf9'
+
 export function paper(ctx: CanvasRenderingContext2D): void {
   ctx.save()
   ctx.globalAlpha = 1
   ctx.globalCompositeOperation = 'source-over'
-  ctx.fillStyle = '#fbfbf9'
+  ctx.fillStyle = PAPER
   ctx.fillRect(0, 0, BOARD_W, BOARD_H)
   ctx.fillStyle = '#e4e4df'
   for (let x = 25; x < BOARD_W; x += 25)

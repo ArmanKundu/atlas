@@ -25,6 +25,8 @@ export const BoardOpSchema = z.discriminatedUnion('t', [
     y: num,
     text: z.string().max(300),
     size: num.default(30),
+    /** `left`: (x, y) is the start of the line of text; `center`: the middle of the text. */
+    align: z.enum(['left', 'center']).catch('left').default('left'),
     ...style,
   }),
   z.object({ t: z.literal('line'), from: pt, to: pt, ...style }),
@@ -105,25 +107,269 @@ export interface Board {
   steps: { say: string; draw: BoardOp[] }[]
 }
 
-/** Reads a board from the assistant's JSON. Unknown or broken drawing commands are skipped. */
-export function parseBoard(code: string): Board | null {
-  let raw: unknown
-  try {
-    raw = JSON.parse(code)
-  } catch {
-    return null
+/* ---------- Shapes Atlas works out itself ---------- */
+
+type P = [number, number]
+const shapeStyle = { color: color.default('ink'), tool: tool.default('pen') }
+const labelColor = color.default('blue')
+
+/**
+ * Higher-level shapes. The assistant names the shape and Atlas does the geometry, so squares are
+ * square, right-angle marks sit in the corner, and labels sit outside the lines.
+ */
+const ShapeSchema = z.discriminatedUnion('t', [
+  z.object({ t: z.literal('square'), x: num, y: num, size: num, ...shapeStyle }),
+  z.object({
+    t: z.literal('triangle'),
+    points: z.tuple([pt, pt, pt]),
+    /** Names of the corners, e.g. ["A", "B", "C"]. */
+    vertices: z.array(z.string().max(12)).max(3).default([]),
+    /** Labels of the sides AB, BC and CA. Empty strings are skipped. */
+    sides: z.array(z.string().max(24)).max(3).default([]),
+    /** Index (0, 1 or 2) of the corner that is a right angle. */
+    right: z.coerce.number().int().min(0).max(2).optional().catch(undefined),
+    labelColor,
+    ...shapeStyle,
+  }),
+  /** A square standing on the segment from → to, on the side away from `away`. */
+  z.object({
+    t: z.literal('squareOn'),
+    from: pt,
+    to: pt,
+    away: pt.optional(),
+    label: z.string().max(24).default(''),
+    labelColor,
+    ...shapeStyle,
+  }),
+  /** Text beside the middle of a segment, on the side away from `away`. */
+  z.object({
+    t: z.literal('label'),
+    from: pt,
+    to: pt,
+    away: pt.optional(),
+    text: z.string().max(40),
+    size: num.default(30),
+    /** Where along the segment, from 0 (at "from") to 1 (at "to"). */
+    at: z.coerce.number().min(0).max(1).catch(0.5).default(0.5),
+    color: labelColor,
+  }),
+])
+
+const CENTRE: P = [BOARD_W / 2, BOARD_H / 2]
+const sub2 = (a: P, b: P): P => [a[0] - b[0], a[1] - b[1]]
+const add2 = (a: P, b: P): P => [a[0] + b[0], a[1] + b[1]]
+const mul = (a: P, k: number): P => [a[0] * k, a[1] * k]
+const len = (a: P): number => Math.hypot(a[0], a[1]) || 1
+const unit = (a: P): P => mul(a, 1 / len(a))
+
+/** The unit normal of a segment that points away from `away`. */
+function outward(from: P, to: P, away: P): P {
+  const d = unit(sub2(to, from))
+  const n: P = [-d[1], d[0]]
+  const mid = mul(add2(from, to), 0.5)
+  const toAway = sub2(away, mid)
+  return n[0] * toAway[0] + n[1] * toAway[1] > 0 ? mul(n, -1) : n
+}
+
+function labelOp(
+  from: P,
+  to: P,
+  away: P,
+  words: string,
+  size: number,
+  c: BoardColor,
+  at = 0.5,
+): BoardOp {
+  const mid = add2(from, mul(sub2(to, from), at))
+  const n = outward(from, to, away)
+  const gap = size * 0.75 + 6
+  const spot = add2(mid, mul(n, gap))
+  return {
+    t: 'text',
+    x: spot[0],
+    y: spot[1] + size * 0.35,
+    text: words,
+    size,
+    align: 'center',
+    color: c,
+    tool: 'pen',
   }
+}
+
+/** A right-angle mark at corner v between the sides towards a and b. */
+function rightMark(v: P, a: P, b: P, c: BoardColor): BoardOp {
+  const s = Math.min(22, len(sub2(a, v)) * 0.22, len(sub2(b, v)) * 0.22)
+  const u = mul(unit(sub2(a, v)), s)
+  const w = mul(unit(sub2(b, v)), s)
+  return {
+    t: 'poly',
+    points: [add2(v, u), add2(add2(v, u), w), add2(v, w)],
+    close: false,
+    color: c,
+    tool: 'pen',
+  }
+}
+
+function expandShape(shape: z.infer<typeof ShapeSchema>): BoardOp[] {
+  switch (shape.t) {
+    case 'square':
+      return [
+        {
+          t: 'rect',
+          x: shape.x,
+          y: shape.y,
+          w: shape.size,
+          h: shape.size,
+          color: shape.color,
+          tool: shape.tool,
+        },
+      ]
+    case 'triangle': {
+      const pts = shape.points as [P, P, P]
+      const g = mul(add2(add2(pts[0], pts[1]), pts[2]), 1 / 3)
+      const out: BoardOp[] = [
+        { t: 'poly', points: pts, close: true, color: shape.color, tool: shape.tool },
+      ]
+      if (shape.right !== undefined) {
+        const i = shape.right
+        out.push(rightMark(pts[i] as P, pts[(i + 1) % 3] as P, pts[(i + 2) % 3] as P, shape.color))
+      }
+      shape.sides.forEach((words, i) => {
+        if (words.trim())
+          out.push(labelOp(pts[i] as P, pts[(i + 1) % 3] as P, g, words, 30, shape.labelColor))
+      })
+      shape.vertices.forEach((name, i) => {
+        if (!name.trim()) return
+        const v = pts[i] as P
+        const at = add2(v, mul(unit(sub2(v, g)), 26))
+        out.push({
+          t: 'text',
+          x: at[0],
+          y: at[1] + 10,
+          text: name,
+          size: 28,
+          align: 'center',
+          color: shape.color,
+          tool: 'pen',
+        })
+      })
+      return out
+    }
+    case 'squareOn': {
+      const from = shape.from as P
+      const to = shape.to as P
+      const n = outward(from, to, (shape.away as P | undefined) ?? CENTRE)
+      const side = len(sub2(to, from))
+      const a = add2(to, mul(n, side))
+      const b = add2(from, mul(n, side))
+      const out: BoardOp[] = [
+        { t: 'poly', points: [from, to, a, b], close: true, color: shape.color, tool: shape.tool },
+      ]
+      if (shape.label.trim()) {
+        const centre = mul(add2(add2(from, to), add2(a, b)), 0.25)
+        const size = Math.max(20, Math.min(40, side / 4))
+        out.push({
+          t: 'text',
+          x: centre[0],
+          y: centre[1] + size * 0.35,
+          text: shape.label,
+          size,
+          align: 'center',
+          color: shape.labelColor,
+          tool: 'pen',
+        })
+      }
+      return out
+    }
+    case 'label':
+      return [
+        labelOp(
+          shape.from as P,
+          shape.to as P,
+          (shape.away as P | undefined) ?? CENTRE,
+          shape.text,
+          shape.size,
+          shape.color,
+          shape.at,
+        ),
+      ]
+  }
+}
+
+/** One drawing command from the assistant, as plain commands. Broken ones become nothing. */
+export function expandOp(raw: unknown): BoardOp[] {
+  const shape = ShapeSchema.safeParse(raw)
+  if (shape.success) return expandShape(shape.data)
+  const r = BoardOpSchema.safeParse(raw)
+  if (!r.success) return []
+  const op = r.data
+  // A rectangle that is nearly square was almost always meant to be a square.
+  if (
+    op.t === 'rect' &&
+    op.w > 0 &&
+    op.h > 0 &&
+    Math.abs(op.w - op.h) / Math.max(op.w, op.h) < 0.12
+  ) {
+    const side = (op.w + op.h) / 2
+    return [{ ...op, w: side, h: side }]
+  }
+  return [op]
+}
+
+function fromRaw(raw: unknown): Board | null {
   const parsed = BoardSchema.safeParse(raw)
   if (!parsed.success) return null
   return {
     title: parsed.data.title,
-    steps: parsed.data.steps.map((s) => ({
-      say: s.say,
-      draw: s.draw.flatMap((op) => {
-        const r = BoardOpSchema.safeParse(op)
-        return r.success ? [r.data] : []
-      }),
-    })),
+    steps: parsed.data.steps.map((s) => ({ say: s.say, draw: s.draw.flatMap(expandOp) })),
+  }
+}
+
+/** Reads a board from the assistant's JSON. Unknown or broken drawing commands are skipped. */
+export function parseBoard(code: string): Board | null {
+  try {
+    return fromRaw(JSON.parse(code))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Reads a board that is still being written: the title and every step that is complete so far.
+ * Returns null until the first step is complete.
+ */
+export function parseBoardPartial(code: string): Board | null {
+  const whole = parseBoard(code)
+  if (whole) return whole
+  const at = code.indexOf('"steps"')
+  if (at < 0) return null
+  const open = code.indexOf('[', at)
+  if (open < 0) return null
+  let depth = 0
+  let inString = false
+  let escaped = false
+  let lastEnd = -1
+  for (let i = open + 1; i < code.length; i++) {
+    const ch = code[i]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (ch === '\\') escaped = true
+      else if (ch === '"') inString = false
+      continue
+    }
+    if (ch === '"') inString = true
+    else if (ch === '{' || ch === '[') depth++
+    else if (ch === '}' || ch === ']') {
+      if (depth === 0) break
+      depth--
+      if (depth === 0 && ch === '}') lastEnd = i
+    }
+  }
+  if (lastEnd < 0) return null
+  try {
+    return fromRaw(JSON.parse(code.slice(0, lastEnd + 1) + ']}'))
+  } catch {
+    return null
   }
 }
 

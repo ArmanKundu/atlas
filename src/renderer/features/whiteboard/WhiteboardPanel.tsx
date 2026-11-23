@@ -23,6 +23,7 @@ import { changed, useLive } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { call, subscribe } from '@/lib/ipc'
 import { useSetting } from '@/lib/settings'
+import { speakCached } from './voice-cache'
 import { drawCursor, drawPiece, paper, plan, type Piece } from './draw'
 
 const GAP = 110
@@ -133,10 +134,8 @@ export function WhiteboardPanel({
       const key = i
       const cached = clips.current.get(key)
       if (cached) return cached
-      const job = call('voice:speak', { text: say, voice: voiceId, speed: 1 })
-        .then(({ wav }) =>
-          wav.byteLength ? audioCtx().ctx.decodeAudioData(wav.slice().buffer) : null,
-        )
+      const job = speakCached(say, voiceId)
+        .then((wav) => (wav ? audioCtx().ctx.decodeAudioData(wav.slice().buffer) : null))
         .catch(() => null)
       clips.current.set(key, job)
       return job

@@ -26,7 +26,7 @@ import { Segmented } from '@/design/Segmented'
 import { EmptyState, ErrorState, SkeletonList } from '@/design/States'
 import { useToast } from '@/design/Toast'
 import { BoardCard } from '@/features/whiteboard/BoardCard'
-import { SAMPLE_BOARD } from '@/features/whiteboard/sample'
+import { PYTHAGORAS_BOARD, SAMPLE_BOARD } from '@/features/whiteboard/sample'
 import { closeBoard, useOpenBoard } from '@/features/whiteboard/store'
 import { WhiteboardPanel } from '@/features/whiteboard/WhiteboardPanel'
 import { Mascot } from '@/mascot/Mascot'
@@ -292,8 +292,9 @@ function BoardSample() {
   const open = useOpenBoard()
   return (
     <div className="flex flex-col gap-3">
-      <div className="max-w-md">
+      <div className="grid max-w-4xl grid-cols-2 gap-4">
         <BoardCard code={SAMPLE_BOARD} />
+        <BoardCard code={PYTHAGORAS_BOARD} />
       </div>
       {open ? (
         <div className="flex h-[640px] justify-end overflow-hidden rounded-xl ring-1 ring-line">

@@ -24,6 +24,10 @@ const CHAT_BLOCKS = {
   'atlas-share': (code: string) => <ShareActionCard code={code} />,
   'atlas-board': (code: string) => <BoardCard code={code} />,
 }
+/** While a reply is still arriving, only the whiteboard draws live; other cards wait. */
+const LIVE_BLOCKS = {
+  'atlas-board': (code: string) => <BoardCard code={code} live />,
+}
 
 function parseCards(text: string): { front: string; back: string }[] {
   const start = text.indexOf('[')
@@ -85,7 +89,7 @@ function MessageBubble({ message, subjectId }: { message: ChatMessage; subjectId
   return (
     <div className="group flex flex-col gap-1.5">
       {message.contentMd ? (
-        <Markdown blocks={streaming ? undefined : CHAT_BLOCKS}>{message.contentMd}</Markdown>
+        <Markdown blocks={streaming ? LIVE_BLOCKS : CHAT_BLOCKS}>{message.contentMd}</Markdown>
       ) : streaming ? (
         <p className="animate-pulse-soft text-ink-3">Thinking…</p>
       ) : null}

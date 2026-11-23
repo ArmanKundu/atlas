@@ -38,3 +38,76 @@ export const SAMPLE_BOARD = JSON.stringify({
     },
   ],
 })
+
+/** Pythagoras with the shape commands: Atlas works out the squares and label positions. */
+export const PYTHAGORAS_BOARD = JSON.stringify({
+  title: "Pythagoras' theorem",
+  steps: [
+    {
+      say: 'Start with a right-angled triangle.',
+      draw: [
+        {
+          t: 'triangle',
+          points: [
+            [300, 380],
+            [500, 380],
+            [300, 230],
+          ],
+          right: 0,
+        },
+      ],
+    },
+    {
+      say: 'The shorter sides are a and b. The longest side is the hypotenuse c.',
+      draw: [
+        { t: 'label', from: [300, 380], to: [500, 380], away: [400, 520], text: 'a' },
+        { t: 'label', from: [300, 230], to: [300, 380], away: [160, 300], text: 'b' },
+        {
+          t: 'label',
+          from: [500, 380],
+          to: [300, 230],
+          away: [520, 200],
+          text: 'c',
+          at: 0.62,
+          color: 'red',
+        },
+      ],
+    },
+    {
+      say: 'Build a square on each side.',
+      draw: [
+        {
+          t: 'squareOn',
+          from: [300, 380],
+          to: [500, 380],
+          away: [300, 230],
+          label: 'a²',
+          color: 'blue',
+        },
+        {
+          t: 'squareOn',
+          from: [300, 230],
+          to: [300, 380],
+          away: [500, 380],
+          label: 'b²',
+          color: 'green',
+        },
+        {
+          t: 'squareOn',
+          from: [500, 380],
+          to: [300, 230],
+          away: [300, 380],
+          label: 'c²',
+          color: 'red',
+        },
+      ],
+    },
+    {
+      say: 'The two smaller squares add up to the big one.',
+      draw: [
+        { t: 'text', x: 830, y: 470, text: 'a² + b² = c²', size: 44, align: 'center' },
+        { t: 'highlight', x: 700, y: 430, w: 260, h: 56 },
+      ],
+    },
+  ],
+})
