@@ -48,11 +48,15 @@ try {
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByText('Use a plan you already pay for').waitFor()
   await shot('04-onboarding-ai')
-  await page.getByRole('button', { name: 'Next' }).click()
-  await page.getByRole('button', { name: 'Next' }).click()
-  await page.getByRole('button', { name: 'Blue' }).click()
-  await shot('05-onboarding-mascot')
-  await page.getByRole('button', { name: 'Next' }).click()
+  // Click through the remaining steps (the optional shared-library sign-in has Skip).
+  for (let i = 0; i < 10; i++) {
+    const open = page.getByRole('button', { name: 'Open Atlas' })
+    if (await open.isVisible()) break
+    const skip = page.getByRole('button', { name: 'Skip' })
+    if (await skip.isVisible()) await skip.click()
+    else await page.getByRole('button', { name: 'Next' }).click()
+    await page.waitForTimeout(300)
+  }
   await page.getByRole('button', { name: 'Open Atlas' }).click()
   await page.getByRole('navigation', { name: 'Main' }).waitFor()
   await shot('06-today')

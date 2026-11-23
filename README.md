@@ -1,8 +1,24 @@
-# Atlas
+<p align="center"><img src="docs/logo.png" width="112" alt="Atlas logo"></p>
 
-An open-source, local-first AI study assistant for any subject. Everything stays on your laptop, and AI runs on your own plan: Claude, ChatGPT, Gemini, a local model, or your own API key.
+<h1 align="center">Atlas</h1>
 
-> Screenshots: run `npm run build && node scripts/screenshots.mjs` to generate them into `docs/screenshots/`.
+<p align="center">An open-source, local-first AI study buddy for VCE and any other subject.<br>Your files stay on your laptop, and the AI runs on your own plan: Claude, ChatGPT, Gemini, a local model, or your own API key.</p>
+
+<p align="center"><a href="../../releases/latest"><b>Download for Mac or Windows</b></a></p>
+
+![Today](docs/screenshots/06-today.jpg)
+
+|                                                                                |                                                  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------ |
+| ![Exam papers with marked questions](docs/screenshots/08b-viewer-question.jpg) | ![Assistant](docs/screenshots/09-assistant.jpg)  |
+| ![Flashcards](docs/screenshots/11-flashcards.jpg)                              | ![Planner](docs/screenshots/12-planner.jpg)      |
+| ![Focus timer](docs/screenshots/13-timer.jpg)                                  | ![Dark mode](docs/screenshots/18-today-dark.jpg) |
+
+Screenshots use a throwaway sample profile. Make fresh ones with `npm run build && node scripts/screenshots.mjs`.
+
+## Shared library
+
+Sign in with your email (Atlas sends a code) to join the one shared library: everything anyone shares (notes, files, flashcards, Explainer lessons) is open to everyone signed in. Share a file without filling anything in, and your own AI reads it and adds the title, subject, units and a summary. Places are limited for now; the admin sees who has joined.
 
 ## What it does today
 
@@ -16,7 +32,7 @@ An open-source, local-first AI study assistant for any subject. Everything stays
 
 ## Privacy
 
-No account, no server, no telemetry. Your subjects, files and results stay on your laptop. The only network calls Atlas makes are to the AI provider you connect. API keys are stored in your computer's keychain. Subscription sign-ins go through the provider's own app, and Atlas never sees your password or tokens.
+No account needed, no telemetry. The optional shared library is the only online part. Your subjects, files and results stay on your laptop. The only network calls Atlas makes are to the AI provider you connect. API keys are stored in your computer's keychain. Subscription sign-ins go through the provider's own app, and Atlas never sees your password or tokens.
 
 No subject content, textbooks, exams or personal data ever go in this repo. Each user adds their own inside the app.
 
