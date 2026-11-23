@@ -11,6 +11,8 @@ export interface LessonOptions {
   /** The admin allows this person 3D models and quick checks. Both on when left out. */
   models3d?: boolean
   checks?: boolean
+  /** An exam walkthrough: a chapter per part of the question, in depth. */
+  walkthrough?: boolean
 }
 
 /**
@@ -27,6 +29,7 @@ Answer with one \`\`\`atlas-lesson fenced block of JSON and nothing else. Write 
   "title": "Short title",
   "subject": "${options.subject ?? 'The subject'}",
   "theme": "board",              // board (dark chalkboard), night (deep blue) or paper (white)
+  "question": "",                // optional: the question in a line or two, pinned across the top of the board
   "scenes": [
     {
       "title": "Shown at the top when it changes (optional)",
@@ -34,6 +37,8 @@ Answer with one \`\`\`atlas-lesson fenced block of JSON and nothing else. Write 
       "clear": false,             // true wipes the board first
       "model": null,              // optional 3D model for the diagram side (see below)
       "check": null,              // optional quick question the tutor asks after this scene
+      "chapter": "",              // optional: starts a chapter here ("Part (a)"); the student can jump between chapters
+      "key": "",                  // optional: a key result in LaTeX to add to the lesson's formula list ("C'(5) \\approx -4")
       "graph": { "x": [-5, 5], "y": [-5, 5], "equal": false, "grid": true, "xlabel": "x", "ylabel": "y" },
       "items": [ ... things to write or draw, in the order they should appear ... ]
     }
@@ -79,7 +84,17 @@ ${
     : `Quick checks: like a real tutor, after a key idea ask the student something short to keep them thinking: "check": {"q":"Which electrode gains mass?","options":["The anode","The cathode"],"answer":1,"why":"Copper ions are reduced and plated onto the cathode."} ("answer" is the index of the right option). The lesson waits for their answer and the tutor reads out "why". Use 1 or 2 per lesson, never in the first scene.
 `
 }
-Colours ("c"): ${LESSON_COLORS.join(', ')}. Colour is meaning: give each quantity its own colour and use the same colour for it in the working, the diagram and the labels, so the student can see which part is which.
+${
+  options.walkthrough
+    ? `Exam walkthrough: the student wants the whole question explained in depth, part by part, like a great tutor walking through a past paper.
+- Put the question (shortened to its key facts) in "question" so it stays pinned on the board.
+- First chapter "Understanding the question": read it with the student, say what each quantity means in real life, and draw the given data (plot a table's values as points on a graph, label the diagram).
+- Then one chapter per part, "Part (a)", "Part (b)" and so on, each starting with "chapter" and "clear": true and its own "title". In each part: what is being asked in plain words, the idea that unlocks it, the full working, the answer with units, and what the answer means in context. Show where the marks are and the mistake most students make.
+- Show it, don't just say it: take shapes off the diagram and use them as the working (Riemann rectangles become "Area 1 + Area 2 + Area 3 = 985" with each product under its box), show an average as a rectangle of equal area, mark the slope you are estimating.
+- Give each part's answer as a "key" so the formula list builds up. Up to 60 scenes in total.
+`
+    : ''
+}Colours ("c"): ${LESSON_COLORS.join(', ')}. Colour is meaning: give each quantity its own colour and use the same colour for it in the working, the diagram and the labels, so the student can see which part is which.
 
 How to teach:
 - Start from what the student asked. If they sent a question, restate it briefly, then solve it step by step with full working; never skip algebra a student would get stuck on.
@@ -90,6 +105,7 @@ How to teach:
 - Prefer a picture whenever one helps: graphs for functions and calculus, labelled shapes for geometry and trig, boxes and arrows for processes, icons and atoms for science, timelines and labelled boxes for humanities and essays.
 - Coordinates must fit inside the graph ranges or the 0 to 100 square; keep labels away from edges. Choose graph ranges that show every important feature.
 - Nothing may overlap. Leave clear space between boxes, icons and atoms (at least 4 units), keep labels to a few words, and make each box wide enough for its words (about 2 units per letter at w 26). Atlas measures the board and will send back anything that overlaps or doesn't fit.
+- Give the most important results a "key" (2 to 5 per lesson) so the student keeps a list of the formulas and answers that matter.
 - End with a short summary scene: the answer or the key idea, highlighted.
 ${options.level ? `- Pitch it at: ${options.level}.` : '- Pitch it at a senior secondary student unless the question is clearly simpler or harder.'}
 ${options.style === 'fun' ? '- Style: playful and energetic, with a light joke or vivid analogy now and then, but never at the cost of accuracy.' : '- Style: calm, clear and encouraging.'}

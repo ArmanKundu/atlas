@@ -487,7 +487,9 @@ export function Stage({
 
   const theme = THEMES[lesson.theme]
   const board = boardAt(lesson, scene, t, seconds)
-  const top = board.title ? 130 : 70
+  // An exam walkthrough keeps the question pinned in a strip across the top.
+  const strip = lesson.question ? 62 : 0
+  const top = (board.title ? 130 : 70) + strip
   const frame: Frame = board.split
     ? { x: 830, y: top + 10, w: 700, h: STAGE_H - top - 90 }
     : { x: 160, y: top + 10, w: STAGE_W - 320, h: STAGE_H - top - 90 }
@@ -500,7 +502,8 @@ export function Stage({
   const leftW = board.split ? 700 : STAGE_W - 400
   const bottomRoom = caption ? 130 : 50
   const placer = new LabelPlacer({ x: 24, y: 24, w: STAGE_W - 48, h: STAGE_H - 48 - bottomRoom })
-  if (board.title) placer.reserve({ x: 200, y: 20, w: STAGE_W - 400, h: top - 40 })
+  if (strip) placer.reserve({ x: 0, y: 0, w: STAGE_W, h: strip })
+  if (board.title) placer.reserve({ x: 200, y: 20 + strip, w: STAGE_W - 400, h: top - strip - 40 })
   if (board.left.length && board.split)
     placer.reserve({ x: leftX - 20, y: top, w: leftW + 30, h: STAGE_H - top })
   if (caption) placer.reserve({ x: 0, y: STAGE_H - bottomRoom, w: STAGE_W, h: bottomRoom })
@@ -1268,11 +1271,28 @@ export function Stage({
           <g clipPath={board.graph ? 'url(#lesson-frame)' : undefined}>{svg}</g>
           {pen && !writing ? <PenTip x={pen.x} y={pen.y} color={pen.color} /> : null}
         </svg>
+        {strip ? (
+          <p
+            className="absolute right-0 left-0 truncate px-16"
+            style={{
+              top: 0,
+              height: strip,
+              lineHeight: `${strip}px`,
+              color: theme.ink,
+              opacity: 0.72,
+              fontSize: 24,
+              borderBottom: `2px solid ${theme.colors.yellow}55`,
+              background: 'rgba(0,0,0,0.035)',
+            }}
+          >
+            {lesson.question}
+          </p>
+        ) : null}
         {board.title ? (
           <h2
             className="absolute right-0 left-0 text-center"
             style={{
-              top: 34,
+              top: 34 + strip,
               color: theme.ink,
               fontFamily: theme.font,
               fontSize: 52,

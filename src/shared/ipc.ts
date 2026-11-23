@@ -386,6 +386,7 @@ export const ipcContract = {
       style: z.enum(['clear', 'fun']).default('clear'),
       exam: z.boolean().default(false),
       /** What the admin allows this person: 3D models, and the tutor's quick checks. */
+      walkthrough: z.boolean().default(false),
       models3d: z.boolean().default(true),
       checks: z.boolean().default(true),
       /** Files on disk: uploads, pasted screenshots. */

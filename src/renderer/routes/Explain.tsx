@@ -21,6 +21,7 @@ import type { LessonRow, Question, Source, Subject } from '@shared/models'
 import { Menu } from '@/design/Menu'
 import { Select } from '@/design/Form'
 import { Segmented } from '@/design/Segmented'
+import { LessonRail } from '@/features/explainer/LessonRail'
 import { Player } from '@/features/explainer/Player'
 import { LibraryPicker, QuestionPicker } from '@/features/explainer/Pickers'
 import { questionName, stemPreview } from '@/features/explainer/names'
@@ -77,6 +78,8 @@ export function Explain() {
   const [level, setLevel] = useSetting<string>('explainer.level', 'Units 3 and 4')
   const [style, setStyle] = useSetting<'clear' | 'fun'>('explainer.style', 'clear')
   const [exam, setExam] = useSetting<boolean>('explainer.exam', false)
+  const [quiz, setQuiz] = useSetting<boolean>('explainer.quiz', true)
+  const [walkthrough, setWalkthrough] = useState(false)
   const [autoShare] = useSetting<boolean>('explainer.autoShare', true)
   const [params] = useSearchParams()
   const [handledLink, setHandledLink] = useState<string | null>(null)
@@ -185,7 +188,8 @@ export function Explain() {
     questionIds: followUp ? [] : attachments.flatMap((a) => (a.kind === 'question' ? [a.id] : [])),
     followUp,
     models3d: features.models3d,
-    checks: features.tutor,
+    checks: features.tutor && quiz,
+    walkthrough: walkthrough && !followUp,
   })
 
   const begin = (next: LessonRequest): void => {
@@ -258,6 +262,18 @@ export function Explain() {
   }
 
   // Opened from a link (a saved remix): /explain?lesson=<id>.
+  // "Walk me through it" from a question: attach it and switch on the walkthrough.
+  const wantedQuestion = params.get('question')
+  if (wantedQuestion && handledLink !== `q:${wantedQuestion}`) {
+    setHandledLink(`q:${wantedQuestion}`)
+    setWalkthrough(true)
+    setOpened(null)
+    setAttachments((list) =>
+      list.some((a) => a.kind === 'question' && a.id === wantedQuestion)
+        ? list
+        : [...list, { kind: 'question', id: wantedQuestion, name: 'Exam question', detail: '' }],
+    )
+  }
   const wanted = params.get('lesson')
   const wantedRow = wanted ? (recent.data ?? []).find((r) => r.id === wanted) : undefined
   if (wanted && wantedRow && handledLink !== wanted) {
@@ -358,6 +374,32 @@ export function Explain() {
             />
             Exam mode
           </label>
+          <label
+            title="Every part of the question, explained in depth, with chapters you can jump between"
+            className="flex h-8 cursor-pointer items-center gap-2 rounded-full px-2.5 text-2xs text-ink-2 ring-1 ring-line select-none hover:bg-hover"
+          >
+            <input
+              type="checkbox"
+              checked={walkthrough}
+              onChange={(e) => setWalkthrough(e.target.checked)}
+              className="accent-[var(--atlas-blue,#2563eb)]"
+            />
+            Walkthrough
+          </label>
+          {features.tutor ? (
+            <label
+              title="The tutor stops now and then to ask you a quick question"
+              className="flex h-8 cursor-pointer items-center gap-2 rounded-full px-2.5 text-2xs text-ink-2 ring-1 ring-line select-none hover:bg-hover"
+            >
+              <input
+                type="checkbox"
+                checked={quiz}
+                onChange={(e) => setQuiz(e.target.checked)}
+                className="accent-[var(--atlas-blue,#2563eb)]"
+              />
+              Quiz me
+            </label>
+          ) : null}
         </>
       }
     />
@@ -522,37 +564,31 @@ export function Explain() {
               </form>
             ) : null}
           </div>
-          <aside className="w-full shrink-0 xl:w-[340px]">
-            <h2 className="mb-2 text-2xs font-medium tracking-wide text-ink-3 uppercase">
-              Transcript
-            </h2>
-            <ol className="flex flex-col gap-1">
-              {(lesson?.scenes ?? []).map((s, i) => (
-                <li
-                  key={i}
-                  className={cn(
-                    'rounded-lg px-3 py-2 transition-colors',
-                    i === scene ? 'bg-surface shadow-pop ring-1 ring-line' : 'text-ink-2',
-                  )}
-                >
-                  <p className={cn('leading-5', i === scene ? 'text-ink' : 'text-ink-2')}>
-                    {s.say}
-                  </p>
-                </li>
-              ))}
-              {streaming ? (
-                <li className="flex items-center gap-2 px-3 py-2 text-ink-3">
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden /> Writing more…
-                </li>
-              ) : null}
-            </ol>
-            {stream.state.status === 'done' && stream.state.provider ? (
-              <p className="mt-3 px-3 text-2xs text-ink-3">
-                Made with {stream.state.provider}
-                {shareNote ? ` · ${shareNote}` : ''}
-              </p>
-            ) : null}
-          </aside>
+          <LessonRail
+            lesson={lesson}
+            scene={scene}
+            streaming={streaming}
+            onJump={
+              opened && !live
+                ? (at) => {
+                    setScene(at)
+                    setOpened({
+                      ...opened,
+                      key: `${opened.key.split('~')[0]}~${Date.now()}`,
+                      start: at,
+                    })
+                  }
+                : undefined
+            }
+            footer={
+              stream.state.status === 'done' && stream.state.provider ? (
+                <p className="px-3 text-2xs text-ink-3">
+                  Made with {stream.state.provider}
+                  {shareNote ? ` · ${shareNote}` : ''}
+                </p>
+              ) : null
+            }
+          />
         </div>
       </div>
     )

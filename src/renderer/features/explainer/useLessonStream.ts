@@ -16,6 +16,8 @@ export interface LessonRequest {
   /** Let the AI use 3D models and quick checks (off when the admin turned them off). */
   models3d?: boolean
   checks?: boolean
+  /** An exam walkthrough, chapter by chapter. */
+  walkthrough?: boolean
 }
 
 export type StreamState =

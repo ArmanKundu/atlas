@@ -208,3 +208,14 @@ The owner wants AI that works on weak laptops with no account or limits, and a w
 - Switches are enforced in the app (the UI hides the feature and the prompt stops asking the AI
   for it). Someone who rebuilds the app from source could get round that; the shared library and
   reports stay protected server-side by row-level security.
+
+## D-031 Exam walkthroughs and the lesson rail (2026-11-23)
+
+- Inspired by Onlock Learning (see random-inspo/NOTES.md): a lesson can pin its `question`
+  across the top of the board, mark `chapter` starts ("Understanding the question", "Part (a)")
+  and give `key` results. The rail beside the player shows chapters (click to jump), key results
+  (KaTeX) and a clickable transcript.
+- "Walkthrough" in the Explainer (and "Walk me through it" on a practice question) asks for a
+  chapter per part, in depth, up to 60 scenes. "Quiz me" turns the tutor's quick checks on or off.
+- If an AI reply cannot be read as a lesson, Atlas asks once more for a clean block; an empty
+  reply is reported as a connection problem instead of a vague failure.

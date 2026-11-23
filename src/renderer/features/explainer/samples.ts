@@ -115,6 +115,106 @@ const PLANE = {
   ],
 }
 
-export const SAMPLE_LESSONS: Lesson[] = [AREA, PLANE, SODIUM]
+/** An exam walkthrough: the question pinned on top, a chapter per part, key results. */
+const WALK = {
+  title: 'Walkthrough: water in a tank',
+  subject: 'Mathematical Methods',
+  theme: 'paper',
+  question:
+    'Water drains from a tank. The volume V(t) litres after t minutes is given at t = 0, 2, 5 and 8: 80, 68, 50 and 38. (a) Estimate V′(3.5). (b) Use a left sum to estimate the total of V over 0 ≤ t ≤ 8.',
+  scenes: [
+    {
+      chapter: 'Understanding the question',
+      title: 'What is going on?',
+      say: 'A tank is draining. V of t is how much water is left, in litres, after t minutes. We are given four readings.',
+      graph: { x: [0, 9], y: [0, 90], xlabel: 't (min)', ylabel: 'V (L)' },
+      items: [
+        { t: 'text', text: 'V(t) = litres left', c: 'yellow' },
+        { t: 'text', text: 't = minutes', c: 'blue' },
+      ],
+    },
+    {
+      say: 'Let us plot the readings. Each one is a dot: time across, water up.',
+      items: [
+        { t: 'point', at: [0, 80], label: '80', c: 'yellow' },
+        { t: 'point', at: [2, 68], label: '68', c: 'yellow' },
+        { t: 'point', at: [5, 50], label: '50', c: 'yellow' },
+        { t: 'point', at: [8, 38], label: '38', c: 'yellow' },
+      ],
+    },
+    {
+      chapter: 'Part (a)',
+      title: 'Estimate the rate at t = 3.5',
+      clear: true,
+      say: 'Part a wants the rate the water is leaving at three and a half minutes. Three and a half sits between two and five, so use those two readings.',
+      graph: { x: [0, 9], y: [0, 90], xlabel: 't (min)', ylabel: 'V (L)' },
+      items: [
+        { t: 'point', at: [2, 68], c: 'yellow' },
+        { t: 'point', at: [5, 50], c: 'yellow' },
+        { t: 'line', from: [2, 68], to: [5, 50], c: 'red', label: 'slope' },
+      ],
+    },
+    {
+      say: 'The rate is change in water over change in time: fifty minus sixty eight, over five minus two. That is minus six litres per minute.',
+      key: "V'(3.5) \\approx -6 \\text{ L/min}",
+      items: [
+        { t: 'math', tex: "V'(3.5) \\approx \\frac{50 - 68}{5 - 2}", c: 'red' },
+        { t: 'math', tex: '= -6 \\text{ L/min}', c: 'red' },
+      ],
+    },
+    {
+      chapter: 'Part (b)',
+      title: 'A left sum',
+      clear: true,
+      say: 'Part b. A left sum uses the height at the left of each gap, times the width of the gap.',
+      graph: { x: [0, 9], y: [0, 90], xlabel: 't (min)', ylabel: 'V (L)' },
+      items: [
+        {
+          t: 'poly',
+          points: [
+            [0, 0],
+            [0, 80],
+            [2, 80],
+            [2, 0],
+          ],
+          fill: 'yellow',
+          c: 'yellow',
+        },
+        {
+          t: 'poly',
+          points: [
+            [2, 0],
+            [2, 68],
+            [5, 68],
+            [5, 0],
+          ],
+          fill: 'yellow',
+          c: 'yellow',
+        },
+        {
+          t: 'poly',
+          points: [
+            [5, 0],
+            [5, 50],
+            [8, 50],
+            [8, 0],
+          ],
+          fill: 'yellow',
+          c: 'yellow',
+        },
+      ],
+    },
+    {
+      say: 'Eighty times two, plus sixty eight times three, plus fifty times three. That gives five hundred and fourteen.',
+      key: '80(2) + 68(3) + 50(3) = 514',
+      items: [
+        { t: 'math', tex: '80 \\times 2 + 68 \\times 3 + 50 \\times 3', c: 'yellow' },
+        { t: 'math', tex: '= 514', c: 'green' },
+      ],
+    },
+  ],
+}
+
+export const SAMPLE_LESSONS: Lesson[] = [AREA, PLANE, SODIUM, WALK]
   .map((raw) => parseLesson(JSON.stringify(raw)))
   .filter((l): l is Lesson => l !== null)

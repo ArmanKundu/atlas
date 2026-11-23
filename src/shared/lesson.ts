@@ -363,12 +363,18 @@ export interface LessonScene {
   /** A 3D model for the diagram side; it stays until another model or a cleared board. */
   model: LessonModel | null
   check: LessonCheck | null
+  /** Starts a chapter here ("Understanding the question", "Part (a)"), for exam walkthroughs. */
+  chapter: string
+  /** A key result to keep in the lesson's formula list (LaTeX), e.g. "C'(5) \\approx -4". */
+  key: string
 }
 
 export interface Lesson {
   title: string
   subject: string
   theme: LessonTheme
+  /** The question being explained, pinned across the top of the board. */
+  question: string
   scenes: LessonScene[]
 }
 
@@ -380,13 +386,16 @@ const SceneSchema = z.object({
   items: z.array(z.unknown()).max(40).catch([]).default([]),
   model: ModelSchema.nullable().optional().catch(null),
   check: CheckSchema.nullable().optional().catch(null),
+  chapter: words(80).catch('').default(''),
+  key: words(300).catch('').default(''),
 })
 
 const LessonSchema = z.object({
   title: words(140).default('Explainer'),
   subject: words(60).default(''),
   theme: z.enum(LESSON_THEMES).catch('board').default('board'),
-  scenes: z.array(z.unknown()).max(40),
+  question: words(600).catch('').default(''),
+  scenes: z.array(z.unknown()).max(80),
 })
 
 function toScene(raw: unknown): LessonScene | null {
@@ -419,6 +428,8 @@ function toScene(raw: unknown): LessonScene | null {
       check && check.q && check.options.every(Boolean)
         ? { ...check, answer: Math.max(0, Math.min(check.options.length - 1, check.answer)) }
         : null,
+    chapter: s.data.chapter,
+    key: s.data.key,
   }
 }
 
@@ -431,6 +442,7 @@ function fromRaw(raw: unknown): Lesson | null {
     title: lesson.data.title,
     subject: lesson.data.subject,
     theme: lesson.data.theme,
+    question: lesson.data.question,
     scenes,
   }
 }
@@ -540,6 +552,7 @@ export function parseLessonPartial(text: string): Lesson | null {
     title: field('title') || 'Explainer',
     subject: field('subject'),
     theme: (LESSON_THEMES as readonly string[]).includes(theme) ? (theme as LessonTheme) : 'board',
+    question: field('question'),
     scenes,
   }
 }

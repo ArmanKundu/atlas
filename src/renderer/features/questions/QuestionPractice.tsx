@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Check, Eye, RotateCcw } from 'lucide-react'
+import { useNavigate } from 'react-router'
+import { Check, Clapperboard, Eye, RotateCcw } from 'lucide-react'
 import { MISTAKE_TYPES, type Answer, type Question } from '@shared/models'
 import { Button } from '@/design/Button'
 import { Field, Select, Textarea } from '@/design/Form'
@@ -123,13 +124,16 @@ function PracticeRound({
             <span className="text-2xs text-ink-3 tabular-nums" aria-label={`Time ${minutes}`}>
               {minutes}
             </span>
-            <Button
-              variant="primary"
-              icon={<Eye className="size-4" />}
-              onClick={() => setStage('marking')}
-            >
-              Check answer
-            </Button>
+            <div className="flex gap-2">
+              <WalkThrough id={question.id} />
+              <Button
+                variant="primary"
+                icon={<Eye className="size-4" />}
+                onClick={() => setStage('marking')}
+              >
+                Check answer
+              </Button>
+            </div>
           </div>
         </>
       ) : null}
@@ -248,6 +252,7 @@ function PracticeRound({
             Saved: {score} out of {max} in {minutes}.
           </p>
           <div className="flex gap-2">
+            <WalkThrough id={question.id} />
             <Button variant="secondary" icon={<RotateCcw className="size-4" />} onClick={onRetry}>
               Try again
             </Button>
@@ -260,5 +265,19 @@ function PracticeRound({
         </div>
       ) : null}
     </div>
+  )
+}
+
+/** Opens the Explainer ready to walk through this question part by part. */
+function WalkThrough({ id }: { id: string }) {
+  const navigate = useNavigate()
+  return (
+    <Button
+      variant="ghost"
+      icon={<Clapperboard className="size-4" />}
+      onClick={() => void navigate(`/explain?question=${id}`)}
+    >
+      Walk me through it
+    </Button>
   )
 }

@@ -157,3 +157,29 @@ y = x² from 0 to 2 with thinner and thinner rectangles).
   speaks while the board is being prepared; a key-formulas rail beside the board; a coloured live
   transcript; a "just explain" vs "quiz me" switch; spoken back-and-forth as an option. Never let
   questions hold up the visuals.
+
+## Onlock Learning (onlocklearning.com), studied 2026-11-23
+
+Exam walkthroughs, one short video per part (AP Calc AB 2024 Q1: "Understanding the question",
+then Parts a–d, 1.5–3 min each). The page is a player plus a playlist rail of parts with a
+little icon per part (C′(t), ∫, F.T.C, C″(t)), the question printed underneath, "Print the exam
+paper", and "Up next".
+
+How the visuals explain (from frames of Q1 intro and Part b):
+- The real question text is pinned as a strip across the top the whole time; the data table
+  sits in the bottom-left corner so it is always there to point at.
+- A graph on the right: the table's points drop in as dots, then a dashed curve joins them.
+- Colour is meaning: the dependent variable (C, temperature) is yellow everywhere (axis, label,
+  numbers); time is cyan. "100 × 3" is written as a yellow 100 times a cyan 3.
+- Shapes are lifted off the graph and become the working: the three Riemann rectangles slide
+  out as "Area 1, Area 2, Area 3", then line up as box + box + box = 985 with each product
+  under its box and a pointing hand on the table value it came from.
+- Meaning is shown, not said: the average value is a single rectangle of height H over the 12
+  minutes with the same area as the integral (∫ = 12 × H).
+- Big chunky outlined words pop in for the key phrase ("Temperature is a function of C( )").
+- A cursor points at the exact words in the question being read.
+- (They use parody voices of real public figures as the cast; Atlas will not do that.)
+
+Ideas for Atlas: an "Exam walkthrough" lesson made of chapters (Understanding the question,
+then one per part) with a chapter rail to jump between them; the question pinned on the board;
+consistent colour per variable; take shapes off the diagram to build the working.

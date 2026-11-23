@@ -293,6 +293,7 @@ export function registerDataHandlers(deps: DataHandlerDeps): void {
         exam: input.exam ?? false,
         models3d: input.models3d ?? true,
         checks: input.checks ?? true,
+        walkthrough: input.walkthrough ?? false,
       },
       files: [...(input.files ?? []), ...library],
       questionIds: input.questionIds ?? [],
