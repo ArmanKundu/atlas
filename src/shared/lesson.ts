@@ -205,12 +205,164 @@ export const GraphSchema = z.object({
 })
 export type Graph = z.infer<typeof GraphSchema>
 
+const pt3 = z.tuple([num, num, num]).catch([0, 0, 0])
+const range = z.tuple([num, num])
+
+/**
+ * One thing in a 3D model. Space runs from about -5 to 5 on each axis with y pointing up; the
+ * student can orbit, zoom and drag objects around. Labels float beside their object and are
+ * kept from overlapping.
+ */
+export const ModelObjectSchema = z.discriminatedUnion('k', [
+  z.object({
+    k: z.literal('sphere'),
+    id,
+    at: pt3,
+    r: num.default(1),
+    c: color.default('blue'),
+    label: words(60).default(''),
+    opacity: num.default(1),
+  }),
+  z.object({
+    k: z.literal('box'),
+    id,
+    at: pt3,
+    size: pt3.default([1, 1, 1]),
+    c: color.default('blue'),
+    label: words(60).default(''),
+    opacity: num.default(1),
+  }),
+  z.object({
+    k: z.literal('cylinder'),
+    id,
+    from: pt3,
+    to: pt3,
+    r: num.default(0.2),
+    c: color.default('grey'),
+    label: words(60).default(''),
+    opacity: num.default(1),
+  }),
+  z.object({
+    k: z.literal('cone'),
+    id,
+    at: pt3,
+    r: num.default(1),
+    h: num.default(2),
+    c: color.default('orange'),
+    label: words(60).default(''),
+    opacity: num.default(1),
+  }),
+  z.object({
+    k: z.literal('torus'),
+    id,
+    at: pt3,
+    r: num.default(1.5),
+    tube: num.default(0.3),
+    c: color.default('purple'),
+    label: words(60).default(''),
+  }),
+  z.object({
+    k: z.literal('arrow'),
+    id,
+    from: pt3,
+    to: pt3,
+    c: color.default('red'),
+    label: words(60).default(''),
+  }),
+  z.object({
+    k: z.literal('plane'),
+    id,
+    at: pt3,
+    normal: pt3.default([0, 1, 0]),
+    size: num.default(6),
+    c: color.default('teal'),
+    label: words(60).default(''),
+    opacity: num.default(0.35),
+  }),
+  /** z = f(x, y) drawn as a surface (height is up). */
+  z.object({
+    k: z.literal('surface'),
+    id,
+    fn: words(200),
+    x: range.catch([-3, 3]).default([-3, 3]),
+    y: range.catch([-3, 3]).default([-3, 3]),
+    c: color.default('blue'),
+    label: words(60).default(''),
+    opacity: num.default(0.9),
+  }),
+  /** A curve (x(t), y(t), z(t)), with z up. */
+  z.object({
+    k: z.literal('curve'),
+    id,
+    fn: z.tuple([words(200), words(200), words(200)]),
+    t: range.catch([0, 6.283]).default([0, 6.283]),
+    c: color.default('yellow'),
+    label: words(60).default(''),
+  }),
+  z.object({
+    k: z.literal('axes'),
+    id,
+    size: num.default(4),
+    labels: z.boolean().catch(true).default(true),
+  }),
+  /** A ball-and-stick molecule; atoms are coloured by element. */
+  z.object({
+    k: z.literal('molecule'),
+    id,
+    atoms: z
+      .array(z.object({ el: words(3), at: pt3, label: words(40).default('') }))
+      .max(60)
+      .catch([]),
+    bonds: z
+      .array(z.tuple([num, num]).or(z.tuple([num, num, num])))
+      .max(80)
+      .catch([])
+      .default([]),
+    at: pt3.default([0, 0, 0]),
+    scale: num.default(1),
+  }),
+  z.object({ k: z.literal('label'), id, at: pt3, text: words(80) }),
+])
+export type ModelObject = z.infer<typeof ModelObjectSchema>
+
+export interface LessonModel {
+  objects: ModelObject[]
+  /** Turn slowly until the student grabs it. */
+  spin: boolean
+  /** Where the camera starts, looking at the centre. */
+  camera: [number, number, number]
+}
+
+const ModelSchema = z.object({
+  objects: z.array(z.unknown()).max(80).catch([]),
+  spin: z.boolean().catch(false).default(false),
+  camera: z.tuple([num, num, num]).catch([6, 5, 8]).default([6, 5, 8]),
+})
+
+/** A quick question the tutor asks at the end of a scene; the lesson waits for an answer. */
+export interface LessonCheck {
+  q: string
+  options: string[]
+  answer: number
+  why: string
+}
+
+const CheckSchema = z.object({
+  q: words(400),
+  options: z.array(words(200)).min(2).max(4),
+  answer: z.coerce.number().int().catch(0),
+  why: words(600).default(''),
+})
+
 export interface LessonScene {
   title: string
   say: string
   clear: boolean
   graph: Graph | null
   items: LessonItem[]
+  /** A 3D model for the diagram side; it stays until another model or a cleared board. */
+  model: LessonModel | null
+  check: LessonCheck | null
 }
 
 export interface Lesson {
@@ -226,6 +378,8 @@ const SceneSchema = z.object({
   clear: z.boolean().catch(false).default(false),
   graph: GraphSchema.nullable().optional().catch(null),
   items: z.array(z.unknown()).max(40).catch([]).default([]),
+  model: ModelSchema.nullable().optional().catch(null),
+  check: CheckSchema.nullable().optional().catch(null),
 })
 
 const LessonSchema = z.object({
@@ -242,13 +396,29 @@ function toScene(raw: unknown): LessonScene | null {
     const parsed = LessonItemSchema.safeParse(item)
     return parsed.success ? [parsed.data] : []
   })
-  if (!s.data.say && items.length === 0) return null
+  const model = s.data.model
+    ? {
+        objects: s.data.model.objects.flatMap((o) => {
+          const parsed = ModelObjectSchema.safeParse(o)
+          return parsed.success ? [parsed.data] : []
+        }),
+        spin: s.data.model.spin,
+        camera: s.data.model.camera,
+      }
+    : null
+  const check = s.data.check
+  if (!s.data.say && items.length === 0 && !model) return null
   return {
     title: s.data.title,
     say: s.data.say,
     clear: s.data.clear,
     graph: s.data.graph ?? null,
     items,
+    model: model && model.objects.length > 0 ? model : null,
+    check:
+      check && check.q && check.options.every(Boolean)
+        ? { ...check, answer: Math.max(0, Math.min(check.options.length - 1, check.answer)) }
+        : null,
   }
 }
 

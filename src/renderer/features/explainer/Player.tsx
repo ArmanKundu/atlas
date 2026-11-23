@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Captions, Loader2, Pause, Play, RotateCcw } from 'lucide-react'
+import { ArrowUp, Captions, Check, Hand, Loader2, Pause, Play, RotateCcw, X } from 'lucide-react'
 import { speakingSeconds, subtitleAt, type Lesson } from '@shared/lesson'
 import { useLive } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { call } from '@/lib/ipc'
 import { useSetting } from '@/lib/settings'
+import { MicButton } from '@/features/voice/MicButton'
 import { clip, lessonAudio } from './audio'
 import { Stage } from './Stage'
+import { Tutor } from './Tutor'
 
 const clock = (s: number): string =>
   `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
@@ -19,14 +21,23 @@ export function Player({
   lesson,
   live = false,
   autoPlay = true,
+  startScene = 0,
   onScene,
   onEnded,
+  onAsk,
+  busy = false,
 }: {
   lesson: Lesson
   live?: boolean
   autoPlay?: boolean
+  /** Pick up from this scene (coming back after answering an interruption). */
+  startScene?: number
   onScene?: (scene: number) => void
   onEnded?: () => void
+  /** The student interrupted with a question, typed or spoken, at this scene. */
+  onAsk?: (question: string, scene: number) => void
+  /** The tutor is working on an answer. */
+  busy?: boolean
 }) {
   const [voiceOn] = useSetting<boolean>('whiteboard.voice', true)
   const [voiceId] = useSetting<string>('whiteboard.voiceId', 'af_heart')
@@ -34,13 +45,57 @@ export function Player({
   const voice = useLive([], () => call('voice:status'))
   const speak = voiceOn && voice.data === 'ready'
 
-  const [scene, setScene] = useState(0)
+  const [scene, setScene] = useState(() => Math.min(startScene, lesson.scenes.length - 1))
   const [t, setT] = useState(0)
   const [playing, setPlaying] = useState(autoPlay)
   const [waiting, setWaiting] = useState(false)
   const [durations, setDurations] = useState<Record<number, number>>({})
   const [seek, setSeek] = useState(0)
   const source = useRef<AudioBufferSourceNode | null>(null)
+  // A check-in question waiting for an answer, and the ones already answered.
+  const [checking, setChecking] = useState<number | null>(null)
+  const [picked, setPicked] = useState<number | null>(null)
+  const answered = useRef(new Set<number>())
+  const [mood, setMood] = useState<'idle' | 'happy' | 'concerned' | 'thinking'>('idle')
+  const [asking, setAsking] = useState(false)
+  const [question, setQuestion] = useState('')
+  const [lineTalking, setLineTalking] = useState(false)
+  const line = useRef<AudioBufferSourceNode | null>(null)
+
+  /** The tutor says one line outside the lesson's narration (a question, feedback). */
+  const sayLine = useCallback(
+    async (text: string): Promise<void> => {
+      try {
+        line.current?.stop()
+      } catch {
+        // already stopped
+      }
+      if (!speak || !text) return
+      const { ctx, meter } = lessonAudio()
+      if (ctx.state === 'suspended') await ctx.resume()
+      const buf = await clip(text, voiceId)
+      if (!buf) return
+      const node = ctx.createBufferSource()
+      node.buffer = buf
+      node.connect(ctx.destination)
+      node.connect(meter)
+      node.onended = () => setLineTalking(false)
+      setLineTalking(true)
+      node.start()
+      line.current = node
+    },
+    [speak, voiceId],
+  )
+  useEffect(
+    () => () => {
+      try {
+        line.current?.stop()
+      } catch {
+        // already stopped
+      }
+    },
+    [],
+  )
 
   const seconds = useMemo(
     () => lesson.scenes.map((s, i) => durations[i] ?? speakingSeconds(s.say)),
@@ -82,7 +137,7 @@ export function Player({
     let frame = 0
     let begin = 0
     const offset = t
-    const { ctx, tap } = lessonAudio()
+    const { ctx, tap, meter } = lessonAudio()
 
     const tick = (): void => {
       if (!alive) return
@@ -91,7 +146,13 @@ export function Player({
       const length = seconds[scene] ?? 6
       if (local >= length) {
         setT(length)
-        if (scene + 1 < lesson.scenes.length) {
+        if (current.check && !answered.current.has(scene)) {
+          // The tutor asks a quick question before moving on.
+          setPlaying(false)
+          setChecking(scene)
+          setPicked(null)
+          void sayLine(current.check.q)
+        } else if (scene + 1 < lesson.scenes.length) {
           setScene(scene + 1)
           setT(0)
         } else if (live) setWaiting(true)
@@ -116,6 +177,7 @@ export function Player({
           node.buffer = buf
           node.connect(ctx.destination)
           node.connect(tap)
+          node.connect(meter)
           node.start(0, offset)
           source.current = node
         }
@@ -142,6 +204,7 @@ export function Player({
   const go = (next: number, offset = 0): void => {
     stopAudio()
     setWaiting(false)
+    setChecking(null)
     setScene(Math.max(0, Math.min(lesson.scenes.length - 1, next)))
     setT(offset)
     setSeek((n) => n + 1)
@@ -155,12 +218,75 @@ export function Player({
     while (i > 0 && (starts[i] ?? 0) > time) i--
     go(i, Math.max(0, time - (starts[i] ?? 0)))
   }
-  const ended = !playing && scene === lesson.scenes.length - 1 && t >= (seconds[scene] ?? 0) - 0.01
+  const ended =
+    !playing &&
+    checking === null &&
+    scene === lesson.scenes.length - 1 &&
+    t >= (seconds[scene] ?? 0) - 0.01
   const say = lesson.scenes[scene]?.say ?? ''
+  const check = checking === null ? null : (lesson.scenes[checking]?.check ?? null)
+
+  const toggle = (): void => {
+    if (checking !== null || asking) return
+    if (ended) {
+      go(0)
+      setPlaying(true)
+    } else setPlaying((p) => !p)
+  }
+  const interrupt = (): void => {
+    setPlaying(false)
+    setAsking(true)
+    setMood('thinking')
+  }
+  const sendQuestion = (text: string): void => {
+    const q = text.trim()
+    if (!q || !onAsk) return
+    setAsking(false)
+    setQuestion('')
+    setMood('idle')
+    onAsk(q, scene)
+  }
+  const pick = (i: number): void => {
+    if (!check || picked !== null || checking === null) return
+    setPicked(i)
+    answered.current.add(checking)
+    const right = i === check.answer
+    setMood(right ? 'happy' : 'concerned')
+    void sayLine(
+      `${right ? 'Yes, nice one!' : `Not quite. It's ${check.options[check.answer] ?? ''}.`} ${check.why}`,
+    )
+  }
+  const carryOn = (): void => {
+    try {
+      line.current?.stop()
+    } catch {
+      // already stopped
+    }
+    setChecking(null)
+    setMood('idle')
+    if (scene + 1 < lesson.scenes.length) {
+      setScene(scene + 1)
+      setT(0)
+      setPlaying(true)
+    } else onEnded?.()
+  }
+  const tutorNote = busy
+    ? 'Good question, let me show you…'
+    : asking
+      ? 'What would you like to know?'
+      : !playing && !ended && checking === null && onAsk
+        ? 'Paused. Ask me anything with ✋'
+        : null
 
   return (
     <div className="group/player overflow-hidden rounded-2xl bg-black shadow-pop ring-1 ring-line">
-      <div className="relative">
+      <div
+        className="relative"
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest('[data-interactive]')) return
+          toggle()
+        }}
+      >
         <Stage
           lesson={lesson}
           scene={scene}
@@ -173,28 +299,129 @@ export function Player({
             <Loader2 className="size-3.5 animate-spin" aria-hidden /> Writing the next scene…
           </div>
         ) : null}
-        <button
-          type="button"
-          aria-label={playing ? 'Pause' : 'Play'}
-          onClick={() => {
-            if (ended) {
-              go(0)
-              setPlaying(true)
-            } else setPlaying((p) => !p)
-          }}
-          className="absolute inset-0"
-        />
+        <div className="absolute bottom-[12%] left-4">
+          <Tutor
+            talking={(playing && !waiting) || lineTalking || busy}
+            withVoice={speak && !busy}
+            mood={busy ? 'thinking' : mood}
+            note={tutorNote}
+          />
+        </div>
+        {check && checking !== null ? (
+          <div
+            data-interactive
+            className="absolute inset-0 grid place-items-center bg-black/45 p-6"
+          >
+            <div className="w-full max-w-lg rounded-2xl bg-surface p-5 shadow-pop">
+              <p className="text-2xs font-medium tracking-wide text-ink-3 uppercase">Quick check</p>
+              <p className="mt-1 text-[1.0625rem] font-semibold text-ink">{check.q}</p>
+              <div className="mt-3 grid gap-2">
+                {check.options.map((option, i) => {
+                  const right = picked !== null && i === check.answer
+                  const wrong = picked === i && i !== check.answer
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      disabled={picked !== null}
+                      onClick={() => pick(i)}
+                      className={cn(
+                        'flex items-center gap-2 rounded-lg px-3 py-2.5 text-left ring-1 ring-line transition-colors',
+                        picked === null && 'hover:bg-hover',
+                        right && 'bg-success-soft text-success ring-success/40',
+                        wrong && 'bg-danger-soft text-danger ring-danger/40',
+                      )}
+                    >
+                      <span className="grid size-6 shrink-0 place-items-center rounded-full bg-hover text-2xs font-semibold">
+                        {right ? (
+                          <Check className="size-3.5" aria-hidden />
+                        ) : wrong ? (
+                          <X className="size-3.5" aria-hidden />
+                        ) : (
+                          String.fromCharCode(65 + i)
+                        )}
+                      </span>
+                      {option}
+                    </button>
+                  )
+                })}
+              </div>
+              {picked !== null ? (
+                <>
+                  {check.why ? <p className="mt-3 text-ink-2">{check.why}</p> : null}
+                  <button
+                    type="button"
+                    onClick={carryOn}
+                    className="mt-4 h-9 rounded-lg bg-accent px-4 font-medium text-accent-fg hover:bg-accent-hover"
+                  >
+                    Keep going
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={carryOn}
+                  className="mt-3 text-2xs text-ink-3 hover:text-ink"
+                >
+                  Skip
+                </button>
+              )}
+            </div>
+          </div>
+        ) : null}
+        {asking ? (
+          <form
+            data-interactive
+            onSubmit={(e) => {
+              e.preventDefault()
+              sendQuestion(question)
+            }}
+            className="absolute right-4 bottom-4 left-28 flex items-center gap-2 rounded-xl bg-surface p-2 shadow-pop"
+          >
+            <Hand className="ml-1 size-4 shrink-0 text-ink-3" aria-hidden />
+            <input
+              autoFocus
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setAsking(false)
+                  setMood('idle')
+                  setPlaying(true)
+                }
+              }}
+              placeholder="Type or say your question"
+              aria-label="Your question"
+              className="h-8 min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-3"
+            />
+            <MicButton onText={(text) => sendQuestion(text)} />
+            <button
+              type="submit"
+              aria-label="Ask"
+              disabled={!question.trim()}
+              className="flex size-8 items-center justify-center rounded-full bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-40"
+            >
+              <ArrowUp className="size-4" aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAsking(false)
+                setMood('idle')
+                setPlaying(true)
+              }}
+              className="h-8 rounded-md px-2 text-2xs text-ink-2 hover:bg-hover"
+            >
+              Keep watching
+            </button>
+          </form>
+        ) : null}
       </div>
       <div className="flex items-center gap-1 bg-[#101114] px-3 py-2 text-white">
         <button
           type="button"
           aria-label={ended ? 'Replay' : playing ? 'Pause' : 'Play'}
-          onClick={() => {
-            if (ended) {
-              go(0)
-              setPlaying(true)
-            } else setPlaying((p) => !p)
-          }}
+          onClick={toggle}
           className="grid size-9 place-items-center rounded-full bg-white text-black hover:bg-white/90"
         >
           {ended ? (
@@ -233,6 +460,16 @@ export function Player({
         <span className="mr-2 font-mono text-2xs text-white/50">
           {live ? 'writing…' : clock(total)}
         </span>
+        {onAsk ? (
+          <button
+            type="button"
+            onClick={interrupt}
+            disabled={busy}
+            className="mr-1 flex h-8 items-center gap-1.5 rounded-full bg-white/15 px-3 text-2xs font-medium hover:bg-white/25 disabled:opacity-40"
+          >
+            <Hand className="size-4" aria-hidden /> Ask
+          </button>
+        ) : null}
         <button
           type="button"
           aria-label="Captions"

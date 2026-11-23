@@ -180,3 +180,44 @@ describe('auditLesson', () => {
     expect(auditLesson(lesson as NonNullable<typeof lesson>)).toEqual([])
   })
 })
+
+describe('3D models and quick checks', () => {
+  it('compiles formulas in several variables', async () => {
+    const { compileExpression } = await import('../../src/shared/whiteboard')
+    const f = compileExpression('x^2 - y^2', ['x', 'y'])
+    expect(f?.([3, 1])).toBe(8)
+    expect(compileExpression('2xy', ['x', 'y'])?.([2, 3])).toBe(12)
+    expect(compileExpression('z = 3 - x - y', ['x', 'y'])?.([1, 1])).toBe(1)
+    expect(compileExpression('foo(x)', ['x'])).toBeNull()
+  })
+
+  it('reads a model and a check, dropping broken parts', () => {
+    const lesson = parseLesson(
+      '```atlas-lesson\n' +
+        JSON.stringify({
+          title: 'Water',
+          scenes: [
+            {
+              say: 'A water molecule.',
+              model: {
+                objects: [
+                  { k: 'molecule', atoms: [{ el: 'O', at: [0, 0, 0] }], bonds: [] },
+                  { k: 'nonsense' },
+                ],
+              },
+              check: {
+                q: 'Bent or linear?',
+                options: ['Bent', 'Linear'],
+                answer: 9,
+                why: 'Lone pairs.',
+              },
+            },
+          ],
+        }) +
+        '\n```',
+    )
+    const scene = lesson?.scenes[0]
+    expect(scene?.model?.objects).toHaveLength(1)
+    expect(scene?.check?.answer).toBe(1)
+  })
+})

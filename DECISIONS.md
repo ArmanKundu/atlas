@@ -185,3 +185,10 @@ The owner wants AI that works on weak laptops with no account or limits, and a w
 - **Decision:** the board is written live in a handwriting font (Kalam, KaTeX restyled to match) with a pen tip following the stroke; the working column scrolls like a notebook instead of jumping. The player has one scrubber and short subtitles, and the side rail is a plain transcript.
 - **Overlaps:** labels are placed by `LabelPlacer` (`src/shared/label-layout.ts`), which tries nearby spots and avoids other labels, curves, the working column and the subtitles, drawing a leader line when it moves one. After each lesson is written, `auditLesson` measures boxes, icons, atoms and labels; if anything overlaps, doesn't fit or is off the board, the AI gets one pass to fix just those, and the fix is kept only if it has fewer problems.
 - **Sharing:** finished lessons still auto-share to the library; a Share button beside Download does it by hand.
+
+### D-029 A tutor you can interrupt, quick checks and 3D models
+
+- **Tutor:** the mascot sits in the corner of the board and its mouth follows the voice's loudness (an analyser on the lesson audio). It says check-in questions and feedback aloud.
+- **Interrupt:** "Ask" pauses the lesson; the student types or speaks (on-device Whisper, sent as soon as it is heard). The answer is a short follow-up lesson played on the same board; when it ends the original lesson resumes at the scene where it stopped.
+- **Quick checks:** a scene may carry `check` (question, 2 to 4 options, answer, why). The lesson waits for an answer and the tutor reads the explanation.
+- **3D:** a scene may carry `model`, a list of primitives (spheres, boxes, arrows, planes, surfaces z = f(x, y), parametric curves, molecules coloured by element, axes). three.js renders it on the diagram side; drag to orbit, scroll to zoom, grab a part to move it. Labels are placed each frame with `LabelPlacer`, so they never overlap. Coordinates are z-up to match maths.

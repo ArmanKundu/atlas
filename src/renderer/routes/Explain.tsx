@@ -88,9 +88,15 @@ export function Explain() {
     key: string
     lesson: Lesson
     rowId: string | null
+    /** The scene to pick up from (after an interruption). */
+    start?: number
   } | null>(null)
   /** A lesson paused to ask a follow-up about, to come back to. */
-  const [parent, setParent] = useState<{ lesson: Lesson; rowId: string | null } | null>(null)
+  const [parent, setParent] = useState<{
+    lesson: Lesson
+    rowId: string | null
+    scene: number
+  } | null>(null)
   const [scene, setScene] = useState(0)
   const [ask, setAsk] = useState('')
   const [streamKey, setStreamKey] = useState('')
@@ -135,8 +141,11 @@ export function Explain() {
   const streaming = stream.state.status === 'writing'
   const streamLesson = stream.state.status === 'idle' ? null : (stream.state.lesson ?? null)
 
-  const showing: Lesson | null = opened?.lesson ?? streamLesson
-  const live = !opened && streaming
+  // While the tutor answers an interruption, the paused lesson stays up until the answer starts.
+  const answering = !!parent && !!streamLesson
+  const showing: Lesson | null = answering ? streamLesson : (opened?.lesson ?? streamLesson)
+  const live = streaming && (!opened || answering)
+  const thinking = !!parent && streaming && !streamLesson
 
   const addFiles = async (files: File[]): Promise<void> => {
     const added: Attachment[] = []
@@ -190,11 +199,39 @@ export function Explain() {
     setDraft('')
   }
 
+  /**
+   * The student interrupts: the lesson pauses, the tutor answers on the same board (in words, a
+   * quick drawing or a short animation), then the lesson picks up where it stopped.
+   */
+  const askAside = (question: string, at: number): void => {
+    const base = parent?.lesson ?? opened?.lesson ?? streamLesson
+    if (!base || !question.trim()) return
+    if (!parent) setParent({ lesson: base, rowId: opened?.rowId ?? null, scene: at })
+    if (!opened) setOpened({ key: streamKey, lesson: base, rowId: null })
+    const next = request(question.trim(), { lesson: JSON.stringify(base), scene: at })
+    setError(null)
+    setShareNote(null)
+    setStreamKey(`s-${Date.now()}`)
+    lastRequest.current = next
+    void stream.start(next)
+  }
+
+  const backToParent = (): void => {
+    if (!parent) return
+    stream.cancel()
+    stream.reset()
+    setOpened({
+      key: `p-${Date.now()}`,
+      lesson: parent.lesson,
+      rowId: parent.rowId,
+      start: parent.scene,
+    })
+    setParent(null)
+  }
+
   const askFollowUp = (): void => {
-    if (!showing || !ask.trim()) return
-    const rowId = opened?.rowId ?? null
-    setParent({ lesson: showing, rowId })
-    begin(request(ask.trim(), { lesson: JSON.stringify(showing), scene }))
+    if (!ask.trim()) return
+    askAside(ask, scene)
     setAsk('')
   }
 
@@ -385,15 +422,7 @@ export function Explain() {
               {parent ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    stream.cancel()
-                    setOpened({
-                      key: `p-${Date.now()}`,
-                      lesson: parent.lesson,
-                      rowId: parent.rowId,
-                    })
-                    setParent(null)
-                  }}
+                  onClick={backToParent}
                   className="flex h-8 items-center gap-1.5 rounded-md px-2 text-ink-2 hover:bg-hover hover:text-ink"
                 >
                   Back to “{parent.lesson.title}”
@@ -439,10 +468,14 @@ export function Explain() {
             </div>
             {lesson ? (
               <Player
-                key={opened?.key ?? streamKey}
+                key={answering ? streamKey : (opened?.key ?? streamKey)}
                 lesson={lesson}
                 live={live}
+                startScene={answering ? 0 : (opened?.start ?? 0)}
                 onScene={setScene}
+                onAsk={askAside}
+                busy={thinking}
+                onEnded={answering ? backToParent : undefined}
               />
             ) : (
               <Writing chars={stream.state.status === 'writing' ? stream.state.chars : 0} />

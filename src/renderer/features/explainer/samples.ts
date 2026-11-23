@@ -61,6 +61,60 @@ const SODIUM = {
   ],
 }
 
-export const SAMPLE_LESSONS: Lesson[] = [AREA, SODIUM]
+const PLANE = {
+  title: 'A plane and its normal',
+  subject: 'Specialist Mathematics',
+  theme: 'board',
+  scenes: [
+    {
+      title: 'A plane and its normal',
+      say: 'Here is the plane x plus y plus z equals three. Drag the picture to turn it around and see it from any side.',
+      model: {
+        camera: [7, -8, 5],
+        objects: [
+          { k: 'axes', size: 4 },
+          {
+            k: 'surface',
+            fn: '3 - x - y',
+            x: [-1, 3],
+            y: [-1, 3],
+            c: 'teal',
+            opacity: 0.75,
+            label: 'x + y + z = 3',
+          },
+        ],
+      },
+      items: [
+        { t: 'text', text: 'The plane:' },
+        { t: 'math', tex: 'x + y + z = 3', c: 'teal' },
+      ],
+    },
+    {
+      say: 'The numbers in front of x, y and z give a vector that sticks straight out of the plane. We call it the normal.',
+      model: {
+        camera: [7, -8, 5],
+        objects: [
+          { k: 'axes', size: 4 },
+          { k: 'surface', fn: '3 - x - y', x: [-1, 3], y: [-1, 3], c: 'teal', opacity: 0.75 },
+          { k: 'sphere', at: [1, 1, 1], r: 0.12, c: 'yellow', label: 'P(1, 1, 1)' },
+          { k: 'arrow', from: [1, 1, 1], to: [2.2, 2.2, 2.2], c: 'red', label: 'n = (1, 1, 1)' },
+        ],
+      },
+      items: [{ t: 'math', tex: '\\vec n = \\begin{pmatrix}1\\\\1\\\\1\\end{pmatrix}', c: 'red' }],
+      check: {
+        q: 'What is a normal to the plane 2x − y + 5z = 7?',
+        options: ['(2, −1, 5)', '(2, 1, 5)', '(7, 7, 7)'],
+        answer: 0,
+        why: 'Read the coefficients of x, y and z, signs included.',
+      },
+    },
+    {
+      say: 'So any plane a x plus b y plus c z equals d has normal a, b, c. That is the key idea.',
+      items: [{ t: 'math', tex: 'ax + by + cz = d \\Rightarrow \\vec n = (a, b, c)', c: 'yellow' }],
+    },
+  ],
+}
+
+export const SAMPLE_LESSONS: Lesson[] = [AREA, PLANE, SODIUM]
   .map((raw) => parseLesson(JSON.stringify(raw)))
   .filter((l): l is Lesson => l !== null)

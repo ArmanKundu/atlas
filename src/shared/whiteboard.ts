@@ -377,7 +377,7 @@ export function parseBoardPartial(code: string): Board | null {
 
 type Node =
   | { k: 'n'; v: number }
-  | { k: 'x' }
+  | { k: 'x'; i: number }
   | { k: 'u'; op: '-'; a: Node }
   | { k: 'b'; op: '+' | '-' | '*' | '/' | '^'; a: Node; b: Node }
   | { k: 'f'; name: string; a: Node }
@@ -403,15 +403,34 @@ const CONSTS: Record<string, number> = { pi: Math.PI, e: Math.E }
  * maths functions are allowed, so nothing the assistant writes can run as code.
  */
 export function compileFormula(source: string): ((x: number) => number) | null {
+  const run = compileExpression(source, ['x'])
+  return run ? (x) => run([x]) : null
+}
+
+/**
+ * Like compileFormula, for formulas in several variables (a surface z = f(x, y), a curve in t).
+ * Values are passed in the same order as `vars`. "xy" means x times y.
+ */
+export function compileExpression(
+  source: string,
+  vars: readonly string[],
+): ((values: number[]) => number) | null {
   const text = source
     .toLowerCase()
-    .replace(/^\s*y\s*=/, '')
+    .replace(/^\s*[a-z]\s*=/, '')
     .replace(/π/g, 'pi')
     .replace(/[×·]/g, '*')
     .replace(/÷/g, '/')
     .replace(/−/g, '-')
     .replace(/\*\*/g, '^')
-  const tokens = text.match(/\d*\.?\d+(?:e[+-]?\d+)?|[a-z]+|[-+*/^()]|\S/g) ?? []
+  const tokens = (text.match(/\d*\.?\d+(?:e[+-]?\d+)?|[a-z]+|[-+*/^()]|\S/g) ?? []).flatMap((t) =>
+    /^[a-z]{2,}$/.test(t) &&
+    !(t in CONSTS) &&
+    !(t in FUNCS) &&
+    [...t].every((c) => vars.includes(c))
+      ? [...t]
+      : [t],
+  )
   let i = 0
   const peek = (): string | undefined => tokens[i]
   const next = (): string | undefined => tokens[i++]
@@ -464,7 +483,7 @@ export function compileFormula(source: string): ((x: number) => number) | null {
       return inner
     }
     if (/^\d*\.?\d/.test(t)) return { k: 'n', v: Number(t) }
-    if (t === 'x') return { k: 'x' }
+    if (vars.includes(t)) return { k: 'x', i: vars.indexOf(t) }
     if (t in CONSTS) return { k: 'n', v: CONSTS[t] ?? 0 }
     if (t in FUNCS) {
       // sin x and sin(x) both work.
@@ -480,12 +499,12 @@ export function compileFormula(source: string): ((x: number) => number) | null {
   } catch {
     return null
   }
-  const run = (n: Node, x: number): number => {
+  const run = (n: Node, x: number[]): number => {
     switch (n.k) {
       case 'n':
         return n.v
       case 'x':
-        return x
+        return x[n.i] ?? 0
       case 'u':
         return -run(n.a, x)
       case 'f':
@@ -501,5 +520,5 @@ export function compileFormula(source: string): ((x: number) => number) | null {
       }
     }
   }
-  return (x) => run(tree, x)
+  return (values) => run(tree, values)
 }

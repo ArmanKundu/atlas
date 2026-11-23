@@ -75,8 +75,10 @@ import {
   type Lesson,
   type LessonColor,
   type LessonItem,
+  type LessonModel,
   type LessonTheme,
 } from '@shared/lesson'
+import { Model3D } from './Model3D'
 import { LabelPlacer, textWidth, type Anchor, type Box } from '@shared/label-layout'
 
 export const STAGE_W = 1600
@@ -222,6 +224,9 @@ interface BoardState {
   left: Placed[]
   diagram: Placed[]
   split: boolean
+  /** A 3D model on the diagram side, and how far its scene has played. */
+  model: LessonModel | null
+  modelP: number
 }
 
 const LEFT_TYPES = new Set(['text', 'math'])
@@ -248,7 +253,11 @@ function boardAt(lesson: Lesson, scene: number, t: number, seconds: number[]): B
   }
   const stretch = lesson.scenes.slice(start, end)
   const hasLeft = stretch.some((s) => s.items.some((it) => LEFT_TYPES.has(it.t)))
-  const hasDiagram = stretch.some((s) => s.graph || s.items.some((it) => !LEFT_TYPES.has(it.t)))
+  const hasDiagram = stretch.some(
+    (s) => s.graph || s.model || s.items.some((it) => !LEFT_TYPES.has(it.t)),
+  )
+  let model: LessonModel | null = null
+  let modelP = 1
 
   let title = ''
   let graph: Graph | null = null
@@ -258,6 +267,10 @@ function boardAt(lesson: Lesson, scene: number, t: number, seconds: number[]): B
     if (!s) continue
     if (s.title) title = s.title
     if (s.graph) graph = s.graph
+    if (s.model) {
+      model = s.model
+      modelP = i < scene ? 1 : Math.min(1, t / Math.max(0.5, (seconds[i] ?? 6) * 0.7))
+    }
     const times = sceneTimeline(s, seconds[i] ?? 6)
     s.items.forEach((item, k) => {
       const slot = times[k] ?? { start: 0, end: 0 }
@@ -287,6 +300,8 @@ function boardAt(lesson: Lesson, scene: number, t: number, seconds: number[]): B
     left: live.filter((x) => LEFT_TYPES.has(x.item.t)),
     diagram: live.filter((x) => !LEFT_TYPES.has(x.item.t)),
     split: hasLeft && hasDiagram,
+    model,
+    modelP,
   }
 }
 
@@ -486,6 +501,7 @@ export function Stage({
   if (board.left.length && board.split)
     placer.reserve({ x: leftX - 20, y: top, w: leftW + 30, h: STAGE_H - top })
   if (caption) placer.reserve({ x: 0, y: STAGE_H - bottomRoom, w: STAGE_W, h: bottomRoom })
+  if (board.model) placer.reserve(frame)
 
   const curves = new Map<string, (x: number) => number>()
   for (const { item } of board.diagram) {
@@ -1343,6 +1359,21 @@ export function Stage({
           </div>
         ) : null}
         <div className="absolute inset-0">{html}</div>
+        {board.model ? (
+          <div
+            className="absolute"
+            style={{ left: frame.x, top: frame.y - 20, width: frame.w, height: frame.h + 20 }}
+          >
+            <Model3D
+              model={board.model}
+              progress={board.modelP}
+              colors={theme.colors}
+              ink={theme.colors.ink}
+              width={frame.w}
+              height={frame.h + 20}
+            />
+          </div>
+        ) : null}
         {caption ? (
           <div className="absolute right-0 bottom-6 left-0 flex justify-center px-24">
             <p

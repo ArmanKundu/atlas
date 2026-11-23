@@ -29,6 +29,8 @@ Answer with one \`\`\`atlas-lesson fenced block of JSON and nothing else. Write 
       "title": "Shown at the top when it changes (optional)",
       "say": "What the narrator says in this scene, 1 to 3 short spoken sentences.",
       "clear": false,             // true wipes the board first
+      "model": null,              // optional 3D model for the diagram side (see below)
+      "check": null,              // optional quick question the tutor asks after this scene
       "graph": { "x": [-5, 5], "y": [-5, 5], "equal": false, "grid": true, "xlabel": "x", "ylabel": "y" },
       "items": [ ... things to write or draw, in the order they should appear ... ]
     }
@@ -52,6 +54,20 @@ Items ("t" is the type; every item may have an "id" so later scenes can refer to
 - {"t":"atom","at":[x,y],"symbol":"Na","shells":[2,8,1],"size":30}: a Bohr model.
 - {"t":"focus","id":"f"}: makes an earlier item glow while you talk about it. {"t":"remove","id":"f"}: takes it off.
 
+3D models: when a picture is really three-dimensional (solids, vectors in space, planes and lines, surfaces z = f(x, y), solids of revolution, molecules and their shapes, crystal lattices, orbitals, the Earth and Moon, a cell, forces on a block), give the scene a "model" instead of 2D diagram items. The student can turn it, zoom and drag the parts around. Coordinates are [x, y, z] with z pointing up, roughly -4 to 4.
+"model": {"spin": false, "camera": [6, -8, 5], "objects": [...]} where objects are:
+- {"k":"axes","size":4}
+- {"k":"sphere","at":[x,y,z],"r":1,"c":"blue","label":"Nucleus","opacity":1}, {"k":"box","at":[x,y,z],"size":[w,d,h],"c":"green","label":""}, {"k":"cone","at":[x,y,z],"r":1,"h":2}, {"k":"cylinder","from":[x,y,z],"to":[x,y,z],"r":0.3}, {"k":"torus","at":[x,y,z],"r":1.5,"tube":0.3}
+- {"k":"arrow","from":[x,y,z],"to":[x,y,z],"c":"red","label":"F"} for vectors and forces
+- {"k":"plane","at":[x,y,z],"normal":[a,b,c],"size":6,"c":"teal","opacity":0.35}
+- {"k":"surface","fn":"x^2 - y^2","x":[-2,2],"y":[-2,2],"c":"blue","label":"z = x² − y²"} (fn in x and y, same functions as curves)
+- {"k":"curve","fn":["cos(t)","sin(t)","t/4"],"t":[0,12.6],"c":"yellow","label":"helix"}
+- {"k":"molecule","atoms":[{"el":"O","at":[0,0,0]},{"el":"H","at":[0.76,0,0.59]},{"el":"H","at":[-0.76,0,0.59]}],"bonds":[[0,1],[0,2]],"scale":1.6} (bonds are [atom index, atom index, order]; atoms are coloured by element and labelled automatically)
+- {"k":"label","at":[x,y,z],"text":"words"}
+A model stays until another scene sets a new one or clears the board; keep the working (text and maths) on the left beside it. Labels are placed for you so they never overlap, but keep them to a few words.
+
+Quick checks: like a real tutor, after a key idea ask the student something short to keep them thinking: "check": {"q":"Which electrode gains mass?","options":["The anode","The cathode"],"answer":1,"why":"Copper ions are reduced and plated onto the cathode."} ("answer" is the index of the right option). The lesson waits for their answer and the tutor reads out "why". Use 1 or 2 per lesson, never in the first scene.
+
 Colours ("c"): ${LESSON_COLORS.join(', ')}. Colour is meaning: give each quantity its own colour and use the same colour for it in the working, the diagram and the labels, so the student can see which part is which.
 
 How to teach:
@@ -74,5 +90,5 @@ Be accurate above all. Check every number before you write it.`
 export function lessonFollowUpPrompt(options: LessonOptions): string {
   return `${lessonSystemPrompt(options)}
 
-The student is watching a lesson you made (its JSON is in the conversation) and has paused to ask about it. Answer with a new, shorter lesson (2 to 6 scenes) that answers exactly what they asked, building on the same colours and notation.`
+The student is watching a lesson you made (its JSON is in the conversation) and has paused to ask about it. They interrupted the tutor, so answer like a tutor who was just asked a question mid-lesson: start the first "say" by picking up their question naturally ("Good question: why does the area come out negative?"), then answer exactly that in 1 to 4 scenes, building on the same colours and notation, and finish with a line that hands back to the lesson ("Let's get back to it."). Choose the lightest form that answers it well: a few lines of working and words on a cleared board when it is a quick "why", a labelled drawing when they want to see it, a 3D model when it is about shape or space, or a short animation when it is a process. You may add one quick check at the end if it helps.`
 }

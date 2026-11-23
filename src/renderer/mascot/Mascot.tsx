@@ -92,6 +92,8 @@ export interface MascotProps {
   /** Accessible name. Leave out when the mascot is decorative. */
   label?: string
   className?: string
+  /** How open its mouth is, 0 to 1, for talking (the Explainer's tutor). No mouth when left out. */
+  mouth?: MotionValue<number>
 }
 
 /**
@@ -107,6 +109,7 @@ export function Mascot({
   interactive = true,
   label,
   className,
+  mouth,
 }: MascotProps) {
   const reducedMotion = useReducedMotion() ?? false
   const clipBase = useId()
@@ -231,6 +234,7 @@ export function Mascot({
               still={reducedMotion}
             />
           ))}
+          {mouth ? <MouthView open={mouth} palette={palette} /> : null}
           {accessory === 'none' ? null : <Accessory kind={accessory} palette={palette} />}
         </svg>
       </motion.div>
@@ -308,6 +312,19 @@ function EyeView({
       </g>
     </motion.g>
   )
+}
+
+/** A small mouth under the eyes that opens with the voice. */
+function MouthView({
+  open,
+  palette,
+}: {
+  open: MotionValue<number>
+  palette: { body: string; eye: string; pupil: string }
+}) {
+  const ry = useTransform(open, (v) => 1.6 + Math.min(1, Math.max(0, v)) * 8)
+  const rx = useTransform(open, (v) => 9 - Math.min(1, Math.max(0, v)) * 2)
+  return <motion.ellipse cx={101} cy={140} rx={rx} ry={ry} fill={palette.eye} />
 }
 
 function Accessory({
