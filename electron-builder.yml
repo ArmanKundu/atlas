@@ -19,6 +19,9 @@ asarUnpack:
   - node_modules/onnxruntime-node/**
   - node_modules/node-llama-cpp/**
   - node_modules/@node-llama-cpp/**
+  # sharp (needed by transformers.js for dictation) loads a native addon and libvips.
+  - node_modules/sharp/**
+  - node_modules/@img/**
 
 mac:
   category: public.app-category.education

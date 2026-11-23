@@ -20,7 +20,14 @@ try {
   await page.getByLabel('Your name').fill('Packaged')
   await page.getByRole('button', { name: 'Create profile' }).click()
   await page.getByRole('button', { name: 'Get started' }).click()
-  for (let i = 0; i < 5; i++) await page.getByRole('button', { name: 'Next' }).click()
+  // Click through setup (optional steps have Skip) until Atlas can be opened.
+  for (let i = 0; i < 12; i++) {
+    if (await page.getByRole('button', { name: 'Open Atlas' }).isVisible()) break
+    const skip = page.getByRole('button', { name: 'Skip' })
+    if (await skip.isVisible()) await skip.click()
+    else await page.getByRole('button', { name: 'Next' }).click()
+    await page.waitForTimeout(300)
+  }
   await page.getByRole('button', { name: 'Open Atlas' }).click()
   await page.getByRole('navigation', { name: 'Main' }).waitFor()
   const info = await page.evaluate(async () => {
@@ -32,6 +39,20 @@ try {
       stats: (await call('stats:summary')).counts,
     }
   })
+  // Dictation loads Whisper through transformers.js, which needs sharp's native files to be
+  // unpacked from the asar archive. A missing one broke the mic in an earlier build.
+  const speech = await app.evaluate(({ app: electronApp }) => {
+    try {
+      const { createRequire } = process.getBuiltinModule('node:module')
+      const load = createRequire(`${electronApp.getAppPath()}/package.json`)
+      load('sharp')
+      load('onnxruntime-node')
+      return 'ok'
+    } catch (error) {
+      return String(error).slice(0, 300)
+    }
+  })
+  if (speech !== 'ok') errors.push(`dictation runtime: ${speech}`)
   console.warn(
     JSON.stringify(
       {
@@ -41,6 +62,7 @@ try {
         arch: info.app.arch,
         ai: info.ai,
         stats: info.stats,
+        speech,
         errors,
       },
       null,
