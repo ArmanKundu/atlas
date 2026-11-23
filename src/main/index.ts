@@ -105,6 +105,9 @@ async function main(): Promise<void> {
   const profiles = new ProfileManager(join(app.getPath('userData'), 'profiles'), log)
   const secrets = new SecretStore(join(app.getPath('userData'), 'secrets.json'))
   const ai = new AiService({
+    onChanged: (what, id) => {
+      if (what === 'library') broadcast(windows(), 'library:changed', { sourceId: id })
+    },
     profiles,
     secrets,
     log,
@@ -336,6 +339,21 @@ async function main(): Promise<void> {
     })
   }
   openWindow()
+
+  // First run: fetch the small on-device AI in the background, so dictation follow-ups, titles
+  // and quick jobs work without an account. Only once; removing it in Settings keeps it removed.
+  if (!testUserData && prefs.get().localAiAuto) {
+    setTimeout(() => {
+      void (async () => {
+        try {
+          if ((await localModels.installed()).length === 0) await localModels.download('qwen3-1.7b')
+          await prefs.set({ localAiAuto: false })
+        } catch (error) {
+          log.warn(`on-device AI download failed: ${String(error)}`)
+        }
+      })()
+    }, 20_000)
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) openWindow()

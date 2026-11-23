@@ -33,6 +33,7 @@ import {
   type ChatTurn,
 } from './providers'
 import type { SecretStore } from './secrets'
+import { localModels } from './local-model'
 
 const STOPWORDS = new Set(
   'about after again also because been before being between both could does doing during each from further have having here into more most other over same should some such than that their them then there these they this those through under until very were what when where which while will with would your explain question answer please'.split(
@@ -94,6 +95,8 @@ function toChatMessage(row: Row): ChatMessage {
 }
 
 export interface AiServiceDeps {
+  /** Something the AI changed in the background (a tidier title). */
+  onChanged?: (what: 'chats' | 'library', id: string) => void
   profiles: ProfileManager
   secrets: SecretStore
   log: Logger
@@ -226,8 +229,9 @@ export class AiService {
       ...(PROVIDER_IDS.includes(preferred as ProviderId) ? [preferred as ProviderId] : []),
       ...(config.defaultProvider ? [config.defaultProvider] : []),
     ]
-    // With no explicit choice anywhere, "No AI" stays off rather than picking a provider silently.
-    if (wanted.length === 0) return []
+    // With no explicit choice anywhere, use the AI on this computer if it is there; otherwise
+    // "No AI" stays off rather than picking an account silently.
+    if (wanted.length === 0) return ready.has('atlas-local') ? ['atlas-local'] : []
     return [...new Set([...wanted, ...PROVIDER_IDS])].filter((id) => ready.has(id))
   }
 
@@ -295,6 +299,54 @@ export class AiService {
       }
     }
     throw lastError
+  }
+
+  /**
+   * Small jobs (titles, tidying) run on the AI on this computer: instant, free and private, even
+   * when an account is connected. Returns null when it is not installed or gives nothing useful.
+   */
+  async quick(system: string, prompt: string): Promise<string | null> {
+    try {
+      if (!(await localModels.installed()).length) return null
+      const result = await streamFrom(
+        'atlas-local',
+        {
+          system,
+          messages: [{ role: 'user', content: prompt }],
+          model: null,
+          signal: AbortSignal.timeout(60_000),
+          maxTokens: 40,
+          onText: () => undefined,
+        },
+        this.ctx('atlas-local'),
+      )
+      const line = result.text
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .split('\n')
+        .map((l) => l.replace(/^["'#*\s]+|["'*.\s]+$/g, ''))
+        .find(Boolean)
+      return line && line.length <= 90 ? line : null
+    } catch {
+      return null
+    }
+  }
+
+  /** Gives an imported file a clear title from its first page, unless the student renamed it. */
+  async titleSource(sourceId: string, fileTitle: string): Promise<void> {
+    const db = this.db()
+    const first = db.all(
+      'SELECT text FROM pages WHERE source_id = ? ORDER BY number LIMIT 1',
+      sourceId,
+    )[0]
+    const text = String(first?.['text'] ?? '').slice(0, 1500)
+    if (text.trim().length < 40) return
+    const title = await this.quick(
+      'Write a clear title of at most eight words for this study document, like "2023 Chemistry Exam 2" or "Stoichiometry practice questions". Use the year, subject and paper if they appear. Output only the title, with no quotes.',
+      `File name: ${fileTitle}\n\nFirst page:\n${text}`,
+    )
+    if (!title || this.db().get('sources', sourceId)?.['title'] !== fileTitle) return
+    this.db().update('sources', sourceId, { title })
+    this.deps.onChanged?.('library', sourceId)
   }
 
   /* ---------- Chat ---------- */
@@ -385,8 +437,13 @@ export class AiService {
       }),
     )
     if (chat['title'] === 'New chat') {
-      db.update('chats', chatId, {
-        title: content.replace(/\s+/g, ' ').trim().slice(0, 64) || 'New chat',
+      const rough = content.replace(/\s+/g, ' ').trim().slice(0, 64) || 'New chat'
+      db.update('chats', chatId, { title: rough })
+      // A tidy title from the AI on this computer, if it is installed.
+      void this.quick(TASK_PROMPTS.title, content.slice(0, 1500)).then((title) => {
+        if (!title || this.db().get('chats', chatId)?.['title'] !== rough) return
+        this.db().update('chats', chatId, { title })
+        this.deps.onChanged?.('chats', chatId)
       })
     } else db.update('chats', chatId, {})
 

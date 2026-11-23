@@ -80,6 +80,8 @@ export function Explain() {
   const [exam, setExam] = useSetting<boolean>('explainer.exam', false)
   const [quiz, setQuiz] = useSetting<boolean>('explainer.quiz', true)
   const [walkthrough, setWalkthrough] = useState(false)
+  /** Talking with the tutor out loud: it keeps listening after each answer. */
+  const [conversation, setConversation] = useState(false)
   const [autoShare] = useSetting<boolean>('explainer.autoShare', true)
   const [params] = useSearchParams()
   const [handledLink, setHandledLink] = useState<string | null>(null)
@@ -217,7 +219,12 @@ export function Explain() {
     if (!base || !question.trim()) return
     if (!parent) setParent({ lesson: base, rowId: opened?.rowId ?? null, scene: at })
     if (!opened) setOpened({ key: streamKey, lesson: base, rowId: null })
-    const next = request(question.trim(), { lesson: JSON.stringify(base), scene: at })
+    // In a conversation the next question builds on whatever is on the board now.
+    const context = answering && streamLesson ? streamLesson : base
+    const next = request(question.trim(), {
+      lesson: JSON.stringify(context),
+      scene: answering ? Math.min(at, context.scenes.length - 1) : at,
+    })
     setError(null)
     setShareNote(null)
     setStreamKey(`s-${Date.now()}`)
@@ -226,6 +233,7 @@ export function Explain() {
   }
 
   const backToParent = (): void => {
+    setConversation(false)
     if (!parent) return
     stream.cancel()
     stream.reset()
@@ -361,7 +369,7 @@ export function Explain() {
             value={style}
             onChange={setStyle}
             options={[
-              { value: 'clear', label: 'Clear' },
+              { value: 'clear', label: 'Serious' },
               { value: 'fun', label: 'Fun' },
             ]}
           />
@@ -527,6 +535,9 @@ export function Explain() {
                 onEnded={answering ? backToParent : undefined}
                 tutor={features.tutor}
                 models3d={features.models3d}
+                fun={style === 'fun'}
+                conversation={conversation}
+                onConversation={setConversation}
               />
             ) : (
               <Writing chars={stream.state.status === 'writing' ? stream.state.chars : 0} />

@@ -23,6 +23,7 @@ describe('PrefsStore', () => {
       theme: 'system',
       sidebarCollapsed: false,
       lastProfileId: null,
+      localAiAuto: true,
     })
   })
 
@@ -37,6 +38,7 @@ describe('PrefsStore', () => {
       theme: 'dark',
       sidebarCollapsed: true,
       lastProfileId: null,
+      localAiAuto: true,
     })
   })
 
@@ -51,6 +53,7 @@ describe('PrefsStore', () => {
       theme: 'dark',
       sidebarCollapsed: true,
       lastProfileId: null,
+      localAiAuto: true,
     })
     expect(await readdir(join(dir, 'nested'))).toEqual(['prefs.json'])
   })
@@ -62,6 +65,7 @@ describe('PrefsStore', () => {
       theme: 'system',
       sidebarCollapsed: false,
       lastProfileId: null,
+      localAiAuto: true,
     })
     expect(await readFile(join(dir, 'prefs.json.corrupt'), 'utf8')).toBe('{ this is not json')
   })
@@ -79,6 +83,7 @@ describe('PrefsStore', () => {
       theme: 'light',
       sidebarCollapsed: false,
       lastProfileId: null,
+      localAiAuto: true,
     })
   })
 })

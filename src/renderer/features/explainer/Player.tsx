@@ -1,11 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUp, Captions, Check, Hand, Loader2, Pause, Play, RotateCcw, X } from 'lucide-react'
+import {
+  ArrowUp,
+  Captions,
+  Check,
+  Hand,
+  Loader2,
+  Mic,
+  Pause,
+  Play,
+  RotateCcw,
+  Square,
+  X,
+} from 'lucide-react'
 import { speakingSeconds, subtitleAt, type Lesson } from '@shared/lesson'
 import { useLive } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { call } from '@/lib/ipc'
 import { useSetting } from '@/lib/settings'
 import { MicButton } from '@/features/voice/MicButton'
+import { listen, transcribe, type Listening } from '@/features/voice/mic'
+import { errorMessage } from '@/lib/ipc'
 import { clip, lessonAudio } from './audio'
 import { Stage } from './Stage'
 import { Tutor } from './Tutor'
@@ -28,6 +42,9 @@ export function Player({
   busy = false,
   tutor = true,
   models3d = true,
+  conversation = false,
+  onConversation,
+  fun = false,
 }: {
   lesson: Lesson
   live?: boolean
@@ -44,6 +61,11 @@ export function Player({
   tutor?: boolean
   /** Interactive 3D models (the admin can turn these off). */
   models3d?: boolean
+  /** Talking with the tutor: it listens again whenever it finishes explaining. */
+  conversation?: boolean
+  onConversation?: (on: boolean) => void
+  /** Fun mode: the tutor hypes and teases instead of being polite. */
+  fun?: boolean
 }) {
   const onAsk = tutor ? askProp : undefined
   const [voiceOn] = useSetting<boolean>('whiteboard.voice', true)
@@ -68,6 +90,11 @@ export function Player({
   const [question, setQuestion] = useState('')
   const [lineTalking, setLineTalking] = useState(false)
   const line = useRef<AudioBufferSourceNode | null>(null)
+  // Talking out loud: listening, then turning speech into text.
+  const [talk, setTalk] = useState<'idle' | 'listening' | 'hearing'>('idle')
+  const [level, setLevel] = useState(0)
+  const [heard, setHeard] = useState<string | null>(null)
+  const session = useRef<Listening | null>(null)
 
   /** The tutor says one line outside the lesson's narration (a question, feedback). */
   const sayLine = useCallback(
@@ -135,6 +162,68 @@ export function Player({
     source.current = null
   }, [])
 
+  /**
+   * The student talks: the tutor stops, listens until they pause, and answers on the board. At
+   * the end of a lesson in a conversation, silence means they are done.
+   */
+  const listenNow = useCallback(
+    async (afterEnd = false): Promise<void> => {
+      if (!onAsk || session.current) return
+      stopAudio()
+      try {
+        line.current?.stop()
+      } catch {
+        // already stopped
+      }
+      setPlaying(false)
+      setAsking(false)
+      setHeard(null)
+      setMood('thinking')
+      try {
+        const listening = await listen({ autoStop: true, onLevel: setLevel })
+        session.current = listening
+        setTalk('listening')
+        const pcm = await listening.done
+        session.current = null
+        setTalk('hearing')
+        const text = await transcribe(pcm)
+        setTalk('idle')
+        setLevel(0)
+        if (text) {
+          setHeard(text)
+          setMood('idle')
+          onAsk(text, scene)
+        } else if (afterEnd) {
+          setMood('idle')
+          onConversation?.(false)
+          onEnded?.()
+        } else {
+          setMood('concerned')
+          setHeard("I didn't catch that. Tap Talk and try again.")
+        }
+      } catch (e) {
+        session.current = null
+        setTalk('idle')
+        setLevel(0)
+        setMood('concerned')
+        onConversation?.(false)
+        setHeard(
+          /denied|NotAllowed/i.test(String(e))
+            ? 'I need the microphone. Allow Atlas in System Settings → Privacy & Security → Microphone.'
+            : errorMessage(e),
+        )
+      }
+    },
+    [onAsk, onConversation, onEnded, scene, stopAudio],
+  )
+  const listenRef = useRef(listenNow)
+  const convoRef = useRef(conversation)
+  useEffect(() => {
+    listenRef.current = listenNow
+    convoRef.current = conversation
+  })
+  useEffect(() => () => session.current?.stop(), [])
+
   // The clock for the current scene: the voice when there is one, otherwise the wall clock.
   useEffect(() => {
     if (!playing) return
@@ -165,7 +254,9 @@ export function Player({
         } else if (live) setWaiting(true)
         else {
           setPlaying(false)
-          onEnded?.()
+          // In a conversation the tutor waits for the student's next question.
+          if (convoRef.current && onAsk) void listenRef.current(true)
+          else onEnded?.()
         }
         return
       }
@@ -260,7 +351,15 @@ export function Player({
     const right = i === check.answer
     setMood(right ? 'happy' : 'concerned')
     void sayLine(
-      `${right ? 'Yes, nice one!' : `Not quite. It's ${check.options[check.answer] ?? ''}.`} ${check.why}`,
+      `${
+        right
+          ? fun
+            ? "Let's gooo, you're locked in!"
+            : 'Yes, nice one!'
+          : fun
+            ? `Nah bro, not even close. It's ${check.options[check.answer] ?? ''}.`
+            : `Not quite. It's ${check.options[check.answer] ?? ''}.`
+      } ${check.why}`,
     )
   }
   const carryOn = (): void => {
@@ -278,12 +377,22 @@ export function Player({
     } else onEnded?.()
   }
   const tutorNote = busy
-    ? 'Good question, let me show you…'
-    : asking
-      ? 'What would you like to know?'
-      : !playing && !ended && checking === null && onAsk
-        ? 'Paused. Ask me anything with ✋'
-        : null
+    ? heard
+      ? `“${heard.length > 80 ? `${heard.slice(0, 80)}…` : heard}” Let me show you…`
+      : 'Good question, let me show you…'
+    : talk === 'listening'
+      ? conversation && ended
+        ? 'Anything else? I’m listening…'
+        : 'I’m listening…'
+      : talk === 'hearing'
+        ? 'Got it, one sec…'
+        : heard && mood === 'concerned'
+          ? heard
+          : asking
+            ? 'What would you like to know?'
+            : !playing && !ended && checking === null && onAsk
+              ? 'Paused. Ask me anything with ✋'
+              : null
 
   return (
     <div className="group/player overflow-hidden rounded-2xl bg-black shadow-pop ring-1 ring-line">
@@ -470,6 +579,57 @@ export function Player({
         <span className="mr-2 font-mono text-2xs text-white/50">
           {live ? 'writing…' : clock(total)}
         </span>
+        {onAsk ? (
+          <button
+            type="button"
+            aria-pressed={conversation}
+            title="Interrupt and talk to the tutor. It keeps listening after each answer until you stop."
+            onClick={() => {
+              if (talk === 'listening') {
+                session.current?.stop()
+                return
+              }
+              if (conversation) {
+                onConversation?.(false)
+                return
+              }
+              onConversation?.(true)
+              void listenNow()
+            }}
+            disabled={busy || talk === 'hearing'}
+            className={cn(
+              'relative mr-1 flex h-8 items-center gap-1.5 rounded-full px-3 text-2xs font-medium disabled:opacity-40',
+              talk === 'listening'
+                ? 'bg-danger text-white'
+                : conversation
+                  ? 'bg-white text-black hover:bg-white/90'
+                  : 'bg-white/15 hover:bg-white/25',
+            )}
+          >
+            {talk === 'listening' ? (
+              <>
+                <span
+                  aria-hidden
+                  className="absolute inset-0 rounded-full bg-danger/40"
+                  style={{
+                    transform: `scale(${1 + level * 0.25})`,
+                    transition: 'transform 80ms linear',
+                  }}
+                />
+                <Square className="relative size-3 fill-current" aria-hidden />
+                <span className="relative">Done</span>
+              </>
+            ) : talk === 'hearing' ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden /> Listening…
+              </>
+            ) : (
+              <>
+                <Mic className="size-4" aria-hidden /> {conversation ? 'Talking' : 'Talk'}
+              </>
+            )}
+          </button>
+        ) : null}
         {onAsk ? (
           <button
             type="button"

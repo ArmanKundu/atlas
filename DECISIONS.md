@@ -219,3 +219,15 @@ The owner wants AI that works on weak laptops with no account or limits, and a w
   chapter per part, in depth, up to 60 scenes. "Quiz me" turns the tutor's quick checks on or off.
 - If an AI reply cannot be read as a lesson, Atlas asks once more for a clean block; an empty
   reply is reported as a connection problem instead of a vague failure.
+
+## D-032 Talk mode, Fun/Serious tutor and the local model by default (2026-11-23)
+
+- "Talk" in the lesson player turns on hands-free conversation: Atlas listens (Whisper, local),
+  answers with a short follow-up lesson on the same board (redrawing with changed numbers when
+  asked "what if…"), then listens again. Silence after a lesson ends the conversation.
+- Style is now Fun or Serious. Fun is a Gen Z hype-man that teases to motivate but is never
+  mean, personal or crude, and keeps the maths rigorous. Serious is calm exam-style teaching.
+- On first run Atlas downloads the small local model (Qwen3 1.7B, about 1.1 GB) in the
+  background once (pref `localAiAuto`). It is used for quick jobs even when Claude is connected:
+  file and chat titles. It is the fallback when no other AI is set up. It is too small for
+  lesson JSON, so lessons still prefer a connected provider.

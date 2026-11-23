@@ -72,6 +72,8 @@ export const PrefsSchema = z.object({
   theme: ThemeSchema.default('system'),
   sidebarCollapsed: z.boolean().default(false),
   lastProfileId: z.string().nullable().default(null),
+  /** Atlas downloads its small on-device AI once, on first run. Off once done or declined. */
+  localAiAuto: z.boolean().default(true),
 })
 export type Prefs = z.infer<typeof PrefsSchema>
 
@@ -80,6 +82,7 @@ export const PrefsPatchSchema = z
     theme: ThemeSchema,
     sidebarCollapsed: z.boolean(),
     lastProfileId: z.string().nullable(),
+    localAiAuto: z.boolean(),
   })
   .partial()
   .strict()

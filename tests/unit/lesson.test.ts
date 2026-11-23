@@ -88,7 +88,7 @@ describe('explainer helpers', () => {
     expect(prompt).toContain('atlas-lesson')
     expect(prompt).toContain('flask')
     expect(prompt).toContain('Exam mode')
-    expect(prompt).toContain('playful')
+    expect(prompt).toContain('FUN MODE')
   })
 })
 

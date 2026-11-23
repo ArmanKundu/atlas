@@ -223,12 +223,21 @@ export function registerDataHandlers(deps: DataHandlerDeps): void {
     if (picked.canceled || picked.filePaths.length === 0) return []
     const rows = await importPaths(db(), filesDir(), { subjectId, paths: picked.filePaths, kind })
     emit.libraryChanged(null)
+    tidyTitles(rows)
     return rows
   })
+
+  /** Text files have their pages straight away; PDFs get a title once their text is read. */
+  const tidyTitles = (rows: Row[]): void => {
+    for (const row of rows)
+      if (row['ingestStatus'] === 'ready')
+        void ai.titleSource(String(row['id']), String(row['title'] ?? ''))
+  }
 
   registry.handle('library:importPaths', async ({ subjectId, paths, kind }) => {
     const rows = await importPaths(db(), filesDir(), { subjectId, paths, kind })
     emit.libraryChanged(null)
+    tidyTitles(rows)
     return rows
   })
 
@@ -237,6 +246,8 @@ export function registerDataHandlers(deps: DataHandlerDeps): void {
   registry.handle('library:savePages', ({ sourceId, pages }) => {
     savePages(db(), sourceId, pages)
     emit.libraryChanged(sourceId)
+    const row = db().get('sources', sourceId)
+    if (row) void ai.titleSource(sourceId, String(row['title'] ?? ''))
   })
 
   registry.handle('library:setStatus', ({ sourceId, status, error }) => {
